@@ -980,10 +980,34 @@ function getDb() {
     db = {
       users: users !== null ? parseArrayData(JSON.parse(users), []) : (isInit ? [] : INITIAL_USERS),
       invitations: (invitations !== null ? parseArrayData(JSON.parse(invitations), []) : (isInit ? [] : INITIAL_INVITATIONS)).map(inv => {
-        if (inv.config?.scratchImage && typeof inv.config.scratchImage === 'string' && inv.config.scratchImage.includes('photo-1519225495810-7512c696505a')) {
-          return { ...inv, config: { ...inv.config, scratchImage: "" } };
-        }
-        return inv;
+        let cleanWishes = Array.isArray(inv.wishes) ? inv.wishes : [];
+        const seenW = new Set();
+        cleanWishes = cleanWishes.filter(w => {
+          const k = (w.sender || "").trim().toLowerCase();
+          if (!k || seenW.has(k)) return false;
+          seenW.add(k);
+          return true;
+        });
+
+        let cleanRsvps = Array.isArray(inv.rsvps) ? inv.rsvps : [];
+        const seenR = new Set();
+        cleanRsvps = cleanRsvps.filter(r => {
+          const k = (r.name || "").trim().toLowerCase();
+          if (!k || seenR.has(k)) return false;
+          seenR.add(k);
+          return true;
+        });
+
+        const updatedConfig = (inv.config?.scratchImage && typeof inv.config.scratchImage === 'string' && inv.config.scratchImage.includes('photo-1519225495810-7512c696505a'))
+          ? { ...inv.config, scratchImage: "" }
+          : inv.config;
+
+        return {
+          ...inv,
+          wishes: cleanWishes,
+          rsvps: cleanRsvps,
+          config: updatedConfig
+        };
       }),
       presets: (presets !== null ? parseArrayData(JSON.parse(presets), []) : (isInit ? [] : INITIAL_PRESETS)).filter(p => !deletedPresetIds.includes(p.id)),
       bgPresets: (bgPresets !== null ? parseArrayData(JSON.parse(bgPresets), []) : (isInit ? [] : INITIAL_BG_PRESETS)).filter(p => !deletedBgPresetIds.includes(p.id)),
@@ -1289,21 +1313,159 @@ export const dbStore = {
     window.dispatchEvent(new Event("db_synced"));
     return true;
   },
+  ensureInvitationCached(inv) {
+    if (!inv || !inv.id) return;
+    const db = getDb();
+    const idx = db.invitations.findIndex(i => i.id === inv.id);
+
+    const sanitizeWishes = (list) => {
+      if (!Array.isArray(list)) return [];
+      const seen = new Set();
+      return list.filter(w => {
+        const k = (w.sender || "").trim().toLowerCase();
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    };
+
+    const sanitizeRsvps = (list) => {
+      if (!Array.isArray(list)) return [];
+      const seen = new Set();
+      return list.filter(r => {
+        const k = (r.name || "").trim().toLowerCase();
+        if (!k || seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+    };
+
+    const targetWishes = sanitizeWishes(Array.isArray(inv.wishes) ? inv.wishes : (idx !== -1 ? db.invitations[idx].wishes : []));
+    const targetRsvps = sanitizeRsvps(Array.isArray(inv.rsvps) ? inv.rsvps : (idx !== -1 ? db.invitations[idx].rsvps : []));
+
+    if (idx === -1) {
+      db.invitations.push({
+        ...inv,
+        rsvps: targetRsvps,
+        wishes: targetWishes
+      });
+    } else {
+      db.invitations[idx] = {
+        ...db.invitations[idx],
+        ...inv,
+        rsvps: targetRsvps,
+        wishes: targetWishes
+      };
+    }
+    saveDb(db);
+  },
   submitRsvp(invitationId, rsvp) {
     const db = getDb();
-    const idx = db.invitations.findIndex(inv => inv.id === invitationId);
-    if (idx === -1) return false;
-    db.invitations[idx].rsvps = [rsvp, ...db.invitations[idx].rsvps];
+    let idx = db.invitations.findIndex(inv => inv.id === invitationId);
+    if (idx === -1) {
+      db.invitations.push({
+        id: invitationId,
+        title: "Wedding Invitation",
+        config: DEFAULT_CONFIG,
+        rsvps: [],
+        wishes: []
+      });
+      idx = db.invitations.length - 1;
+    }
+
+    if (!Array.isArray(db.invitations[idx].rsvps)) {
+      db.invitations[idx].rsvps = [];
+    }
+
+    // Clean any existing duplicates first
+    const seenGuests = new Set();
+    const sanitizedRsvps = [];
+    for (const r of db.invitations[idx].rsvps) {
+      const k = (r.name || "").trim().toLowerCase();
+      if (!k || seenGuests.has(k)) continue;
+      seenGuests.add(k);
+      sanitizedRsvps.push(r);
+    }
+    db.invitations[idx].rsvps = sanitizedRsvps;
+
+    const trimmedName = (rsvp.name || "").trim().toLowerCase();
+    const existingIndex = db.invitations[idx].rsvps.findIndex(
+      r => (r.name || "").trim().toLowerCase() === trimmedName
+    );
+
+    let updated = false;
+    if (existingIndex !== -1) {
+      // Update existing RSVP: guest can edit guest count and attendance
+      db.invitations[idx].rsvps[existingIndex] = {
+        ...db.invitations[idx].rsvps[existingIndex],
+        ...rsvp,
+        name: rsvp.name.trim(),
+        count: Number(rsvp.count) || 1,
+        updatedAt: new Date().toISOString()
+      };
+      updated = true;
+    } else {
+      // Add new RSVP
+      db.invitations[idx].rsvps = [
+        {
+          ...rsvp,
+          name: rsvp.name.trim(),
+          count: Number(rsvp.count) || 1,
+          createdAt: new Date().toISOString()
+        },
+        ...db.invitations[idx].rsvps
+      ];
+    }
+
     saveDb(db);
-    return true;
+    window.dispatchEvent(new Event("db_synced"));
+    return { success: true, updated, rsvps: db.invitations[idx].rsvps };
   },
   submitWish(invitationId, wish) {
     const db = getDb();
-    const idx = db.invitations.findIndex(inv => inv.id === invitationId);
-    if (idx === -1) return false;
-    db.invitations[idx].wishes = [wish, ...db.invitations[idx].wishes];
+    let idx = db.invitations.findIndex(inv => inv.id === invitationId);
+    if (idx === -1) {
+      db.invitations.push({
+        id: invitationId,
+        title: "Wedding Invitation",
+        config: DEFAULT_CONFIG,
+        rsvps: [],
+        wishes: []
+      });
+      idx = db.invitations.length - 1;
+    }
+
+    if (!Array.isArray(db.invitations[idx].wishes)) {
+      db.invitations[idx].wishes = [];
+    }
+
+    // Deduplicate existing wishes first to purge any past duplicates
+    const seenSenders = new Set();
+    const sanitizedWishes = [];
+    for (const w of db.invitations[idx].wishes) {
+      const k = (w.sender || "").trim().toLowerCase();
+      if (!k || seenSenders.has(k)) continue;
+      seenSenders.add(k);
+      sanitizedWishes.push(w);
+    }
+    db.invitations[idx].wishes = sanitizedWishes;
+
+    const trimmedSender = (wish.sender || "").trim().toLowerCase();
+    if (seenSenders.has(trimmedSender)) {
+      throw new Error(`A blessing has already been posted by "${wish.sender.trim()}". Only one blessing is permitted per guest name.`);
+    }
+
+    const newWish = {
+      ...wish,
+      sender: wish.sender.trim(),
+      createdAt: wish.createdAt || new Date().toISOString()
+    };
+
+    db.invitations[idx].wishes = [newWish, ...sanitizedWishes];
+
     saveDb(db);
-    return true;
+    window.dispatchEvent(new Event("db_synced"));
+    return { success: true, wishes: db.invitations[idx].wishes };
   },
 
   // --- PRESETS ---

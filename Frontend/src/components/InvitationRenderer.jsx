@@ -461,6 +461,7 @@ const ScratchCardShield = React.memo(
 );
 
 export default function InvitationRenderer({ 
+  invitationId = 'default',
   config: propConfig, 
   rsvps = [], 
   wishes = [], 
@@ -584,8 +585,15 @@ export default function InvitationRenderer({
     };
   }, [isDragging, dragOffset]);
 
-  // RSVP Form state
-  const [rsvpForm, setRsvpForm] = useState({ name: "", email: "", attending: "yes", count: 1, note: "" });
+  // RSVP Form state with automatic recall for guest
+  const [rsvpForm, setRsvpForm] = useState(() => {
+    try {
+      const saved = localStorage.getItem(`ds_guest_rsvp_${invitationId}`);
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return { name: "", email: "", attending: "yes", count: 1, note: "" };
+  });
+
   // Wish Form state
   const [wishForm, setWishForm] = useState({ sender: "", message: "" });
 
@@ -1426,24 +1434,67 @@ export default function InvitationRenderer({
     return () => window.removeEventListener('triggerCelebrationPreview', handlePreview);
   }, [config.celebrationParticleType]);
 
+  // Identify if this guest has already registered an RSVP
+  const existingRsvpForGuest = useMemo(() => {
+    if (!rsvpForm.name.trim()) return null;
+    return (rsvps || []).find(r => (r.name || "").trim().toLowerCase() === rsvpForm.name.trim().toLowerCase());
+  }, [rsvps, rsvpForm.name]);
+
+  // Ensure displayed blessings are strictly 1 per sender name (deduplicated)
+  const uniqueWishes = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    for (const w of (wishes || [])) {
+      const senderKey = (w.sender || "").trim().toLowerCase();
+      if (!senderKey || seen.has(senderKey)) continue;
+      seen.add(senderKey);
+      result.push(w);
+    }
+    return result;
+  }, [wishes]);
+
+  // Identify if the currently entered sender name has already posted a blessing
+  const existingBlessingForSender = useMemo(() => {
+    const typed = (wishForm.sender || "").trim().toLowerCase();
+    if (!typed) return null;
+    return uniqueWishes.find(w => (w.sender || "").trim().toLowerCase() === typed);
+  }, [uniqueWishes, wishForm.sender]);
+
   const handleRsvpFormSubmit = (e) => {
     e.preventDefault();
     if (!rsvpForm.name.trim()) return;
     
+    // Remember this guest's response on this device for seamless editing later
+    try {
+      localStorage.setItem(`ds_guest_rsvp_${invitationId}`, JSON.stringify(rsvpForm));
+    } catch (err) {}
+
     if (onSubmitRsvp) {
       onSubmitRsvp(rsvpForm);
-      setRsvpForm({ name: "", email: "", attending: "yes", count: 1, note: "" });
     }
   };
 
   const handleWishFormSubmit = (e) => {
     e.preventDefault();
-    if (!wishForm.sender.trim() || !wishForm.message.trim()) return;
+    const sender = (wishForm.sender || "").trim();
+    const message = (wishForm.message || "").trim();
+    if (!sender || !message) return;
+
+    // Check if this guest already shared a blessing
+    const alreadyPosted = uniqueWishes.some(
+      w => (w.sender || "").trim().toLowerCase() === sender.toLowerCase()
+    );
+    if (alreadyPosted) {
+      alert(`A blessing has already been posted by "${sender}". Only one blessing is permitted per guest name.`);
+      return;
+    }
 
     if (onSubmitWish) {
-      onSubmitWish(wishForm);
-      setWishForm({ sender: "", message: "" });
+      onSubmitWish({ sender, message });
     }
+
+    // Reset inputs so multiple people/names can post their own blessings!
+    setWishForm({ sender: "", message: "" });
   };
 
   const isLightBackground = useMemo(() => {
@@ -3545,12 +3596,32 @@ export default function InvitationRenderer({
                 {/* RSVP Form */}
                 {config.showRsvpForm !== false && (
                   <form onSubmit={handleRsvpFormSubmit} className="space-y-4">
+                    {existingRsvpForGuest && (
+                      <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-[10px] flex items-center space-x-1.5 font-medium animate-fade-in">
+                        <SvgCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                        <span>Registered RSVP found. You can adjust your guest count or attendance below and update your response.</span>
+                      </div>
+                    )}
                     <div>
                       <label className="text-[9px] uppercase tracking-wider font-bold opacity-90 block mb-1">Full Name *</label>
                       <input
                         type="text"
                         value={rsvpForm.name}
-                        onChange={(e) => setRsvpForm(prev => ({ ...prev, name: e.target.value }))}
+                        onChange={(e) => {
+                          const newName = e.target.value;
+                          const match = (rsvps || []).find(r => (r.name || "").trim().toLowerCase() === newName.trim().toLowerCase());
+                          if (match) {
+                            setRsvpForm(prev => ({ 
+                              ...prev, 
+                              name: newName, 
+                              attending: match.attending || prev.attending, 
+                              count: match.count !== undefined ? match.count : prev.count, 
+                              note: match.note || prev.note 
+                            }));
+                          } else {
+                            setRsvpForm(prev => ({ ...prev, name: newName }));
+                          }
+                        }}
                         className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs focus:outline-none focus:border-amber-500/50"
                         placeholder="Your name(s)"
                         required
@@ -3570,12 +3641,14 @@ export default function InvitationRenderer({
                         </select>
                       </div>
                       <div>
-                        <label className="text-[9px] uppercase tracking-wider font-bold opacity-90 block mb-1">Guests</label>
+                        <label className="text-[9px] uppercase tracking-wider font-bold opacity-90 block mb-1">
+                          Guests {existingRsvpForGuest && <span className="text-amber-400 font-bold">(Edit Count)</span>}
+                        </label>
                         <input
-                          type="number" min="1" max="10"
+                          type="number" min="1" max="25"
                           value={rsvpForm.count}
                           onChange={(e) => setRsvpForm(prev => ({ ...prev, count: parseInt(e.target.value) || 1 }))}
-                          className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs focus:outline-none"
+                          className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs focus:outline-none focus:border-amber-400"
                         />
                       </div>
                     </div>
@@ -3592,10 +3665,10 @@ export default function InvitationRenderer({
                     <button
                       type="submit"
                       style={customStyles.glassButton}
-                      className="glass-btn-hover w-full px-5 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-semibold flex items-center justify-center space-x-2"
+                      className="glass-btn-hover w-full px-5 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-semibold flex items-center justify-center space-x-2 cursor-pointer"
                     >
-                      <SvgSend className="w-3.5 h-3.5" />
-                      <span>Confirm RSVP</span>
+                      {existingRsvpForGuest ? <SvgCheck className="w-3.5 h-3.5 text-emerald-400" /> : <SvgSend className="w-3.5 h-3.5" />}
+                      <span>{existingRsvpForGuest ? `Update RSVP (Guest Count: ${rsvpForm.count})` : "Confirm RSVP"}</span>
                     </button>
                   </form>
                 )}
@@ -3624,9 +3697,13 @@ export default function InvitationRenderer({
                             {isModerator && onDeleteRsvp && (
                               <button
                                 type="button"
-                                onClick={() => onDeleteRsvp(idx)}
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to delete the RSVP response for "${r.name}"? Only the customer who ordered this invite or the platform admin can perform this.`)) {
+                                    onDeleteRsvp(idx);
+                                  }
+                                }}
                                 className="p-1 rounded text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition cursor-pointer"
-                                title="Delete RSVP response"
+                                title="Delete RSVP response (Invite Owner / Admin only)"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
                                   <polyline points="3 6 5 6 21 6"></polyline>
@@ -3692,24 +3769,44 @@ export default function InvitationRenderer({
                       required
                     />
                   </div>
+
+                  {existingBlessingForSender && (
+                    <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs space-y-1 animate-fade-in">
+                      <div className="flex items-center space-x-1.5 font-semibold text-amber-300">
+                        <SvgHeart className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="currentColor" />
+                        <span>Blessing already posted by "{existingBlessingForSender.sender}"</span>
+                      </div>
+                      <p className="italic text-[11px] text-slate-100 pl-5">"{existingBlessingForSender.message}"</p>
+                      <p className="text-[10px] text-amber-400/90 pl-5 pt-0.5">
+                        ✓ Only one blessing is permitted per guest name. To post a blessing for another person, please change the name above.
+                      </p>
+                    </div>
+                  )}
+
                   <div>
                     <label className="text-[9px] uppercase tracking-wider font-bold opacity-90 block mb-1">Your Blessing *</label>
                     <textarea
                       value={wishForm.message}
                       onChange={(e) => setWishForm(prev => ({ ...prev, message: e.target.value }))}
                       rows={3}
-                      className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs focus:outline-none focus:border-amber-500/50 resize-none"
-                      placeholder="Write a heartfelt message for the couple..."
-                      required
+                      disabled={!!existingBlessingForSender}
+                      className={`w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs focus:outline-none focus:border-amber-500/50 resize-none ${
+                        existingBlessingForSender ? "opacity-50 cursor-not-allowed bg-black/20" : ""
+                      }`}
+                      placeholder={existingBlessingForSender ? "This guest has already shared their blessing" : "Write a heartfelt message for the couple..."}
+                      required={!existingBlessingForSender}
                     />
                   </div>
                   <button
                     type="submit"
+                    disabled={!!existingBlessingForSender}
                     style={customStyles.glassButton}
-                    className="glass-btn-hover w-full px-5 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-semibold flex items-center justify-center space-x-2"
+                    className={`w-full px-5 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-semibold flex items-center justify-center space-x-2 transition ${
+                      existingBlessingForSender ? "opacity-50 cursor-not-allowed bg-white/5" : "glass-btn-hover cursor-pointer"
+                    }`}
                   >
                     <SvgHeart className="w-3.5 h-3.5" fill="currentColor" />
-                    <span>Send Blessings</span>
+                    <span>{existingBlessingForSender ? "Blessing Already Posted for this Name" : "Send Blessings"}</span>
                   </button>
                 </form>
 
@@ -3717,12 +3814,12 @@ export default function InvitationRenderer({
                 <div className="space-y-3 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
                   <h3 className="text-xs font-semibold flex items-center space-x-2 mb-4">
                     <SvgMessageSquare className="w-4 h-4" style={customStyles.colorAccent} />
-                    <span>Blessings Posted ({wishes.length})</span>
+                    <span>Blessings Posted ({uniqueWishes.length})</span>
                   </h3>
-                  {wishes.length === 0 ? (
+                  {uniqueWishes.length === 0 ? (
                     <p className="text-[10px] opacity-50 italic text-center py-6">No blessings posted yet. Send your love and wishes above!</p>
                   ) : (
-                    wishes.map((w, idx) => (
+                    uniqueWishes.map((w, idx) => (
                       <div key={idx} className="p-3 rounded-xl bg-white/5 border border-white/5 space-y-1">
                         <div className="flex items-center justify-between text-xs">
                           <p className="font-semibold">{w.sender}</p>
@@ -3731,9 +3828,13 @@ export default function InvitationRenderer({
                             {isModerator && onDeleteWish && (
                               <button
                                 type="button"
-                                onClick={() => onDeleteWish(idx)}
+                                onClick={() => {
+                                  if (window.confirm(`Are you sure you want to delete the blessing by "${w.sender}"? Only the customer who ordered this invite or the platform admin can perform this.`)) {
+                                    onDeleteWish(idx);
+                                  }
+                                }}
                                 className="p-1 rounded text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition cursor-pointer"
-                                title="Delete Wish blessing"
+                                title="Delete Blessing (Invite Owner / Admin only)"
                               >
                                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
                                   <polyline points="3 6 5 6 21 6"></polyline>

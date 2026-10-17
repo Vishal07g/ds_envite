@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
 import { ref, get } from 'firebase/database';
 import { database } from '../utils/firebase';
@@ -157,40 +157,97 @@ export default function InvitationView() {
   }, [invitation]);
 
   const handleRsvpSubmit = async (form) => {
-    if (id === "demo") {
-      setInvitation(prev => ({
-        ...prev,
-        rsvps: [form, ...prev.rsvps]
-      }));
-      showToast("RSVP Submitted to Demo Invitation!", "success");
-      return;
-    }
+    try {
+      const guestName = (form.name || "").trim().toLowerCase();
+      let updatedRsvps = [...(invitation?.rsvps || [])];
+      const existingIdx = updatedRsvps.findIndex(r => (r.name || "").trim().toLowerCase() === guestName);
 
-    // submit via dbStore (which automatically syncs to Firebase)
-    dbStore.submitRsvp(id, form);
-    showToast("Thank you! Your RSVP has been saved.", "success");
-    loadData();
+      if (id === "demo") {
+        if (existingIdx !== -1) {
+          updatedRsvps[existingIdx] = { 
+            ...updatedRsvps[existingIdx], 
+            attending: form.attending,
+            count: Number(form.count) || 1,
+            note: form.note || "",
+            updatedAt: new Date().toISOString()
+          };
+          showToast(`RSVP updated! Guest count set to ${form.count}.`, "success");
+        } else {
+          updatedRsvps = [{ ...form, count: Number(form.count) || 1, createdAt: new Date().toISOString() }, ...updatedRsvps];
+          showToast("Thank you! Your RSVP has been confirmed.", "success");
+        }
+        setInvitation(prev => ({
+          ...prev,
+          rsvps: updatedRsvps
+        }));
+        return;
+      }
+
+      // Ensure local store has this invitation
+      if (invitation) {
+        dbStore.ensureInvitationCached(invitation);
+      }
+
+      const res = dbStore.submitRsvp(id, form);
+      if (res && res.updated) {
+        showToast(`RSVP updated! Guest count set to ${form.count}.`, "success");
+      } else {
+        showToast("Thank you! Your RSVP has been confirmed.", "success");
+      }
+
+      if (res && res.rsvps) {
+        setInvitation(prev => ({
+          ...prev,
+          rsvps: res.rsvps
+        }));
+      }
+    } catch (err) {
+      showToast(err.message || "Failed to submit RSVP", "error");
+    }
   };
 
   const handleWishSubmit = async (form) => {
-    const wishData = {
-      ...form,
-      date: new Date().toLocaleDateString('en-GB') + " " + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-    };
+    try {
+      const senderName = (form.sender || "").trim().toLowerCase();
+      const existing = (invitation?.wishes || []).find(w => (w.sender || "").trim().toLowerCase() === senderName);
+      if (existing) {
+        showToast(`A blessing has already been posted by "${form.sender.trim()}". Only one blessing is permitted per guest name.`, "info");
+        return;
+      }
 
-    if (id === "demo") {
-      setInvitation(prev => ({
-        ...prev,
-        wishes: [wishData, ...prev.wishes]
-      }));
-      showToast("Blessing Posted to Demo Invitation!", "success");
-      return;
+      const wishData = {
+        ...form,
+        sender: form.sender.trim(),
+        date: new Date().toLocaleDateString('en-GB') + " " + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+      };
+
+      if (id === "demo") {
+        setInvitation(prev => {
+          const filtered = (prev.wishes || []).filter(w => (w.sender || "").trim().toLowerCase() !== senderName);
+          return {
+            ...prev,
+            wishes: [wishData, ...filtered]
+          };
+        });
+        showToast("Thank you! Your blessing has been posted.", "success");
+        return;
+      }
+
+      if (invitation) {
+        dbStore.ensureInvitationCached(invitation);
+      }
+      const res = dbStore.submitWish(id, wishData);
+      showToast("Thank you! Your beautiful blessing has been posted.", "success");
+
+      if (res && res.wishes) {
+        setInvitation(prev => ({
+          ...prev,
+          wishes: res.wishes
+        }));
+      }
+    } catch (err) {
+      showToast(err.message || "Failed to post blessing", "error");
     }
-
-    // submit via dbStore (which automatically syncs to Firebase)
-    dbStore.submitWish(id, wishData);
-    showToast("Thank you! Your beautiful wish has been posted.", "success");
-    loadData();
   };
 
   const handleDeleteRsvp = async (indexToDelete) => {
@@ -198,23 +255,37 @@ export default function InvitationView() {
       currentUser &&
       currentUser.id &&
       (
+        currentUser.role === 'admin' ||
         (invitation?.customerId && currentUser.id === invitation.customerId) ||
-        currentUser.role === 'admin'
+        (invitation?.customerEmail && currentUser.email && currentUser.email.toLowerCase() === invitation.customerEmail.toLowerCase()) ||
+        (dbStore.getOrders?.() || []).some(o => o.customerId === currentUser.id && (o.id === invitation?.orderId || o.details?.invitationId === invitation?.id))
       )
     );
     if (!authorized) {
-      showToast("Unauthorized delete attempt.", "error");
+      showToast("Access Denied: Only the customer who ordered this invitation or the platform admin can delete RSVP responses.", "error");
       return;
     }
 
-    const displayedRsvps = invitation?.rsvps || [];
     const itemToDelete = displayedRsvps[indexToDelete];
     if (!itemToDelete) return;
 
     // Filter and update local + cloud
-    const filtered = displayedRsvps.filter(
-      r => !(r.name === itemToDelete.name && r.note === itemToDelete.note)
+    const filtered = (invitation?.rsvps || []).filter(
+      r => !(
+        (r.name || "").trim().toLowerCase() === (itemToDelete.name || "").trim().toLowerCase() && 
+        r.note === itemToDelete.note
+      )
     );
+
+    if (id === "demo") {
+      setInvitation(prev => ({
+        ...prev,
+        rsvps: filtered
+      }));
+      showToast("RSVP response removed.", "info");
+      return;
+    }
+
     dbStore.updateInvitation(id, { rsvps: filtered });
     showToast("RSVP response removed successfully.", "success");
     loadData();
@@ -225,23 +296,37 @@ export default function InvitationView() {
       currentUser &&
       currentUser.id &&
       (
+        currentUser.role === 'admin' ||
         (invitation?.customerId && currentUser.id === invitation.customerId) ||
-        currentUser.role === 'admin'
+        (invitation?.customerEmail && currentUser.email && currentUser.email.toLowerCase() === invitation.customerEmail.toLowerCase()) ||
+        (dbStore.getOrders?.() || []).some(o => o.customerId === currentUser.id && (o.id === invitation?.orderId || o.details?.invitationId === invitation?.id))
       )
     );
     if (!authorized) {
-      showToast("Unauthorized delete attempt.", "error");
+      showToast("Access Denied: Only the customer who ordered this invitation or the platform admin can delete blessings.", "error");
       return;
     }
 
-    const displayedWishes = invitation?.wishes || [];
     const itemToDelete = displayedWishes[indexToDelete];
     if (!itemToDelete) return;
 
     // Filter and update local + cloud
-    const filtered = displayedWishes.filter(
-      w => !(w.sender === itemToDelete.sender && w.message === itemToDelete.message)
+    const filtered = (invitation?.wishes || []).filter(
+      w => !(
+        (w.sender || "").trim().toLowerCase() === (itemToDelete.sender || "").trim().toLowerCase() && 
+        (w.message || "").trim() === (itemToDelete.message || "").trim()
+      )
     );
+
+    if (id === "demo") {
+      setInvitation(prev => ({
+        ...prev,
+        wishes: filtered
+      }));
+      showToast("Blessing wish removed.", "info");
+      return;
+    }
+
     dbStore.updateInvitation(id, { wishes: filtered });
     showToast("Blessing wish removed successfully.", "success");
     loadData();
@@ -302,6 +387,47 @@ export default function InvitationView() {
     }
   };
 
+  // Strict check: if marked paid anywhere in db, it IS paid!
+  const isPaid = !!(invitation?.isPaid || invitation?.config?.isPaid);
+  const showWatermark = !isPaid;
+
+  // Compute moderator access: ONLY the customer who ordered the invite or the platform admin
+  const isModerator = !!(
+    currentUser &&
+    currentUser.id &&
+    invitation &&
+    (
+      currentUser.role === 'admin' ||
+      (invitation.customerId && currentUser.id === invitation.customerId) ||
+      (invitation.customerEmail && currentUser.email && currentUser.email.toLowerCase() === invitation.customerEmail.toLowerCase()) ||
+      (dbStore.getOrders?.() || []).some(o => o.customerId === currentUser.id && (o.id === invitation.orderId || o.details?.invitationId === invitation.id))
+    )
+  );
+
+  const displayedRsvps = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    for (const r of (invitation?.rsvps || [])) {
+      const nameKey = (r.name || "").trim().toLowerCase();
+      if (!nameKey || seen.has(nameKey)) continue;
+      seen.add(nameKey);
+      result.push(r);
+    }
+    return result;
+  }, [invitation?.rsvps]);
+
+  const displayedWishes = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    for (const w of (invitation?.wishes || [])) {
+      const senderKey = (w.sender || "").trim().toLowerCase();
+      if (!senderKey || seen.has(senderKey)) continue;
+      seen.add(senderKey);
+      result.push(w);
+    }
+    return result;
+  }, [invitation?.wishes]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#070b19] text-amber-200 flex flex-col items-center justify-center space-y-4 p-4 font-sans select-none">
@@ -349,23 +475,6 @@ export default function InvitationView() {
       </div>
     );
   }
-
-  // Strict check: if marked paid anywhere in db, it IS paid!
-  const isPaid = !!(invitation.isPaid || invitation.config?.isPaid);
-  const showWatermark = !isPaid;
-
-  // Compute moderator access: logged in user who owns the invite, or administrator
-  const isModerator = !!(
-    currentUser &&
-    currentUser.id &&
-    (
-      (invitation.customerId && currentUser.id === invitation.customerId) ||
-      currentUser.role === 'admin'
-    )
-  );
-
-  const displayedRsvps = invitation.rsvps || [];
-  const displayedWishes = invitation.wishes || [];
 
   return (
     <div 
@@ -537,6 +646,7 @@ export default function InvitationView() {
       />
 
       <InvitationRenderer
+        invitationId={id}
         config={invitation.config}
         rsvps={displayedRsvps}
         wishes={displayedWishes}
