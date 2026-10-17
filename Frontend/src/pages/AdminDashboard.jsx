@@ -11,6 +11,8 @@ import CustomDialog from '../components/CustomDialog';
 import ThemeEditorModal from '../components/ThemeEditorModal';
 import PaymentModal from '../components/PaymentModal';
 import InvoiceModal from '../components/InvoiceModal';
+import ShareInviteModal from '../components/ShareInviteModal';
+import { downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
 
 function LogoBrandingManager({ showToast }) {
   const initialSettings = dbStore.getBrandSettings();
@@ -977,6 +979,7 @@ export default function AdminDashboard() {
   const [expandedOrderIds, setExpandedOrderIds] = useState({});
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
+  const [shareModalData, setShareModalData] = useState({ isOpen: false, invitation: null });
   const [, setTick] = useState(0);
 
   const toggleOrderExpand = (orderId) => {
@@ -1197,11 +1200,12 @@ export default function AdminDashboard() {
     });
   };
 
-  const handleCopyLink = (id, paid) => {
-    const origin = window.location.origin;
-    const shareUrl = `${origin}/invite/${id}${paid ? '' : '?preview=true'}`;
-    navigator.clipboard.writeText(shareUrl);
-    showToast("Invitation link copied to clipboard!", "success");
+  const handleCopyLink = (id, paid, invObj = null) => {
+    const targetInv = invObj || invitations.find(i => i.id === id);
+    setShareModalData({
+      isOpen: true,
+      invitation: targetInv || { id, isPaid: paid }
+    });
   };
 
   return (
@@ -1372,11 +1376,22 @@ export default function AdminDashboard() {
                           </td>
                           <td className="py-4 text-right space-x-1 whitespace-nowrap">
                             <button
-                              onClick={() => handleCopyLink(inv.id, inv.isPaid)}
-                              className="p-2 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition"
-                              title="Copy Share Link"
+                              onClick={() => handleCopyLink(inv.id, inv.isPaid, inv)}
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 text-xs font-semibold transition inline-flex items-center space-x-1"
+                              title="Share Independent Invitation Link (No Login Required)"
                             >
-                              <SvgCopy className="w-4 h-4" />
+                              <SvgCopy className="w-3.5 h-3.5" />
+                              <span>Share</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                downloadStandaloneHtmlWebsite(inv.config, inv);
+                                showToast("Standalone HTML Website downloaded! Opens directly without any login.", "success");
+                              }}
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 text-xs font-semibold transition inline-flex items-center space-x-1"
+                              title="Download Independent HTML Website (Zero Login, Zero Server Dependencies)"
+                            >
+                              <span>🌐 HTML</span>
                             </button>
                             <Link
                               to={`/invite/${inv.id}`}
@@ -2268,6 +2283,13 @@ export default function AdminDashboard() {
       />
 
       <CustomDialog {...dialog} themeConfig={{ primaryColor: '#0b1329', accentGold: '#e5b858' }} />
+
+      <ShareInviteModal
+        isOpen={shareModalData.isOpen}
+        onClose={() => setShareModalData({ isOpen: false, invitation: null })}
+        invitation={shareModalData.invitation}
+        showToast={showToast}
+      />
     </div>
   );
 }

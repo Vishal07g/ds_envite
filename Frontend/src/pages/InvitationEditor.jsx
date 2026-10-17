@@ -10,7 +10,8 @@ import Toast from '../components/Toast';
 import PaymentModal from '../components/PaymentModal';
 import AiAssistantModal from '../components/AiAssistantModal';
 import GuestManagerModal from '../components/GuestManagerModal';
-import { downloadPrintablePdfCard, downloadInvitationImage } from '../utils/exportInvitation';
+import ShareInviteModal from '../components/ShareInviteModal';
+import { downloadPrintablePdfCard, downloadInvitationImage, downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
 
 export default function InvitationEditor() {
   const { id } = useParams();
@@ -32,6 +33,7 @@ export default function InvitationEditor() {
   // AI & Guest Manager Modals
   const [showAiModal, setShowAiModal] = useState(false);
   const [showGuestModal, setShowGuestModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // UI state
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -302,6 +304,18 @@ export default function InvitationEditor() {
             </button>
 
             <button
+              onClick={() => {
+                downloadStandaloneHtmlWebsite(config, { id });
+                showToast("Standalone HTML website downloaded! Opens in any browser with zero login.", "success");
+              }}
+              className="editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer text-amber-700 hover:text-amber-600 bg-amber-500/10"
+              title="Download 100% Independent Standalone Interactive HTML Website (Runs offline & online without any login)"
+            >
+              <span className="text-xs">🌐</span>
+              <span className="hidden sm:inline">HTML Website</span>
+            </button>
+
+            <button
               onClick={() => setPreviewEnvelope(!previewEnvelope)}
               className={`editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer ${
                 previewEnvelope ? 'editor-toolbar-btn-active' : ''
@@ -327,12 +341,12 @@ export default function InvitationEditor() {
 
             {id && (
               <button
-                onClick={handleCopyLink}
-                className="editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer"
-                title="Copy share link"
+                onClick={() => setShowShareModal(true)}
+                className="editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer bg-gradient-to-r from-amber-400/20 to-yellow-500/20 text-[#513321] border-amber-500/40"
+                title="Share Invitation Website (Copy Link, WhatsApp, Standalone HTML)"
               >
                 <SvgCopy className="w-4 h-4 shrink-0 text-[#68472D]" />
-                <span className="hidden md:inline">Copy Link</span>
+                <span>Share Link</span>
               </button>
             )}
 
@@ -446,6 +460,15 @@ export default function InvitationEditor() {
             dbStore.updateInvitation(id, { guestList: newList });
           }
         }}
+      />
+
+      <ShareInviteModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        invitationId={id}
+        config={config}
+        isPaid={isPaid}
+        showToast={showToast}
       />
     </div>
   );
