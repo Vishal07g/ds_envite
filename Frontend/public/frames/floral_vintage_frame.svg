@@ -1,0 +1,252 @@
+<svg width="800" height="1200" viewBox="0 0 800 1200" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Realistic 3D Antique & Yellow Gold Multi-Stop Metallic Gradient -->
+    <linearGradient id="realGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8C631B"/>
+      <stop offset="18%" stop-color="#D4AF37"/>
+      <stop offset="35%" stop-color="#FFFDF0"/>
+      <stop offset="50%" stop-color="#E5BE4A"/>
+      <stop offset="68%" stop-color="#B88A28"/>
+      <stop offset="82%" stop-color="#FFF5CE"/>
+      <stop offset="100%" stop-color="#7A5210"/>
+    </linearGradient>
+
+    <!-- Realistic Sculpted Rose Gold Metallic Gradient -->
+    <linearGradient id="realRoseGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8F3E48"/>
+      <stop offset="25%" stop-color="#D98A92"/>
+      <stop offset="45%" stop-color="#FFF5F6"/>
+      <stop offset="60%" stop-color="#E89BA2"/>
+      <stop offset="80%" stop-color="#F2BAC0"/>
+      <stop offset="100%" stop-color="#7A2D37"/>
+    </linearGradient>
+
+    <!-- Bevel Specular Light & Shadow Gradients -->
+    <linearGradient id="lightBevel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFFDF5" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#D4AF37" stop-opacity="0.4"/>
+    </linearGradient>
+
+    <linearGradient id="darkBevel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1A0F02" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#59390B" stop-opacity="0.3"/>
+    </linearGradient>
+
+    <!-- Dimensional Botanical Leaf Shading -->
+    <linearGradient id="botanicalLeaf" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#2D4A38"/>
+      <stop offset="35%" stop-color="#567D64"/>
+      <stop offset="70%" stop-color="#8FA89B"/>
+      <stop offset="90%" stop-color="#C2D6CA"/>
+      <stop offset="100%" stop-color="#3A5C47"/>
+    </linearGradient>
+
+    <!-- Radial Pearl / Gold Bead Shading -->
+    <radialGradient id="goldBead" cx="35%" cy="35%" r="65%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="25%" stop-color="#FFF2CA"/>
+      <stop offset="55%" stop-color="#D4AF37"/>
+      <stop offset="85%" stop-color="#8C631B"/>
+      <stop offset="100%" stop-color="#3D2606"/>
+    </radialGradient>
+
+    <!-- Realistic Cast Shadow Filter -->
+    <filter id="realisticFrameShadow" x="-5%" y="-3%" width="110%" height="106%" filterUnits="userSpaceOnUse">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="5" result="blur"/>
+      <feOffset in="blur" dx="0" dy="5" result="offsetBlur"/>
+      <feComponentTransfer in="offsetBlur" result="shadowAlpha">
+        <feFuncA type="linear" slope="0.4"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode in="shadowAlpha"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Soft Golden Aura Glow -->
+    <filter id="goldAura" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#D4AF37" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       OUTER MOLDING & BEVELED BORDER RAILS (Frame Perimeter)
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <g filter="url(#realisticFrameShadow)">
+    <!-- Base Deep Shadow Channel -->
+    <rect x="14" y="14" width="772" height="1172" rx="14" stroke="#1A0F02" stroke-width="4.5" fill="none" opacity="0.6"/>
+
+    <!-- Primary Gilded Beveled Rail -->
+    <rect x="16" y="16" width="768" height="1168" rx="12" stroke="url(#realGold)" stroke-width="3" fill="none"/>
+    <rect x="15" y="15" width="770" height="1170" rx="13" stroke="url(#lightBevel)" stroke-width="1" fill="none" opacity="0.85"/>
+    <rect x="18" y="18" width="764" height="1164" rx="11" stroke="url(#darkBevel)" stroke-width="1.2" fill="none" opacity="0.9"/>
+
+    <!-- Fine Inset Gilded Trim Rail -->
+    <rect x="24" y="24" width="752" height="1152" rx="8" stroke="url(#realRoseGold)" stroke-width="1.8" fill="none"/>
+    <rect x="26" y="26" width="748" height="1148" rx="7" stroke="url(#realGold)" stroke-width="0.75" fill="none" opacity="0.75"/>
+
+    <!-- Sculpted Scalloped Inner Rail with Fine Beads -->
+    <rect x="32" y="32" width="736" height="1136" rx="6" stroke="url(#realGold)" stroke-width="1.2" stroke-dasharray="8 4" fill="none" opacity="0.75"/>
+    <rect x="36" y="36" width="728" height="1128" rx="5" stroke="url(#realRoseGold)" stroke-width="0.8" fill="none" opacity="0.55"/>
+  </g>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       REALISTIC SCULPTED FLORAL & BAROQUE CORNER BOUQUET
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <g id="realisticCornerBouquet" filter="url(#realisticFrameShadow)">
+    <!-- Elegant Baroque Outer Corner Bracket with 3D Bevel -->
+    <path d="M 10 90 Q 12 40 40 22 Q 65 12 110 10" stroke="#1A0F02" stroke-width="4.5" fill="none" opacity="0.55" stroke-linecap="round"/>
+    <path d="M 10 90 Q 12 40 40 22 Q 65 12 110 10" stroke="url(#realGold)" stroke-width="2.8" fill="none" stroke-linecap="round"/>
+    <path d="M 11 88 Q 13 41 39 23 Q 64 13 108 11" stroke="url(#lightBevel)" stroke-width="1" fill="none" stroke-linecap="round"/>
+
+    <!-- Inner Decorative Vine Arch -->
+    <path d="M 22 105 Q 26 55 55 36 Q 80 26 125 22" stroke="url(#realRoseGold)" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <path d="M 23 104 Q 27 56 54 37 Q 79 27 123 23" stroke="#FFF" stroke-width="0.6" stroke-opacity="0.65" fill="none" stroke-linecap="round"/>
+
+    <!-- Sweeping S-Curve Baroque Scrollwork -->
+    <path d="M 45 140 C 35 110 40 85 62 65 C 80 50 110 48 135 60 C 145 65 152 75 146 82 C 140 88 130 84 126 76 C 120 66 102 62 86 72 C 68 86 62 108 72 135 Z" 
+          fill="url(#realGold)" stroke="#2E1C03" stroke-width="0.6"/>
+    <path d="M 47 138 C 38 112 43 88 64 68 C 81 53 108 50 132 62" stroke="url(#lightBevel)" stroke-width="0.8" fill="none"/>
+
+    <!-- Sculpted Botanical Acanthus Leaves with Shading & Veins -->
+    <!-- Leaf 1 (Top Branch) -->
+    <g>
+      <path d="M 72 45 C 85 30 110 24 130 32 C 122 45 105 52 88 50 Z" fill="url(#botanicalLeaf)" stroke="url(#realGold)" stroke-width="1"/>
+      <!-- Central Leaf Spine Highlight -->
+      <path d="M 76 46 Q 102 36 126 33" stroke="url(#realGold)" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+      <path d="M 90 41 Q 96 34 104 35" stroke="url(#realGold)" stroke-width="0.6" fill="none"/>
+      <path d="M 102 38 Q 110 32 118 33" stroke="url(#realGold)" stroke-width="0.6" fill="none"/>
+    </g>
+
+    <!-- Leaf 2 (Side Branch) -->
+    <g>
+      <path d="M 42 75 C 28 88 22 112 30 132 C 43 124 50 106 48 90 Z" fill="url(#botanicalLeaf)" stroke="url(#realGold)" stroke-width="1"/>
+      <!-- Central Leaf Spine -->
+      <path d="M 44 78 Q 34 104 32 128" stroke="url(#realGold)" stroke-width="1.2" fill="none" stroke-linecap="round"/>
+      <path d="M 39 92 Q 32 98 34 106" stroke="url(#realGold)" stroke-width="0.6" fill="none"/>
+      <path d="M 36 105 Q 30 112 32 120" stroke="url(#realGold)" stroke-width="0.6" fill="none"/>
+    </g>
+
+    <!-- Leaf 3 (Diagonal Accent) -->
+    <g>
+      <path d="M 58 58 C 72 50 88 56 94 70 C 82 76 68 74 60 66 Z" fill="url(#botanicalLeaf)" stroke="url(#realGold)" stroke-width="0.8"/>
+      <path d="M 61 60 Q 76 59 90 68" stroke="url(#realGold)" stroke-width="0.9" fill="none"/>
+    </g>
+
+    <!-- ─── REALISTIC 3D EMBOSSED ROSE BLOSSOM ─── -->
+    <g id="mainEmbossedRose" transform="translate(48, 48)">
+      <!-- Outer Shadow Base -->
+      <circle cx="0" cy="0" r="15" fill="#2E1C03" opacity="0.4" filter="url(#goldAura)"/>
+
+      <!-- Outer Petal Layer (Rose Gold Shading) -->
+      <path d="M -12 -5 C -15 -14 -4 -18 3 -12 C 12 -16 18 -6 12 3 C 16 12 6 18 -3 13 C -12 17 -17 6 -11 -3 Z" 
+            fill="url(#realRoseGold)" stroke="#3E1A20" stroke-width="0.8"/>
+
+      <!-- Secondary Overlapping Petals (Dimensional Relief) -->
+      <path d="M -9 -3 C -11 -9 -2 -12 2 -8 C 8 -11 12 -4 8 2 C 11 8 4 12 -2 9 C -8 11 -11 4 -7 -2 Z" 
+            fill="url(#realGold)" stroke="#4A2608" stroke-width="0.7"/>
+
+      <!-- Inner Rose Petal Curves with Specular Edges -->
+      <path d="M -5 -2 C -7 -6 0 -8 3 -5 C 7 -7 9 -2 6 2 C 8 6 3 9 -1 6 C -5 8 -7 3 -4 -1 Z" 
+            fill="url(#realRoseGold)" stroke="#FFF" stroke-width="0.4" stroke-opacity="0.8"/>
+
+      <!-- Rose Bud Center Medallion -->
+      <circle cx="0" cy="0" r="3.5" fill="url(#goldBead)" stroke="#3E2606" stroke-width="0.5"/>
+      <circle cx="-0.8" cy="-0.8" r="1.2" fill="#FFFFFF" opacity="0.9"/>
+    </g>
+
+    <!-- Secondary Accent Rose Bud (Upper Branch) -->
+    <g transform="translate(108, 28) scale(0.68)">
+      <circle cx="0" cy="0" r="12" fill="#2E1C03" opacity="0.35"/>
+      <path d="M -10 -4 C -12 -11 -3 -14 2 -9 C 9 -12 14 -4 9 2 C 12 9 4 14 -2 10 C -9 13 -13 4 -8 -2 Z" 
+            fill="url(#realRoseGold)" stroke="#3E1A20" stroke-width="0.7"/>
+      <circle cx="0" cy="0" r="3" fill="url(#goldBead)"/>
+    </g>
+
+    <!-- Secondary Accent Rose Bud (Side Branch) -->
+    <g transform="translate(28, 108) scale(0.68)">
+      <circle cx="0" cy="0" r="12" fill="#2E1C03" opacity="0.35"/>
+      <path d="M -10 -4 C -12 -11 -3 -14 2 -9 C 9 -12 14 -4 9 2 C 12 9 4 14 -2 10 C -9 13 -13 4 -8 -2 Z" 
+            fill="url(#realRoseGold)" stroke="#3E1A20" stroke-width="0.7"/>
+      <circle cx="0" cy="0" r="3" fill="url(#goldBead)"/>
+    </g>
+
+    <!-- Dimensional Gold Beads / Gilded Pearls along scroll tips -->
+    <circle cx="138" cy="22" r="3.2" fill="url(#goldBead)" stroke="#3E2606" stroke-width="0.5"/>
+    <circle cx="22" cy="138" r="3.2" fill="url(#goldBead)" stroke="#3E2606" stroke-width="0.5"/>
+    <circle cx="95" cy="46" r="2.2" fill="url(#goldBead)"/>
+    <circle cx="46" cy="95" r="2.2" fill="url(#goldBead)"/>
+  </g>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       REPLICATE CORNER BOUQUETS TO ALL 4 CORNERS
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <!-- Top-Right Corner -->
+  <use href="#realisticCornerBouquet" transform="translate(800, 0) scale(-1, 1)" />
+
+  <!-- Bottom-Left Corner -->
+  <use href="#realisticCornerBouquet" transform="translate(0, 1200) scale(1, -1)" />
+
+  <!-- Bottom-Right Corner -->
+  <use href="#realisticCornerBouquet" transform="translate(800, 1200) scale(-1, -1)" />
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       SEMI-REALISTIC TOP CENTER REGAL CREST ORNAMENT
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <g transform="translate(400, 20)" filter="url(#realisticFrameShadow)">
+    <!-- Base Shadow Arch -->
+    <path d="M -65 6 Q -30 -6 0 -1 Q 30 -6 65 6" stroke="#1A0F02" stroke-width="3" fill="none" opacity="0.45"/>
+
+    <!-- Gilded Crown Scrollwork -->
+    <path d="M -60 5 Q -28 -5 0 0 Q 28 -5 60 5" stroke="url(#realGold)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path d="M -58 4 Q -27 -6 0 -1 Q 27 -6 58 4" stroke="url(#lightBevel)" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+
+    <!-- Botanical Acanthus Wings Left & Right -->
+    <path d="M -18 -1 Q -32 -14 -16 -20 Q -6 -13 -18 -1 Z" fill="url(#botanicalLeaf)" stroke="url(#realGold)" stroke-width="0.9"/>
+    <path d="M 18 -1 Q 32 -14 16 -20 Q 6 -13 18 -1 Z" fill="url(#botanicalLeaf)" stroke="url(#realGold)" stroke-width="0.9"/>
+
+    <!-- Fleur-de-lis / Crown Finial in Center -->
+    <path d="M 0 -18 C -4 -12 -5 -6 0 0 C 5 -6 4 -12 0 -18 Z" fill="url(#realRoseGold)" stroke="#3E1A20" stroke-width="0.7"/>
+    <path d="M -0.5 -16 Q 1.5 -9 0 -2" stroke="#FFF" stroke-width="0.6" stroke-opacity="0.8" fill="none"/>
+
+    <!-- Center Faceted Gold Medallion with Specular Highlight -->
+    <circle cx="0" cy="0" r="7.5" fill="url(#goldBead)" stroke="#3E2606" stroke-width="0.8" filter="url(#goldAura)"/>
+    <circle cx="-2" cy="-2" r="2.5" fill="#FFFFFF" opacity="0.85"/>
+
+    <!-- Flanking Mini Pearls -->
+    <circle cx="-14" cy="2" r="2.8" fill="url(#goldBead)" stroke="#3E2606" stroke-width="0.4"/>
+    <circle cx="14" cy="2" r="2.8" fill="url(#goldBead)" stroke="#3E2606" stroke-width="0.4"/>
+    <circle cx="-28" cy="4" r="2" fill="url(#goldBead)"/>
+    <circle cx="28" cy="4" r="2" fill="url(#goldBead)"/>
+  </g>
+
+  <!-- ══════════════════════════════════════════════════════════════════════════
+       SEMI-REALISTIC BOTTOM CENTER REGAL CREST ORNAMENT
+       ══════════════════════════════════════════════════════════════════════════ -->
+  <g transform="translate(400, 1180)" filter="url(#realisticFrameShadow)">
+    <!-- Base Shadow Arch -->
+    <path d="M -65 -6 Q -30 6 0 1 Q 30 6 65 -6" stroke="#1A0F02" stroke-width="3" fill="none" opacity="0.45"/>
+
+    <!-- Gilded Inverted Scrollwork -->
+    <path d="M -60 -5 Q -28 5 0 0 Q 28 5 60 -5" stroke="url(#realGold)" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path d="M -58 -4 Q -27 6 0 1 Q 27 6 58 -4" stroke="url(#lightBevel)" stroke-width="0.8" fill="none" stroke-linecap="round"/>
+
+    <!-- Botanical Acanthus Wings Left & Right -->
+    <path d="M -18 1 Q -32 14 -16 20 Q -6 13 -18 1 Z" fill="url(#botanicalLeaf)" stroke="url(#realGold)" stroke-width="0.9"/>
+    <path d="M 18 1 Q 32 14 16 20 Q 6 13 18 1 Z" fill="url(#botanicalLeaf)" stroke="url(#realGold)" stroke-width="0.9"/>
+
+    <!-- Inverted Pendant Finial in Center -->
+    <path d="M 0 18 C -4 12 -5 6 0 0 C 5 6 4 12 0 18 Z" fill="url(#realRoseGold)" stroke="#3E1A20" stroke-width="0.7"/>
+    <path d="M -0.5 16 Q 1.5 9 0 2" stroke="#FFF" stroke-width="0.6" stroke-opacity="0.8" fill="none"/>
+
+    <!-- Center Faceted Gold Medallion -->
+    <circle cx="0" cy="0" r="7.5" fill="url(#goldBead)" stroke="#3E2606" stroke-width="0.8" filter="url(#goldAura)"/>
+    <circle cx="-2" cy="-2" r="2.5" fill="#FFFFFF" opacity="0.85"/>
+
+    <!-- Flanking Mini Pearls -->
+    <circle cx="-14" cy="-2" r="2.8" fill="url(#goldBead)" stroke="#3E2606" stroke-width="0.4"/>
+    <circle cx="14" cy="-2" r="2.8" fill="url(#goldBead)" stroke="#3E2606" stroke-width="0.4"/>
+    <circle cx="-28" cy="-4" r="2" fill="url(#goldBead)"/>
+    <circle cx="28" cy="-4" r="2" fill="url(#goldBead)"/>
+  </g>
+</svg>

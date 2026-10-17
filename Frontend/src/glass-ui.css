@@ -1,0 +1,84 @@
+:root {
+  /* ====================================================
+     WARM IVORY & CHAMPAGNE GOLD LUXURY WEDDING PALETTE
+     Section-by-section Color System
+     ==================================================== */
+  
+  /* 1. Surfaces & Backgrounds */
+  --bg-app: #FFF9F2;                  /* App background: Warm ivory */
+  --bg-card: #FFFEFB;                 /* Section/card background: Soft white */
+  --bg-panel: #F7EFE5;                /* Secondary panel: Pale cream */
+  --bg-input: #FFFFFF;                /* Input background: White ivory */
+  
+  /* 2. Typography */
+  --text-heading: #513321;             /* Main heading: Espresso brown */
+  --text-body: #6C6B70;                /* Body text: Muted slate */
+  --text-muted: #999198;               /* Helper/placeholder text: Warm grey */
+  --text-disabled: #B9B2AD;            /* Disabled text: Soft grey */
+  
+  /* 3. Primary Button (Champagne Gold / Deep Brown) */
+  --primary-btn-bg: #D6AD61;           /* Primary button: Champagne gold */
+  --primary-btn-text: #382416;         /* Primary button text: Deep brown */
+  --primary-btn-border: #C49A4A;       /* Primary button border: Gold */
+  --primary-btn-hover-bg: #C49A4A;
+  --primary-btn-hover-text: #FFFFFF;
+  --primary-btn-pressed-bg: #AC853B;
+  --primary-btn-disabled-bg: #E8DFD2;
+  --primary-btn-disabled-text: #AAA19A;
+  
+  /* 4. Secondary Button (Pale Blush / Rose Brown) */
+  --secondary-btn-bg: #F9E8E5;         /* Secondary button: Pale blush */
+  --secondary-btn-text: #8D414D;       /* Secondary button text: Rose brown */
+  --secondary-btn-border: #E9C9BD;
+  --secondary-btn-hover-bg: #F2D5D1;
+  --secondary-btn-hover-text: #78343F;
+  
+  /* 5. Destructive Button (Soft Crimson / White) */
+  --destructive-btn-bg: #C84F61;       /* Destructive button: Soft crimson */
+  --destructive-btn-text: #FFFFFF;     /* Destructive button text: White */
+  --destructive-btn-hover-bg: #B53F50;
+  
+  /* 6. Borders & Dividers */
+  --border-selected: #D86F7E;          /* Selected preset border: Blush rose */
+  --border-normal: #E9DCCB;            /* Normal border: Warm beige */
+  --border-active: #C49A4A;            /* Active border/accent: Gold */
+  --divider: #EEE4D9;                  /* Divider: Pale beige */
+  
+  /* 7. Icons */
+  --icon-color: #68472D;               /* Icon: Espresso brown */
+  --icon-active: #C49A4A;              /* Active icon: Gold */
+  
+  /* 8. Sliders */
+  --slider-track: #E6DED5;             /* Slider track: Warm grey */
+  --slider-active: #D6AD61;            /* Slider active track: Champagne gold */
+  --slider-thumb: #E8B747;             /* Slider thumb: Gold with white border */
+  
+  /* 9. Badges & Feedback */
+  --badge-bg: #F8EFE4;                 /* Number/value badge: Pale cream */
+  --badge-text: #513321;               /* Badge text: Espresso brown */
+  --focus-ring: rgba(216, 111, 126, 0.4); /* Focus ring: Translucent rose #D86F7E66 */
+  --success: #66856A;                  /* Success: Muted green */
+  
+  /* 10. Shadows */
+  --card-shadow: 0 8px 24px rgba(104, 71, 45, 0.05); /* 0 8px 24px #68472D0D */
+  --control-shadow: 0 3px 10px rgba(104, 71, 45, 0.08); /* 0 3px 10px #68472D14 */
+  
+  /* 11. Geometry & Radii */
+  --radius-sm: 12px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 24px;
+  
+  /* Backward Compatibility Aliases */
+  --bg: #FFF9F2;
+  --surface: #FFFEFB;
+  --surface-strong: #F7EFE5;
+  --primary: #D6AD61;
+  --primary-light: #E8B747;
+  --text: #513321;
+  --border: #E9DCCB;
+  --shadow: 0 8px 24px rgba(104, 71, 45, 0.05);
+  --shadow-hover: 0 12px 28px rgba(104, 71, 45, 0.1);
+  --glow: 0 0 16px rgba(196, 154, 74, 0.25);
+  --transition: 0.22s ease;
+}

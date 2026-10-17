@@ -1,0 +1,31 @@
+<svg width="800" height="1200" viewBox="0 0 800 1200" fill="none" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Sleek Modern Cartier Metallic Gold Gradient -->
+    <linearGradient id="sleekGold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5C3A0A"/>
+      <stop offset="25%" stop-color="#D4AF37"/>
+      <stop offset="50%" stop-color="#FFFDF2"/>
+      <stop offset="75%" stop-color="#E5BE4A"/>
+      <stop offset="100%" stop-color="#4A3008"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Hairline Rail -->
+  <rect x="18" y="18" width="764" height="1164" rx="6" stroke="url(#sleekGold)" stroke-width="2" fill="none"/>
+  <!-- Inner Hairline Rail -->
+  <rect x="24" y="24" width="752" height="1152" rx="4" stroke="url(#sleekGold)" stroke-width="0.8" fill="none" opacity="0.85"/>
+
+  <!-- Precision 45° Corner Notches -->
+  <g stroke="url(#sleekGold)" stroke-width="1.8" fill="none" stroke-linecap="round">
+    <path d="M 14 36 L 36 14"/>
+    <path d="M 786 36 L 764 14"/>
+    <path d="M 14 1164 L 36 1186"/>
+    <path d="M 786 1164 L 764 1186"/>
+  </g>
+
+  <!-- Sleek Corner Micro-Studs -->
+  <polygon points="28,28 32,24 36,28 32,32" fill="url(#sleekGold)"/>
+  <polygon points="772,28 768,24 764,28 768,32" fill="url(#sleekGold)"/>
+  <polygon points="28,1172 32,1168 36,1172 32,1176" fill="url(#sleekGold)"/>
+  <polygon points="772,1172 768,1168 764,1172 768,1176" fill="url(#sleekGold)"/>
+</svg>
