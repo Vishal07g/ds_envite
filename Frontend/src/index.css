@@ -2295,108 +2295,205 @@ svg.active-icon,
   border-radius: 9999px;
 }
 
-/* 11. Refined Toolbar Buttons: Uniform 16px Horizontal Icon Sizing & Subtle Warm Grey Tone */
+/* 11. Refined Toolbar Container & Uniform White Glassmorphic Buttons */
+.editor-top-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  box-sizing: border-box !important;
+  height: 44px !important;
+  min-height: 44px !important;
+  max-height: 44px !important;
+  white-space: nowrap !important;
+  width: 100% !important;
+}
+
+/* PC & Laptop Mode (>= 1024px): Strictly NO scrollbar, seamless fit */
+@media (min-width: 1024px) {
+  .editor-top-toolbar {
+    overflow-x: hidden !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  .editor-top-toolbar::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+}
+
+/* Phone & Tablet Mode (< 1024px): Smooth horizontal scroll preserved */
+@media (max-width: 1023px) {
+  .editor-top-toolbar {
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    -webkit-overflow-scrolling: touch !important;
+    scroll-behavior: smooth !important;
+    overscroll-behavior-x: contain !important;
+    scrollbar-width: thin !important;
+    scrollbar-color: rgba(196, 154, 74, 0.4) transparent !important;
+  }
+  .editor-top-toolbar::-webkit-scrollbar {
+    height: 3px !important;
+  }
+  .editor-top-toolbar::-webkit-scrollbar-track {
+    background: transparent !important;
+  }
+  .editor-top-toolbar::-webkit-scrollbar-thumb {
+    background: rgba(196, 154, 74, 0.35) !important;
+    border-radius: 99px !important;
+  }
+  .editor-top-toolbar::-webkit-scrollbar-thumb:hover {
+    background: rgba(196, 154, 74, 0.65) !important;
+  }
+}
+
+/* White Pill Input (Title) - 32px height, 12px horizontal padding, pill border-radius */
+.editor-toolbar-input {
+  height: 32px !important;
+  min-height: 32px !important;
+  max-height: 32px !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  line-height: 30px !important;
+  padding: 0 12px !important;
+  border-radius: 9999px !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  background-color: #FFFFFF !important;
+  background: #FFFFFF !important;
+  border: 1px solid #E9DCCB !important;
+  box-shadow: 0 1px 3px rgba(104, 71, 45, 0.05), inset 0 1px 0 #FFFFFF !important;
+  color: #513321 !important;
+  font-weight: 700 !important;
+  font-size: 11.5px !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.editor-toolbar-input:focus {
+  border-color: #C49A4A !important;
+  box-shadow: 0 0 0 2px rgba(196, 154, 74, 0.25), 0 2px 6px rgba(104, 71, 45, 0.08) !important;
+}
+
+/* White Pill Buttons - EXACT same solid white color, 9999px pill border-radius, 12px padding, and 32px height */
 .editor-toolbar-btn,
 button.editor-toolbar-btn,
-a.editor-toolbar-btn {
-  background-color: #E8E4DC !important;
+a.editor-toolbar-btn,
+.editor-toolbar-btn-primary,
+button.editor-toolbar-btn-primary,
+a.editor-toolbar-btn-primary {
+  background: #FFFFFF !important;
+  background-color: #FFFFFF !important;
   background-image: none !important;
-  border: 1px solid #D6D0C5 !important;
-  color: #382416 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 1px 3px rgba(104, 71, 45, 0.06) !important;
+  border: 1px solid #E9DCCB !important;
+  color: #513321 !important;
+  border-radius: 9999px !important;
+  box-shadow: 0 1px 3px rgba(104, 71, 45, 0.05), inset 0 1px 0 #FFFFFF !important;
   font-weight: 700 !important;
-  transition: all 0.2s ease !important;
-  min-height: 36px !important;
-  height: 36px !important;
+  font-size: 11.5px !important;
+  letter-spacing: 0.01em !important;
+  text-transform: none !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  min-height: 32px !important;
+  height: 32px !important;
+  max-height: 32px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 6px 12px !important;
-  gap: 6px !important;
+  padding: 0 12px !important;
+  gap: 5px !important;
+  white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  box-sizing: border-box !important;
+  line-height: 30px !important;
+  cursor: pointer !important;
 }
 
 .editor-toolbar-btn:hover,
 button.editor-toolbar-btn:hover,
-a.editor-toolbar-btn:hover {
-  background-color: #DDD8CF !important;
+a.editor-toolbar-btn:hover,
+.editor-toolbar-btn-primary:hover,
+button.editor-toolbar-btn-primary:hover,
+a.editor-toolbar-btn-primary:hover {
+  background: #FAF7F2 !important;
+  background-color: #FAF7F2 !important;
   border-color: #C49A4A !important;
   color: #382416 !important;
-  box-shadow: 0 2px 6px rgba(104, 71, 45, 0.12) !important;
+  box-shadow: 0 3px 8px rgba(104, 71, 45, 0.1), inset 0 1px 0 #FFFFFF !important;
   transform: translateY(-1px) !important;
 }
 
 .editor-toolbar-btn:active,
 button.editor-toolbar-btn:active,
-a.editor-toolbar-btn:active {
-  background-color: #D5D0C6 !important;
-  transform: translateY(0px) !important;
+a.editor-toolbar-btn:active,
+.editor-toolbar-btn-primary:active,
+button.editor-toolbar-btn-primary:active,
+a.editor-toolbar-btn-primary:active {
+  background-color: #F5EFE6 !important;
+  transform: translateY(0px) scale(0.98) !important;
+  box-shadow: inset 0 1px 2px rgba(104, 71, 45, 0.1) !important;
 }
 
+/* Active / Toggled button state (e.g. Card/Envelope View, Frame: ON) */
 .editor-toolbar-btn-active,
 button.editor-toolbar-btn-active {
-  background-color: #DDD8CF !important;
+  background: #FFFDF9 !important;
+  background-color: #FFFDF9 !important;
   border-color: #C49A4A !important;
-  box-shadow: inset 0 1px 2px rgba(104, 71, 45, 0.12), 0 0 0 1px #C49A4A !important;
+  color: #8A4B1A !important;
+  box-shadow: 0 0 0 1px #C49A4A, 0 2px 6px rgba(196, 154, 74, 0.15), inset 0 1px 0 #FFFFFF !important;
+  font-weight: 700 !important;
 }
 
-/* Primary Toolbar Action Button (e.g. Save Changes) */
-.editor-toolbar-btn-primary,
-button.editor-toolbar-btn-primary,
-a.editor-toolbar-btn-primary {
-  background: #D6AD61 !important;
-  background-image: none !important;
-  border: 1px solid #C49A4A !important;
-  color: #382416 !important;
-  border-radius: 12px !important;
-  box-shadow: 0 2px 8px rgba(196, 154, 74, 0.25) !important;
-  font-weight: 800 !important;
-  transition: all 0.2s ease !important;
-  min-height: 36px !important;
-  height: 36px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 6px 14px !important;
-  gap: 6px !important;
-}
-
-.editor-toolbar-btn-primary:hover,
-button.editor-toolbar-btn-primary:hover,
-a.editor-toolbar-btn-primary:hover {
-  background: #C49A4A !important;
-  color: #FFFFFF !important;
-  box-shadow: 0 4px 12px rgba(196, 154, 74, 0.35) !important;
-  transform: translateY(-1px) !important;
-}
-
-.editor-toolbar-btn-primary:hover svg,
-.editor-toolbar-btn-primary:hover span {
-  color: #FFFFFF !important;
-}
-
-/* Strict uniform horizontal icon size for every button icon */
+/* Strict uniform horizontal icon size and warm bronze color for every button icon */
 .editor-toolbar-btn svg,
 button.editor-toolbar-btn svg,
 a.editor-toolbar-btn svg,
 .editor-toolbar-btn-primary svg,
 button.editor-toolbar-btn-primary svg,
 a.editor-toolbar-btn-primary svg {
-  width: 16px !important;
-  height: 16px !important;
-  min-width: 16px !important;
-  max-width: 16px !important;
-  min-height: 16px !important;
-  max-height: 16px !important;
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  max-width: 14px !important;
+  min-height: 14px !important;
+  max-height: 14px !important;
   flex-shrink: 0 !important;
   display: inline-block !important;
+  color: #513321 !important;
 }
 
 .editor-toolbar-btn span,
 button.editor-toolbar-btn span,
-a.editor-toolbar-btn span {
-  color: #382416 !important;
+a.editor-toolbar-btn span,
+.editor-toolbar-btn-primary span,
+button.editor-toolbar-btn-primary span,
+a.editor-toolbar-btn-primary span {
+  color: #513321 !important;
   font-weight: 700 !important;
+  white-space: nowrap !important;
+}
+
+/* Responsive label adaptors for laptop & desktop fit:
+   Extra words (e.g., 'Card', 'Web', 'Changes', 'Link') are only displayed on ultra-wide screens (>= 1750px)
+   or touch devices (< 1024px) where touch scroll is active.
+   On standard laptops (1024px - 1749px), concise labels guarantee all 11 items fit seamlessly
+   with NO clipping, and Dashboard is 100% visible with ample room. */
+.toolbar-label-extra {
+  display: none !important;
+}
+
+@media (min-width: 1750px) {
+  .toolbar-label-extra {
+    display: inline !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .toolbar-label-extra {
+    display: inline !important;
+  }
 }
 
 /* ------------------------------------------------

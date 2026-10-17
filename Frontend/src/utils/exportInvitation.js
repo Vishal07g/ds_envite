@@ -274,6 +274,91 @@ export function downloadStandaloneHtmlWebsite(config = {}, invitation = {}) {
       <p id="scratch-instruction" class="text-[10px] text-amber-300/80 font-mono">✦ Scratch above (0% revealed) ✦</p>
     </section>
 
+    <!-- WEDDING CEREMONY TIMELINE -->
+    ${config.showTimelineSection !== false ? `
+    <section class="max-w-4xl mx-auto rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden" style="background: rgba(255,255,255,0.06); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(205,164,82,0.3); box-shadow: 0 10px 30px -5px rgba(0,0,0,0.3);">
+      <div class="text-center space-y-1">
+        <h2 class="font-serif text-2xl sm:text-3xl font-bold text-amber-300">${config.timelineHeading || "Wedding Ceremony"}</h2>
+        <p class="font-cursive text-3xl sm:text-4xl text-amber-400 -translate-y-1">${config.timelineSubtitle || "Timeline"}</p>
+        <div class="flex items-center justify-center space-x-2 pt-1 opacity-80">
+          <span class="w-12 h-[1px] bg-amber-400/50"></span>
+          <span class="text-xs text-rose-500">❤</span>
+          <span class="w-12 h-[1px] bg-amber-400/50"></span>
+        </div>
+      </div>
+
+      <div class="relative py-2 space-y-3.5">
+        <!-- Central Line -->
+        <div class="absolute top-2 bottom-2 left-4 md:left-1/2 -translate-x-1/2 w-[1.5px] bg-amber-500/60 rounded-full"></div>
+
+        ${((Array.isArray(config.ceremonies) && config.ceremonies.length > 0) ? config.ceremonies : [
+          { title: "Haldi Ceremony", date: "2026-11-18", time: "10:00 AM", venueName: "Courtyard Lawn", description: "Joyful turmeric ceremony" },
+          { title: "Mehandi Ceremony", date: "2026-11-18", time: "04:00 PM", venueName: "Rosewood Pavilion", description: "Intricate henna rituals" },
+          { title: "Sangeet Night", date: "2026-11-19", time: "07:00 PM", venueName: "Grand Ballroom Lawn", description: "Music and dancing celebration" },
+          { title: "Wedding Ceremony", date: "2026-11-20", time: "04:00 PM", venueName: "Royal Mandap", description: "Sacred vows & phere ceremony" },
+          { title: "Reception", date: "2026-11-21", time: "07:30 PM", venueName: "Gilded Glass Conservatory", description: "Grand dinner celebration" }
+        ]).filter(c => c.visible !== false).map((c, i) => {
+          const isHeaderOnLeft = i % 2 === 0;
+          const headerHtml = (align) => `
+            <div class="p-2.5 flex items-center space-x-3" style="${align === 'right' ? 'justify-content: flex-end; text-align: right;' : 'justify-content: flex-start; text-align: left;'}">
+              ${align === 'right' ? `
+                <div class="min-w-0 flex-grow">
+                  <h3 class="font-serif text-lg sm:text-xl font-bold text-amber-200 leading-tight">${c.title}</h3>
+                </div>
+                <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-lg shadow-sm" style="background: rgba(255,255,255,0.12)">✨</div>
+              ` : `
+                <div class="w-10 h-10 rounded-full flex items-center justify-center shrink-0 text-lg shadow-sm" style="background: rgba(255,255,255,0.12)">✨</div>
+                <div class="min-w-0 flex-grow">
+                  <h3 class="font-serif text-lg sm:text-xl font-bold text-amber-200 leading-tight">${c.title}</h3>
+                </div>
+              `}
+            </div>
+          `;
+          const detailsHtml = (align) => `
+            <div class="p-3 sm:p-3.5 rounded-2xl flex flex-col justify-center space-y-1" style="background: rgba(255,255,255,0.08); backdrop-filter: blur(12px); border: 1px solid rgba(205,164,82,0.3); ${align === 'right' ? 'text-align: right;' : 'text-align: left;'}">
+              <p class="text-[11px] text-amber-300 font-semibold">📅 ${c.date || "Day, Date"}${c.time && c.showTime !== false ? ' • ' + c.time : ''}</p>
+              ${c.venueName ? `<p class="text-[11px] font-semibold text-amber-400/90">📍 ${c.venueName}</p>` : ''}
+              ${c.description ? `<p class="text-[11px] text-slate-300 opacity-85 line-clamp-2">${c.description}</p>` : ''}
+            </div>
+          `;
+
+          return `
+          <div class="relative flex flex-col md:flex-row items-center w-full">
+            <!-- Node -->
+            <div class="absolute left-4 md:left-1/2 -translate-x-1/2 top-4 md:top-1/2 md:-translate-y-1/2 w-3.5 h-3.5 rounded-full bg-slate-950 border-2 border-amber-400 z-10 flex items-center justify-center">
+              <span class="w-1.5 h-1.5 rounded-full bg-amber-400 block"></span>
+            </div>
+            <!-- Desktop Two-Sided Alternating Grid -->
+            <div class="hidden md:grid md:grid-cols-2 md:gap-8 w-full items-center">
+              ${isHeaderOnLeft ? `
+                ${headerHtml('right')}
+                ${detailsHtml('left')}
+              ` : `
+                ${detailsHtml('right')}
+                ${headerHtml('left')}
+              `}
+            </div>
+            <!-- Mobile Row -->
+            <div class="md:hidden w-full pl-9">
+              <div class="space-y-1">
+                <div class="flex items-center space-x-2 py-0.5">
+                  <span class="text-lg">✨</span>
+                  <h3 class="font-serif text-base font-bold text-amber-200">${c.title}</h3>
+                </div>
+                <div class="p-3 rounded-2xl space-y-1" style="background: rgba(255,255,255,0.08); border: 1px solid rgba(205,164,82,0.3);">
+                  <p class="text-[11px] text-amber-300 font-semibold">📅 ${c.date || "Day, Date"}${c.time && c.showTime !== false ? ' • ' + c.time : ''}</p>
+                  ${c.venueName ? `<p class="text-[11px] font-semibold text-amber-400/90">📍 ${c.venueName}</p>` : ''}
+                  ${c.description ? `<p class="text-slate-300 opacity-80 text-[11px]">${c.description}</p>` : ''}
+                </div>
+              </div>
+            </div>
+          </div>
+          `;
+        }).join('')}
+      </div>
+    </section>
+    ` : ''}
+
     <!-- CEREMONY & RECEPTION VENUE -->
     <section class="max-w-2xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
       <div class="p-6 rounded-2xl gold-box space-y-3 text-center">

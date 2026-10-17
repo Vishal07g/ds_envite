@@ -15,6 +15,7 @@ import { EditableText } from './EditableText';
 import CelebrationOverlay from './CelebrationOverlay';
 import RevealEffectsOverlay from './RevealEffectsOverlay';
 import GlobalBorderFrame from './GlobalBorderFrame';
+import WeddingTimeline from './WeddingTimeline';
 
 export const getScratchCardShapeStyles = (shape) => {
   switch (shape) {
@@ -2778,9 +2779,12 @@ export default function InvitationRenderer({
                   </>
                 )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div 
+                  className="grid grid-cols-2 gap-2.5 sm:gap-4 w-full"
+                  style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}
+                >
                   {config.showBrideDetails !== false && (
-                    <div className="p-4 rounded-xl bg-black/20 border" style={customStyles.borderAccentSoft}>
+                    <div className="p-2.5 sm:p-4 rounded-xl bg-black/20 border flex flex-col justify-center min-w-0 text-center overflow-hidden" style={customStyles.borderAccentSoft}>
                       <EditableText config={config}
                         as="h4"
                         isEditing={!!onChangeField}
@@ -2793,7 +2797,7 @@ export default function InvitationRenderer({
                         popoverId="storyBrideTitle"
                         onChangeColor={(color) => onChangeField && onChangeField('storyBrideTitleColor', color)}
                         colorValue={config.storyBrideTitleColor || config.accentGold || '#b89254'}
-                        className={`text-base font-semibold mb-1 ${config.storyBrideTitleFont || config.cursiveFontClass || 'font-cursive'} ${config.storyBrideTitleSize || ''} ${(config.storyBrideTitleAlign || 'center') === 'left' ? 'text-left' : (config.storyBrideTitleAlign === 'right' ? 'text-right' : 'text-center')}`}
+                        className={`text-xs sm:text-base font-semibold mb-0.5 truncate ${config.storyBrideTitleFont || config.cursiveFontClass || 'font-cursive'} ${config.storyBrideTitleSize || ''} ${(config.storyBrideTitleAlign || 'center') === 'left' ? 'text-left' : (config.storyBrideTitleAlign === 'right' ? 'text-right' : 'text-center')}`}
                         style={{ 
                           color: config.storyBrideTitleColor || config.accentGold || '#b89254',
                           opacity: config.storyBrideTitleOpacity !== undefined ? config.storyBrideTitleOpacity : 1.0,
@@ -2814,7 +2818,7 @@ export default function InvitationRenderer({
                         popoverId="storyBrideName"
                         onChangeColor={(color) => onChangeField && onChangeField('storyBrideNameColor', color)}
                         colorValue={config.storyBrideNameColor || defaultBodyTextColor}
-                        className={`text-base ${config.storyBrideNameFont || 'font-serif'} ${config.storyBrideNameSize || ''} ${(config.storyBrideNameAlign || 'center') === 'left' ? 'text-left' : (config.storyBrideNameAlign === 'right' ? 'text-right' : 'text-center')}`}
+                        className={`text-sm sm:text-base font-bold truncate ${config.storyBrideNameFont || 'font-serif'} ${config.storyBrideNameSize || ''} ${(config.storyBrideNameAlign || 'center') === 'left' ? 'text-left' : (config.storyBrideNameAlign === 'right' ? 'text-right' : 'text-center')}`}
                         style={{ 
                           color: config.storyBrideNameColor || defaultBodyTextColor,
                           opacity: config.storyBrideNameOpacity !== undefined ? config.storyBrideNameOpacity : 1.0,
@@ -2835,7 +2839,7 @@ export default function InvitationRenderer({
                         popoverId="storyBrideParentLabel"
                         onChangeColor={(color) => onChangeField && onChangeField('storyBrideParentLabelColor', color)}
                         colorValue={config.storyBrideParentLabelColor || defaultLabelColor}
-                        className={`text-[9px] uppercase tracking-wider font-bold block opacity-90 mt-2 ${config.storyBrideParentLabelFont || 'font-sans'} ${config.storyBrideParentLabelSize || ''} ${(config.storyBrideParentLabelAlign || 'center') === 'left' ? 'text-left' : (config.storyBrideParentLabelAlign === 'right' ? 'text-right' : 'text-center')}`}
+                        className={`text-[8px] sm:text-[9px] uppercase tracking-wider font-bold block opacity-90 mt-1 ${config.storyBrideParentLabelFont || 'font-sans'} ${config.storyBrideParentLabelSize || ''} ${(config.storyBrideParentLabelAlign || 'center') === 'left' ? 'text-left' : (config.storyBrideParentLabelAlign === 'right' ? 'text-right' : 'text-center')}`}
                         style={{ 
                           color: config.storyBrideParentLabelColor || defaultLabelColor,
                           opacity: config.storyBrideParentLabelOpacity !== undefined ? config.storyBrideParentLabelOpacity : 0.9,
@@ -2856,7 +2860,7 @@ export default function InvitationRenderer({
                         popoverId="storyBrideFamily"
                         onChangeColor={(color) => onChangeField && onChangeField('storyBrideFamilyColor', color)}
                         colorValue={config.storyBrideFamilyColor || defaultBodyTextColor}
-                        className={`text-xs italic mt-0.5 ${config.storyBrideFamilyFont || 'font-serif'} ${config.storyBrideFamilySize || ''} ${(config.storyBrideFamilyAlign || 'center') === 'left' ? 'text-left' : (config.storyBrideFamilyAlign === 'right' ? 'text-right' : 'text-center')}`}
+                        className={`text-[10px] sm:text-xs italic mt-0.5 line-clamp-2 ${config.storyBrideFamilyFont || 'font-serif'} ${config.storyBrideFamilySize || ''} ${(config.storyBrideFamilyAlign || 'center') === 'left' ? 'text-left' : (config.storyBrideFamilyAlign === 'right' ? 'text-right' : 'text-center')}`}
                         style={{ 
                           color: config.storyBrideFamilyColor || defaultBodyTextColor,
                           opacity: config.storyBrideFamilyOpacity !== undefined ? config.storyBrideFamilyOpacity : 0.85,
@@ -2869,7 +2873,7 @@ export default function InvitationRenderer({
                   )}
 
                   {config.showGroomDetails !== false && (
-                    <div className="p-4 rounded-xl bg-black/20 border" style={customStyles.borderAccentSoft}>
+                    <div className="p-2.5 sm:p-4 rounded-xl bg-black/20 border flex flex-col justify-center min-w-0 text-center overflow-hidden" style={customStyles.borderAccentSoft}>
                       <EditableText config={config}
                         as="h4"
                         isEditing={!!onChangeField}
@@ -2882,7 +2886,7 @@ export default function InvitationRenderer({
                         popoverId="storyGroomTitle"
                         onChangeColor={(color) => onChangeField && onChangeField('storyGroomTitleColor', color)}
                         colorValue={config.storyGroomTitleColor || config.accentGold || '#b89254'}
-                        className={`text-base font-semibold mb-1 ${config.storyGroomTitleFont || config.cursiveFontClass || 'font-cursive'} ${config.storyGroomTitleSize || ''} ${(config.storyGroomTitleAlign || 'center') === 'left' ? 'text-left' : (config.storyGroomTitleAlign === 'right' ? 'text-right' : 'text-center')}`}
+                        className={`text-xs sm:text-base font-semibold mb-0.5 truncate ${config.storyGroomTitleFont || config.cursiveFontClass || 'font-cursive'} ${config.storyGroomTitleSize || ''} ${(config.storyGroomTitleAlign || 'center') === 'left' ? 'text-left' : (config.storyGroomTitleAlign === 'right' ? 'text-right' : 'text-center')}`}
                         style={{ 
                           color: config.storyGroomTitleColor || config.accentGold || '#b89254',
                           opacity: config.storyGroomTitleOpacity !== undefined ? config.storyGroomTitleOpacity : 1.0,
@@ -2903,7 +2907,7 @@ export default function InvitationRenderer({
                         popoverId="storyGroomName"
                         onChangeColor={(color) => onChangeField && onChangeField('storyGroomNameColor', color)}
                         colorValue={config.storyGroomNameColor || defaultBodyTextColor}
-                        className={`text-base ${config.storyGroomNameFont || 'font-serif'} ${config.storyGroomNameSize || ''} ${(config.storyGroomNameAlign || 'center') === 'left' ? 'text-left' : (config.storyGroomNameAlign === 'right' ? 'text-right' : 'text-center')}`}
+                        className={`text-sm sm:text-base font-bold truncate ${config.storyGroomNameFont || 'font-serif'} ${config.storyGroomNameSize || ''} ${(config.storyGroomNameAlign || 'center') === 'left' ? 'text-left' : (config.storyGroomNameAlign === 'right' ? 'text-right' : 'text-center')}`}
                         style={{ 
                           color: config.storyGroomNameColor || defaultBodyTextColor,
                           opacity: config.storyGroomNameOpacity !== undefined ? config.storyGroomNameOpacity : 1.0,
@@ -2924,7 +2928,7 @@ export default function InvitationRenderer({
                         popoverId="storyGroomParentLabel"
                         onChangeColor={(color) => onChangeField && onChangeField('storyGroomParentLabelColor', color)}
                         colorValue={config.storyGroomParentLabelColor || defaultLabelColor}
-                        className={`text-[9px] uppercase tracking-wider font-bold block opacity-90 mt-2 ${config.storyGroomParentLabelFont || 'font-sans'} ${config.storyGroomParentLabelSize || ''} ${(config.storyGroomParentLabelAlign || 'center') === 'left' ? 'text-left' : (config.storyGroomParentLabelAlign === 'right' ? 'text-right' : 'text-center')}`}
+                        className={`text-[8px] sm:text-[9px] uppercase tracking-wider font-bold block opacity-90 mt-1 ${config.storyGroomParentLabelFont || 'font-sans'} ${config.storyGroomParentLabelSize || ''} ${(config.storyGroomParentLabelAlign || 'center') === 'left' ? 'text-left' : (config.storyGroomParentLabelAlign === 'right' ? 'text-right' : 'text-center')}`}
                         style={{ 
                           color: config.storyGroomParentLabelColor || defaultLabelColor,
                           opacity: config.storyGroomParentLabelOpacity !== undefined ? config.storyGroomParentLabelOpacity : 0.9,
@@ -2945,7 +2949,7 @@ export default function InvitationRenderer({
                         popoverId="storyGroomFamily"
                         onChangeColor={(color) => onChangeField && onChangeField('storyGroomFamilyColor', color)}
                         colorValue={config.storyGroomFamilyColor || defaultBodyTextColor}
-                        className={`text-xs italic mt-0.5 ${config.storyGroomFamilyFont || 'font-serif'} ${config.storyGroomFamilySize || ''} ${(config.storyGroomFamilyAlign || 'center') === 'left' ? 'text-left' : (config.storyGroomFamilyAlign === 'right' ? 'text-right' : 'text-center')}`}
+                        className={`text-[10px] sm:text-xs italic mt-0.5 line-clamp-2 ${config.storyGroomFamilyFont || 'font-serif'} ${config.storyGroomFamilySize || ''} ${(config.storyGroomFamilyAlign || 'center') === 'left' ? 'text-left' : (config.storyGroomFamilyAlign === 'right' ? 'text-right' : 'text-center')}`}
                         style={{ 
                           color: config.storyGroomFamilyColor || defaultBodyTextColor,
                           opacity: config.storyGroomFamilyOpacity !== undefined ? config.storyGroomFamilyOpacity : 0.85,
@@ -3009,6 +3013,13 @@ export default function InvitationRenderer({
           </section>
         </Scroll3DContainer>
       )}
+
+        {/* 3.5. WEDDING CEREMONY TIMELINE SECTION (Immediately Below Meet the Family) */}
+        {config.showTimelineSection !== false && (
+          <div className="relative w-full my-4 z-20">
+            <WeddingTimeline config={config} isPrintMode={isPrintMode} />
+          </div>
+        )}
 
         {/* 4. VENUE & DESTINATIONS */}
         {config.showVenueSection !== false && (
