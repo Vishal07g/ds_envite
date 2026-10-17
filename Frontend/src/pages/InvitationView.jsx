@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom';
+import { ref, get } from 'firebase/database';
+import { database } from '../utils/firebase';
 import dbStore from '../data/store';
 import InvitationRenderer from '../components/InvitationRenderer';
 import Watermark from '../components/Watermark';
 import PaymentModal from '../components/PaymentModal';
 import Toast from '../components/Toast';
 import { useAuth } from '../context/AuthContext';
-import { SvgEdit, SvgSparkles, SvgCheck } from '../components/icons';
+import { SvgEdit, SvgSparkles, SvgCheck, SvgAward, SvgHeart } from '../components/icons';
 
 export default function InvitationView() {
   const { id } = useParams();
@@ -14,6 +16,8 @@ export default function InvitationView() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const [invitation, setInvitation] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const [toast, setToast] = useState({ show: false, message: "", type: "info" });
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -37,7 +41,10 @@ export default function InvitationView() {
   // Check preview gating or database payment state
   const isPreviewParam = searchParams.get("preview") === "true";
 
-  const loadData = () => {
+  const loadData = async () => {
+    setLoading(true);
+    setNotFound(false);
+
     if (id === "demo") {
       const presetId = searchParams.get("preset") || dbStore.getPresets()[0]?.id;
       const preset = dbStore.getPresetById(presetId) || dbStore.getPresets()[0];
@@ -65,11 +72,46 @@ export default function InvitationView() {
         ],
         isPaid: false
       });
+      setLoading(false);
       return;
     }
 
-    // Try loading synced data
-    const inv = dbStore.getInvitationById(id);
+    // 1. Try local cache
+    let inv = dbStore.getInvitationById(id);
+
+    // 2. If not in local cache, check if ID matches a preset ID
+    if (!inv) {
+      const matchingPreset = dbStore.getPresetById(id);
+      if (matchingPreset) {
+        inv = {
+          id: matchingPreset.id,
+          title: matchingPreset.title,
+          config: matchingPreset.config,
+          rsvps: [],
+          wishes: [],
+          isPaid: false
+        };
+      }
+    }
+
+    // 3. If still not found, fetch live from Firebase database
+    if (!inv && typeof window !== "undefined") {
+      try {
+        const dbRef = ref(database, "saas_data");
+        const snap = await get(dbRef);
+        if (snap.exists()) {
+          const cloudDb = snap.val();
+          const cloudInvs = cloudDb.invitations ? (Array.isArray(cloudDb.invitations) ? cloudDb.invitations : Object.values(cloudDb.invitations)) : [];
+          const foundCloud = cloudInvs.find(i => i.id === id);
+          if (foundCloud) {
+            inv = foundCloud;
+          }
+        }
+      } catch (err) {
+        console.warn("Could not fetch invitation from cloud directly:", err);
+      }
+    }
+
     if (inv) {
       let activeConfig = inv.config;
       const savedTemp = sessionStorage.getItem("preview_temp_config");
@@ -85,7 +127,11 @@ export default function InvitationView() {
         ...inv,
         config: activeConfig
       });
+      setNotFound(false);
+    } else {
+      setNotFound(true);
     }
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -256,18 +302,57 @@ export default function InvitationView() {
     }
   };
 
-  if (!invitation) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-[#0b1329] text-white flex items-center justify-center font-cinzel text-lg tracking-widest uppercase">
-        Loading Invitation...
+      <div className="min-h-screen bg-[#070b19] text-amber-200 flex flex-col items-center justify-center space-y-4 p-4 font-sans select-none">
+        <div className="w-16 h-16 rounded-full border-2 border-amber-400/20 border-t-amber-400 animate-spin flex items-center justify-center">
+          <SvgHeart className="w-7 h-7 text-amber-400 animate-pulse" />
+        </div>
+        <div className="text-center space-y-1">
+          <h2 className="font-cinzel text-lg tracking-widest uppercase font-bold text-amber-300">
+            Opening Invitation...
+          </h2>
+          <p className="text-xs text-slate-400 font-mono">
+            Loading bespoke themes & ceremony details
+          </p>
+        </div>
       </div>
     );
   }
 
-  // Watermark should render if:
-  // - URL has ?preview=true
-  // - AND the invitation is NOT paid
-  const showWatermark = isPreviewParam || !invitation.isPaid;
+  if (notFound || !invitation) {
+    return (
+      <div className="min-h-screen bg-[#070b19] text-slate-100 flex flex-col items-center justify-center p-6 text-center space-y-6">
+        <div className="p-4 rounded-full bg-amber-500/10 border border-amber-500/30">
+          <SvgHeart className="w-12 h-12 text-amber-400" />
+        </div>
+        <div className="max-w-md space-y-2">
+          <h1 className="font-cinzel text-2xl font-bold text-amber-300">Invitation Not Found</h1>
+          <p className="text-sm text-slate-300 leading-relaxed">
+            The invitation link you opened could not be located. It may have expired, been updated, or the link might be incomplete.
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Link
+            to="/invite/demo?preview=true"
+            className="px-6 py-3 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 font-bold uppercase tracking-wider text-xs transition shadow-lg"
+          >
+            Explore Sample Invitation
+          </Link>
+          <Link
+            to="/"
+            className="px-6 py-3 rounded-xl bg-slate-900 border border-amber-500/30 hover:border-amber-400 text-amber-300 font-bold uppercase tracking-wider text-xs transition"
+          >
+            Go to DS Envite Home
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Strict check: if marked paid anywhere in db, it IS paid!
+  const isPaid = !!(invitation.isPaid || invitation.config?.isPaid);
+  const showWatermark = !isPaid;
 
   // Compute moderator access: logged in user who owns the invite, or administrator
   const isModerator = !!(
@@ -283,9 +368,22 @@ export default function InvitationView() {
   const displayedWishes = invitation.wishes || [];
 
   return (
-    <div id="invitation-view-container" className="w-full relative min-h-screen custom-preview-scroller scroll-smooth">
+    <div 
+      id="invitation-view-container" 
+      className={`w-full relative min-h-screen custom-preview-scroller scroll-smooth ${
+        isPaid ? "invitation-hd-ultra" : "invitation-preview-quality"
+      }`}
+    >
       {toast.show && (
         <Toast message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: "" })} />
+      )}
+
+      {/* Official Verified Badge for Paid Invitations */}
+      {isPaid && (
+        <div className="fixed top-3 left-3 z-50 pointer-events-none select-none bg-slate-950/80 backdrop-blur-md border border-emerald-500/40 text-emerald-300 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase flex items-center space-x-1.5 shadow-lg">
+          <SvgCheck className="w-3.5 h-3.5 text-emerald-400" />
+          <span>Official Invitation • Ultra HD</span>
+        </div>
       )}
 
       {/* Sticky Preview Header / Bar */}
@@ -402,10 +500,10 @@ export default function InvitationView() {
       )}
 
       {/* Render diagonal watermark overlay if not paid */}
-      <Watermark isPaid={invitation.isPaid} />
+      <Watermark isPaid={isPaid} />
 
       {/* Sticky Bottom Payment & Watermark Removal Bar (If unpaid) */}
-      {!invitation.isPaid && (
+      {!isPaid && (
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 backdrop-blur-md border border-amber-500/50 px-4 py-2.5 rounded-2xl shadow-2xl flex items-center space-x-3 text-xs text-slate-100 max-w-[95vw] animate-fade-in">
           <div className="flex items-center space-x-2">
             <span className="text-[10px] uppercase font-extrabold text-amber-400 hidden sm:inline">Unlock Full Invitation</span>
