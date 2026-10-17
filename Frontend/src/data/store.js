@@ -728,7 +728,7 @@ const INITIAL_PRESETS = [
 ];
 
 const INITIAL_USERS = [
-  { id: "user-admin", username: "admin", password: "admin123", displayName: "Administrator", role: "admin" },
+  { id: "user-admin", username: "dsenviteadmin", password: "dsenvite1006", displayName: "Administrator", role: "admin" },
   { id: "user-customer", username: "customer", password: "customer123", displayName: "Suman & Vishal", role: "customer" }
 ];
 
