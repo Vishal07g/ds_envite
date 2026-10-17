@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { Link } from 'react-router-dom';
+import dbStore from '../data/store';
 import { formatWeddingDate, formatWeddingTime, formatWeddingDateDmy, getFrameClasses, hexToRgb, parseColor, rgbaToCss } from '../utils/helpers';
 import { 
   SvgHeart, SvgSparkles, SvgCalendar, SvgMapPin, 
@@ -475,7 +477,8 @@ export default function InvitationRenderer({
   onMusicToggle,
   onChangeField,
   onSelectElement,
-  isPrintMode = false
+  isPrintMode = false,
+  isPaid = false
 }) {
   const config = useMemo(() => {
     if (!propConfig.syncColorThemeWithEnvelope) return propConfig;
@@ -494,6 +497,13 @@ export default function InvitationRenderer({
   const [previewCelebrationType, setPreviewCelebrationType] = useState(null);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, isPast: false });
   const [fireworks, setFireworks] = useState([]);
+  const [brandSettings, setBrandSettings] = useState(() => dbStore.getBrandSettings());
+
+  useEffect(() => {
+    const handleSync = () => setBrandSettings(dbStore.getBrandSettings());
+    window.addEventListener("db_synced", handleSync);
+    return () => window.removeEventListener("db_synced", handleSync);
+  }, []);
   
   // Reset card cover state when reveal effect style or shape is changed in settings
   useEffect(() => {
@@ -529,7 +539,7 @@ export default function InvitationRenderer({
   const [widgetPos, setWidgetPos] = useState({ x: null, y: null });
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [isWidgetMinimized, setIsWidgetMinimized] = useState(false);
+  const [isWidgetMinimized, setIsWidgetMinimized] = useState(true);
   const [isWidgetHidden, setIsWidgetHidden] = useState(false);
 
   // Sync Audio Volume across both starting and main tracks
@@ -1011,11 +1021,18 @@ export default function InvitationRenderer({
           className={`fixed z-50 flex items-center animate-fade-in ${isDragging ? 'cursor-grabbing scale-105' : 'cursor-grab'}`}
           title="Click & Drag to move anywhere • Tap to expand music controls"
         >
-          <div className="bg-slate-950/90 backdrop-blur-xl border border-amber-500/60 text-slate-100 rounded-full p-1.5 shadow-2xl flex items-center space-x-1.5 group hover:border-amber-400 transition-all">
+          <div 
+            onClick={() => setIsWidgetMinimized(false)}
+            className="bg-slate-950/90 backdrop-blur-xl border border-amber-500/60 text-slate-100 rounded-full p-1.5 shadow-2xl flex items-center space-x-1.5 group hover:border-amber-400 hover:scale-105 transition-all cursor-pointer select-none"
+            title="Click to view full music controls"
+          >
             <span className="text-slate-400 text-[10px] select-none pl-1 opacity-60 group-hover:opacity-100 cursor-grab">⠿</span>
             <button
               type="button"
-              onClick={() => setIsWidgetMinimized(false)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsWidgetMinimized(false);
+              }}
               className="w-7 h-7 rounded-full bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/50 flex items-center justify-center text-amber-400 transition cursor-pointer"
               title="Expand Music Player Controls"
             >
@@ -1825,10 +1842,36 @@ export default function InvitationRenderer({
 
       {/* Navigation and Controller */}
       {!isPrintMode && (
-        <header className="sticky top-0 z-30 backdrop-blur-md bg-opacity-70 py-3.5 px-4 flex items-center justify-between border-b" style={{ borderColor: `${config.accentGold}35`, backgroundColor: `${config.primaryColor}df` }}>
-          <div className="flex items-center space-x-2">
-            <SvgHeart className="w-5 h-5 text-rose-500 animate-pulse" fill="rgba(244,63,94,0.3)" />
-            <span className="font-cinzel tracking-wider text-xs sm:text-sm" style={customStyles.colorAccent}>
+        <header className="sticky top-0 z-30 backdrop-blur-md bg-opacity-70 py-3 px-4 flex items-center justify-between border-b" style={{ borderColor: `${config.accentGold}35`, backgroundColor: `${config.primaryColor}df` }}>
+          <div className="flex items-center space-x-2.5">
+            {isPaid ? (
+              <Link 
+                to="/"
+                className="flex items-center group transition transform hover:scale-105 shrink-0 mr-1.5"
+                title={brandSettings?.brandName || "DS Envite"}
+              >
+                {brandSettings?.logoUrl ? (
+                  <div className={`w-5.5 h-5.5 sm:w-6 sm:h-6 flex items-center justify-center overflow-hidden border border-amber-500/40 shadow-sm ${
+                    brandSettings.logoShape === 'circle' ? 'rounded-full' : brandSettings.logoShape === 'square' ? 'rounded-none' : 'rounded-md'
+                  } bg-slate-950/85 backdrop-blur-md shrink-0 group-hover:border-amber-400 transition`}>
+                    <img
+                      src={brandSettings.logoUrl}
+                      alt={brandSettings.brandName || "Platform Logo"}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-5.5 h-5.5 sm:w-6 sm:h-6 rounded-full bg-slate-950/85 backdrop-blur-md border border-amber-500/40 flex items-center justify-center shadow-sm group-hover:border-amber-400 transition">
+                    <span className="font-cinzel text-amber-300 font-bold text-[8.5px] tracking-tight">
+                      {(brandSettings?.brandName || "DS").split(" ").map(w => w[0]).join("").slice(0, 2) || "DS"}
+                    </span>
+                  </div>
+                )}
+              </Link>
+            ) : (
+              <SvgHeart className="w-4 h-4 text-rose-500 animate-pulse shrink-0 mr-1" fill="rgba(244,63,94,0.3)" />
+            )}
+            <span className="font-cinzel tracking-wider text-xs sm:text-sm pl-1" style={customStyles.colorAccent}>
               {config.brideName} &amp; {config.groomName}
             </span>
           </div>

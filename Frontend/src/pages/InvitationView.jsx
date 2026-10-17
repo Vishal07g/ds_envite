@@ -23,6 +23,13 @@ export default function InvitationView() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const [tick, setTick] = useState(0);
+  const [brandSettings, setBrandSettings] = useState(() => dbStore.getBrandSettings());
+
+  useEffect(() => {
+    const handleSync = () => setBrandSettings(dbStore.getBrandSettings());
+    window.addEventListener("db_synced", handleSync);
+    return () => window.removeEventListener("db_synced", handleSync);
+  }, []);
 
   // Edit preview details modal state
   const [showEditModal, setShowEditModal] = useState(false);
@@ -487,13 +494,6 @@ export default function InvitationView() {
         <Toast message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: "" })} />
       )}
 
-      {/* Official Verified Badge for Paid Invitations */}
-      {isPaid && (
-        <div className="fixed top-3 left-3 z-50 pointer-events-none select-none bg-slate-950/80 backdrop-blur-md border border-emerald-500/40 text-emerald-300 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase flex items-center space-x-1.5 shadow-lg">
-          <SvgCheck className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Official Invitation • Ultra HD</span>
-        </div>
-      )}
 
       {/* Sticky Preview Header / Bar */}
       {(isPreviewParam || id === 'demo') && (
@@ -658,6 +658,7 @@ export default function InvitationView() {
         showEnvelopeFirst={true} // Enable initial envelope opener animation screen for visitors
         isPlayingMusic={musicPlaying}
         onMusicToggle={setMusicPlaying}
+        isPaid={isPaid}
       />
     </div>
   );
