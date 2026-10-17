@@ -2399,5 +2399,30 @@ a.editor-toolbar-btn span {
   font-weight: 700 !important;
 }
 
+/* ------------------------------------------------
+   INVITATION QUALITY MODES (PAID HD vs PREVIEW)
+   ------------------------------------------------ */
+.invitation-hd-ultra {
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: crisp-edges;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.invitation-hd-ultra img {
+  filter: contrast(102%) brightness(101%);
+  transition: filter 0.3s ease;
+}
+
+.invitation-preview-quality {
+  -webkit-font-smoothing: subpixel-antialiased;
+}
+
+.invitation-preview-quality img {
+  filter: contrast(98%);
+}
+
+
 
 

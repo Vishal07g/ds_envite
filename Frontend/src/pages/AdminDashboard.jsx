@@ -1047,8 +1047,18 @@ export default function AdminDashboard() {
 
   // Actions
   const handleTogglePayment = (id, currentVal) => {
-    dbStore.updateInvitation(id, { isPaid: !currentVal, status: !currentVal ? 'paid' : 'preview' });
-    showToast(`Invitation marked as ${!currentVal ? 'Paid (Watermark removed)' : 'Unpaid (Watermarked)'}`, "success");
+    const nextVal = !currentVal;
+    const inv = dbStore.getInvitationById(id);
+    dbStore.updateInvitation(id, { 
+      isPaid: nextVal, 
+      status: nextVal ? 'paid' : 'preview',
+      config: {
+        ...(inv?.config || {}),
+        isPaid: nextVal
+      }
+    });
+    showToast(`Invitation marked as ${nextVal ? 'Paid (Watermark removed & 4K HD Unlocked)' : 'Unpaid (Watermarked)'}`, "success");
+    setTick(t => t + 1);
   };
 
   const handleToggleOrderPayment = (orderId, currentPaid) => {
@@ -1059,6 +1069,7 @@ export default function AdminDashboard() {
       dbStore.markOrderAsPaid(orderId);
       showToast("Order payment approved! Watermark automatically removed for invitation!", "success");
     }
+    setTick(t => t + 1);
   };
 
   const handleDeleteInvitation = (id) => {
@@ -1344,13 +1355,14 @@ export default function AdminDashboard() {
                           <td className="py-4 text-center">
                             <button
                               onClick={() => handleTogglePayment(inv.id, inv.isPaid)}
-                              className={`px-3 py-1.5 rounded-lg font-bold uppercase tracking-widest text-[9px] transition ${
+                              className={`px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider text-[9px] transition cursor-pointer flex items-center justify-center space-x-1 mx-auto shadow-sm ${
                                 inv.isPaid
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/20 hover:bg-emerald-500/30'
-                                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/20 hover:bg-rose-500/30'
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30'
+                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
                               }`}
+                              title={inv.isPaid ? "Click to revoke payment status & restore watermark" : "Click to mark as paid and remove watermark"}
                             >
-                              {inv.isPaid ? "Paid" : "Mark Paid"}
+                              <span>{inv.isPaid ? "✓ Paid (HD Unlocked)" : "Mark Paid (Unlock HD)"}</span>
                             </button>
                           </td>
                           <td className="py-4 text-center">
