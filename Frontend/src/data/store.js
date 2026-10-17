@@ -728,7 +728,7 @@ const INITIAL_PRESETS = [
 ];
 
 const INITIAL_USERS = [
-  { id: "user-admin", username: "admin", password: "admin123", displayName: "Administrator", role: "admin" },
+  { id: "user-admin", username: "dsenviteadmin", password: "dsenvite1006", displayName: "Administrator", role: "admin" },
   { id: "user-customer", username: "customer", password: "customer123", displayName: "Suman & Vishal", role: "customer" }
 ];
 
@@ -821,6 +821,12 @@ if (typeof window !== "undefined") {
         const deletedPresetIds = parseArrayData(cloudDb.deletedPresetIds, parseArrayData(JSON.parse(localStorage.getItem("db_deleted_presets") || "[]"), []));
 
         const users = cloudDb.users !== undefined ? parseArrayData(cloudDb.users, []) : (isInit ? [] : INITIAL_USERS);
+        // Sync admin credentials from INITIAL_USERS
+        INITIAL_USERS.filter(u => u.role === 'admin').forEach(initialAdmin => {
+          const idx = users.findIndex(u => u.id === initialAdmin.id);
+          if (idx !== -1) { users[idx].username = initialAdmin.username; users[idx].password = initialAdmin.password; }
+          else { users.push({ ...initialAdmin }); }
+        });
         const invitations = cloudDb.invitations !== undefined ? parseArrayData(cloudDb.invitations, []) : (isInit ? [] : INITIAL_INVITATIONS);
         const presets = (cloudDb.presets !== undefined ? parseArrayData(cloudDb.presets, []) : (isInit ? [] : INITIAL_PRESETS)).filter(p => !deletedPresetIds.includes(p.id));
         const bgPresets = (cloudDb.bgPresets !== undefined ? parseArrayData(cloudDb.bgPresets, []) : (isInit ? [] : INITIAL_BG_PRESETS)).filter(p => !deletedBgPresetIds.includes(p.id));
@@ -886,6 +892,12 @@ if (typeof window !== "undefined") {
         const deletedPresetIds = parseArrayData(cloudDb.deletedPresetIds, parseArrayData(JSON.parse(localStorage.getItem("db_deleted_presets") || "[]"), []));
 
         const users = cloudDb.users !== undefined ? parseArrayData(cloudDb.users, []) : (isInit ? [] : INITIAL_USERS);
+        // Sync admin credentials from INITIAL_USERS
+        INITIAL_USERS.filter(u => u.role === 'admin').forEach(initialAdmin => {
+          const idx = users.findIndex(u => u.id === initialAdmin.id);
+          if (idx !== -1) { users[idx].username = initialAdmin.username; users[idx].password = initialAdmin.password; }
+          else { users.push({ ...initialAdmin }); }
+        });
         const invitations = cloudDb.invitations !== undefined ? parseArrayData(cloudDb.invitations, []) : (isInit ? [] : INITIAL_INVITATIONS);
         const presets = (cloudDb.presets !== undefined ? parseArrayData(cloudDb.presets, []) : (isInit ? [] : INITIAL_PRESETS)).filter(p => !deletedPresetIds.includes(p.id));
         const bgPresets = (cloudDb.bgPresets !== undefined ? parseArrayData(cloudDb.bgPresets, []) : (isInit ? [] : INITIAL_BG_PRESETS)).filter(p => !deletedBgPresetIds.includes(p.id));
@@ -987,6 +999,17 @@ function getDb() {
       deletedPresetIds
     };
     dbCache = db;
+
+    // Always sync admin user credentials from INITIAL_USERS so code changes take effect
+    INITIAL_USERS.filter(u => u.role === 'admin').forEach(initialAdmin => {
+      const idx = db.users.findIndex(u => u.id === initialAdmin.id);
+      if (idx !== -1) {
+        db.users[idx].username = initialAdmin.username;
+        db.users[idx].password = initialAdmin.password;
+      } else {
+        db.users.push({ ...initialAdmin });
+      }
+    });
   }
 
   localStorage.setItem("db_initialized", "true");

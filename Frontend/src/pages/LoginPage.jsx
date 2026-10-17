@@ -184,22 +184,7 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Quick Help */}
-        {!isSignUp && (
-          <div className="p-3.5 bg-slate-900/90 rounded-xl border border-amber-500/30 text-[11px] text-slate-100 space-y-1.5 font-bold shadow-lg">
-            <p className="font-extrabold text-amber-300 uppercase tracking-wider text-[10px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
-              🔑 Quick Demo Credentials:
-            </p>
-            <p className="flex items-center justify-between text-slate-200">
-              <span>Admin Portal:</span>
-              <span className="text-amber-300 font-mono font-black bg-slate-950 px-2 py-0.5 rounded border border-amber-500/30">admin / admin123</span>
-            </p>
-            <p className="flex items-center justify-between text-slate-200">
-              <span>Customer Portal:</span>
-              <span className="text-amber-300 font-mono font-black bg-slate-950 px-2 py-0.5 rounded border border-amber-500/30">customer / customer123</span>
-            </p>
-          </div>
-        )}
+
       </div>
 
       {/* FORGOT PASSWORD RESET MODAL */}
