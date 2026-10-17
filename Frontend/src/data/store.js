@@ -1,6 +1,7 @@
 // LocalStorage CRUD Database Store for Wedding Invitation SaaS
 import { ref, set, get, onValue } from "firebase/database";
 import { database } from "../utils/firebase";
+import { DEFAULT_TIMELINE_CONFIG } from "./timelineDefaults";
 
 // Firebase Realtime Database sync status
 let isFirebaseSynced = false;
@@ -112,6 +113,7 @@ export const CURATED_CLIPARTS = [
 ];
 
 const DEFAULT_CONFIG = {
+  ...DEFAULT_TIMELINE_CONFIG,
   brideName: "Suman",
   brideFamily: "Mr. & Mrs. Rajesh Sharma",
   groomName: "Vishal",

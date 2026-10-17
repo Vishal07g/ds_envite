@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { hexToRgb, rgbToHex, compressImage, parseColor, rgbaToCss } from '../utils/helpers';
 import dbStore, { CURATED_MUSIC_PRESETS, CURATED_CLIPARTS } from '../data/store';
 import CustomDialog from './CustomDialog';
+import TimelineEditorDrawer from './TimelineEditorDrawer';
 import { 
   SvgX, SvgHeart, SvgSettings, SvgSparkles, SvgCalendar, 
   SvgMapPin, SvgUsers, SvgMessageSquare, SvgSliders, 
@@ -1533,6 +1534,7 @@ export default function AdminSidebar({
     { id: "music", name: "Background Music", icon: <SvgVolume2 className="w-4 h-4" />, toggleKey: "showMusic" },
     { id: "scratch", name: "Scratch & Reveal", icon: <SvgEye className="w-4 h-4" />, toggleKey: "showScratchSection" },
     { id: "couple", name: "Couple & Family", icon: <SvgUsers className="w-4 h-4" />, toggleKey: "showCoupleSection" },
+    { id: "timeline", name: "Wedding Timeline", icon: <SvgCalendar className="w-4 h-4" />, toggleKey: "showTimelineSection" },
     { id: "venue", name: "Event Venues", icon: <SvgMapPin className="w-4 h-4" />, toggleKey: "showVenueSection" },
     { id: "gallery", name: "Our Gallery", icon: <SvgLayers className="w-4 h-4" />, toggleKey: "showGallery" },
     { id: "rsvp", name: "RSVP & Wishes", icon: <SvgMessageSquare className="w-4 h-4" />, toggleKey: "showRsvpSection" },
@@ -5308,6 +5310,15 @@ export default function AdminSidebar({
           </div>
         )}
 
+        {/* WEDDING TIMELINE TAB */}
+        {activeTab === "timeline" && (
+          <TimelineEditorDrawer
+            config={config}
+            onChangeField={onChangeField}
+            triggerDialog={triggerDialog}
+          />
+        )}
+
         {/* EVENT VENUES TAB */}
         {activeTab === "venue" && (
           <div className="space-y-4">
@@ -6386,4 +6397,3 @@ export default function AdminSidebar({
     </div>
   );
 }
-export { RELIGIONS };

@@ -242,65 +242,63 @@ export default function InvitationEditor() {
         sidebarOpen ? 'h-[45vh] md:h-full' : 'h-full'
       }`}>
         
-        {/* Editor floating toolbar */}
-        <div className="h-14 border-b border-[#E9DCCB] bg-[#F7EFE5] px-3 flex items-center justify-between shrink-0 z-20 shadow-xs">
-          <div className="flex items-center space-x-2">
+        {/* Editor floating toolbar with smooth horizontal scrolling */}
+        <div className="editor-top-toolbar w-full border-b border-[#E9DCCB] bg-[#F7EFE5] px-2 shrink-0 z-20 shadow-xs">
+          <div className="flex items-center gap-1.5 py-1 flex-nowrap shrink-0">
             {!sidebarOpen && (
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer"
+                className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
+                title="Open Customization Controls"
               >
-                <SvgSliders className="w-4 h-4 shrink-0 text-[#68472D]" />
-                <span className="hidden xs:inline">Customize</span>
+                <SvgSliders className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
+                <span>Customize</span>
               </button>
             )}
 
-            <div className="flex items-center ml-1">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="bg-white border border-[#E9DCCB] rounded-xl px-2.5 py-1 text-xs sm:text-sm font-bold tracking-wide text-[#513321] max-w-[120px] xs:max-w-[180px] sm:max-w-[220px] truncate shadow-2xs focus:outline-none focus:border-[#C49A4A]"
-                placeholder="Invitation Title"
-              />
-            </div>
-          </div>
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs shrink-0 w-[110px] xl:w-[125px] 2xl:w-[140px] focus:outline-none focus:border-[#C49A4A]"
+              placeholder="Title"
+              title="Invitation Title"
+            />
 
-          <div className="flex items-center space-x-1.5">
             <button
               onClick={() => setShowAiModal(true)}
-              className="editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer"
+              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
               title="Generate AI Wedding Wording with Gemini AI"
             >
-              <SvgSparkles className="w-4 h-4 shrink-0 text-[#7C3AED] animate-pulse" />
-              <span className="hidden lg:inline">AI Wording</span>
+              <SvgSparkles className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
+              <span>AI Wording</span>
             </button>
 
             <button
               onClick={() => setShowGuestModal(true)}
-              className="editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer"
+              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
               title="Manage Guests & RSVP List"
             >
-              <SvgUsers className="w-4 h-4 shrink-0 text-[#2563EB]" />
-              <span className="hidden lg:inline">Guests</span>
+              <SvgUsers className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
+              <span>Guests</span>
             </button>
 
             <button
               onClick={() => downloadPrintablePdfCard(config, id)}
-              className="editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer"
+              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
               title="Download Printable PDF Invitation Card"
             >
-              <SvgDownload className="w-4 h-4 shrink-0 text-[#059669]" />
-              <span>PDF Card</span>
+              <SvgDownload className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
+              <span>PDF</span>
             </button>
 
             <button
               onClick={() => downloadInvitationImage(config)}
-              className="editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer"
+              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
               title="Export High-Res PNG Image"
             >
-              <SvgImage className="w-4 h-4 shrink-0 text-[#E11D48]" />
-              <span>PNG Card</span>
+              <SvgImage className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
+              <span>PNG</span>
             </button>
 
             <button
@@ -308,63 +306,66 @@ export default function InvitationEditor() {
                 downloadStandaloneHtmlWebsite(config, { id });
                 showToast("Standalone HTML website downloaded! Opens in any browser with zero login.", "success");
               }}
-              className="editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer text-amber-700 hover:text-amber-600 bg-amber-500/10"
+              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
               title="Download 100% Independent Standalone Interactive HTML Website (Runs offline & online without any login)"
             >
-              <span className="text-xs">🌐</span>
-              <span className="hidden sm:inline">HTML Website</span>
+              <span className="text-[11px] leading-none">🌐</span>
+              <span>HTML</span>
             </button>
 
             <button
               onClick={() => setPreviewEnvelope(!previewEnvelope)}
-              className={`editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer ${
-                previewEnvelope ? 'editor-toolbar-btn-active' : ''
+              className={`h-8 px-3 rounded-full border text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer transition ${
+                previewEnvelope 
+                  ? 'bg-[#FFFDF9] border-[#C49A4A] text-[#8A4B1A] ring-1 ring-[#C49A4A]' 
+                  : 'bg-white border-[#E9DCCB] text-[#513321] hover:bg-[#FAF7F2] hover:border-[#C49A4A]'
               }`}
               title="Toggle Full-Screen Envelope Live Preview"
             >
-              <SvgMail className="w-4 h-4 shrink-0 text-[#8D414D]" />
-              <span>{previewEnvelope ? "View Card" : "Envelope View"}</span>
+              <SvgMail className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
+              <span>{previewEnvelope ? "Card" : "Envelope"}</span>
             </button>
 
             <button
               onClick={() => handleFieldChange("showGlobalBorder", config.showGlobalBorder === false ? true : false)}
-              className={`editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer ${
+              className={`h-8 px-3 rounded-full border text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer transition ${
                 config.showGlobalBorder !== false 
-                  ? 'bg-amber-500/15 border-amber-500/60 text-amber-500 shadow-sm font-black' 
-                  : 'text-slate-400 hover:text-slate-200'
+                  ? 'bg-[#FFFDF9] border-[#C49A4A] text-[#8A4B1A] ring-1 ring-[#C49A4A]' 
+                  : 'bg-white border-[#E9DCCB] text-[#513321] hover:bg-[#FAF7F2] hover:border-[#C49A4A]'
               }`}
               title="Toggle Luxury Border Frame ON/OFF"
             >
-              <span className="text-xs">🖼️</span>
+              <span className="text-[11px] leading-none">🖼️</span>
               <span>Frame: {config.showGlobalBorder !== false ? "ON" : "OFF"}</span>
             </button>
 
             {id && (
               <button
                 onClick={() => setShowShareModal(true)}
-                className="editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer bg-gradient-to-r from-amber-400/20 to-yellow-500/20 text-[#513321] border-amber-500/40"
+                className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
                 title="Share Invitation Website (Copy Link, WhatsApp, Standalone HTML)"
               >
-                <SvgCopy className="w-4 h-4 shrink-0 text-[#68472D]" />
-                <span>Share Link</span>
+                <SvgCopy className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
+                <span>Share</span>
               </button>
             )}
 
             <button
               onClick={handleSave}
-              className="editor-toolbar-btn-primary px-3 py-1.5 sm:px-4 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center space-x-1.5 shadow-sm hover:shadow-md cursor-pointer"
+              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
+              title="Save All Customization Changes"
             >
-              <SvgCheck className="w-4 h-4 shrink-0 text-[#382416]" />
-              <span className="hidden md:inline">Save Changes</span>
+              <SvgCheck className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
+              <span>Save</span>
             </button>
 
             <button
               onClick={() => navigate(currentUser?.role === 'customer' ? '/customer' : '/admin')}
-              className="editor-toolbar-btn px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all duration-200 flex items-center space-x-1.5 shadow-xs cursor-pointer"
+              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
               title="Return to Dashboard"
             >
-              <SvgLogOut className="w-4 h-4 shrink-0 text-[#68472D]" />
-              <span className="hidden md:inline">Dashboard</span>
+              <SvgLogOut className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
+              <span>Dashboard</span>
             </button>
           </div>
         </div>

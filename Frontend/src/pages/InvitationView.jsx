@@ -3,6 +3,7 @@ import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { ref, get } from 'firebase/database';
 import { database } from '../utils/firebase';
 import dbStore from '../data/store';
+import { DEFAULT_TIMELINE_CONFIG } from '../data/timelineDefaults';
 import InvitationRenderer from '../components/InvitationRenderer';
 import Watermark from '../components/Watermark';
 import PaymentModal from '../components/PaymentModal';
@@ -56,7 +57,10 @@ export default function InvitationView() {
       const presetId = searchParams.get("preset") || dbStore.getPresets()[0]?.id;
       const preset = dbStore.getPresetById(presetId) || dbStore.getPresets()[0];
       
-      let activeConfig = preset?.config || dbStore.getPresets()[0]?.config;
+      let activeConfig = {
+        ...DEFAULT_TIMELINE_CONFIG,
+        ...(preset?.config || dbStore.getPresets()[0]?.config || {})
+      };
       const savedTemp = sessionStorage.getItem("preview_temp_config");
       if (savedTemp) {
         try {
@@ -120,7 +124,10 @@ export default function InvitationView() {
     }
 
     if (inv) {
-      let activeConfig = inv.config;
+      let activeConfig = {
+        ...DEFAULT_TIMELINE_CONFIG,
+        ...(inv.config || {})
+      };
       const savedTemp = sessionStorage.getItem("preview_temp_config");
       if (isPreviewParam && savedTemp) {
         try {
