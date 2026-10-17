@@ -100,6 +100,16 @@ export default function InvitationView() {
     return () => window.removeEventListener("db_synced", handleSync);
   }, [id, isPreviewParam]);
 
+  useEffect(() => {
+    if (invitation?.config) {
+      const bride = invitation.config.brideName || "";
+      const groom = invitation.config.groomName || "";
+      if (bride && groom) {
+        document.title = `${bride} & ${groom} | Wedding Invitation — DS Envite`;
+      }
+    }
+  }, [invitation]);
+
   const handleRsvpSubmit = async (form) => {
     if (id === "demo") {
       setInvitation(prev => ({
