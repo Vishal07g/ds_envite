@@ -14,7 +14,7 @@ import InvoiceModal from '../components/InvoiceModal';
 import InvitationTypeDropdown from '../components/InvitationTypeDropdown';
 import AiAssistantModal from '../components/AiAssistantModal';
 import GuestManagerModal from '../components/GuestManagerModal';
-import { downloadPrintablePdfCard, downloadInvitationImage } from '../utils/exportInvitation';
+import { downloadPrintablePdfCard, downloadInvitationImage, downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
 
 export default function CustomerDashboard() {
   const { currentUser } = useAuth();
@@ -778,6 +778,28 @@ export default function CustomerDashboard() {
                 >
                   <span>Email Invitation</span>
                 </button>
+              </div>
+
+              <button
+                onClick={() => {
+                  downloadStandaloneHtmlWebsite(activeShareInvite.config, activeShareInvite);
+                  showToast("Standalone HTML website downloaded! Opens in any browser with zero login.", "success");
+                }}
+                className="w-full py-2.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold uppercase tracking-wider transition flex items-center justify-center space-x-2 cursor-pointer mt-2"
+                title="Download single-file interactive website (.html) that opens in any browser with zero login"
+              >
+                <span>🌐</span>
+                <span>Download Standalone HTML Website</span>
+              </button>
+
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[10px] text-amber-300/90 space-y-1">
+                <p className="font-bold flex items-center space-x-1">
+                  <span>💡</span>
+                  <span>No Login Required for Guests</span>
+                </p>
+                <p className="text-slate-300 leading-relaxed">
+                  Anyone who receives this link can view the card, scratch the cover, RSVP, and post blessings without signing in. If a Vercel login screen appears on your link, turn off <strong>Deployment Protection</strong> in your Vercel Dashboard project settings.
+                </p>
               </div>
             </div>
           ) : (
