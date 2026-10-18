@@ -1394,7 +1394,7 @@ export default function AdminDashboard() {
                               <span>🌐 HTML</span>
                             </button>
                             <Link
-                              to={`/invite/${inv.id}`}
+                              to={`/invite/${dbStore.getInvitationShareSlug(inv)}`}
                               target="_blank"
                               className="p-2 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition inline-flex items-center"
                               title="View Invitation"

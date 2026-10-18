@@ -199,7 +199,8 @@ export default function InvitationEditor() {
   const handleCopyLink = () => {
     if (!id) return;
     const origin = window.location.origin;
-    const shareUrl = `${origin}/invite/${id}${isPaid ? '' : '?preview=true'}`;
+    const shareSlug = dbStore.getInvitationShareSlug(invitation || { id, config });
+    const shareUrl = `${origin}/invite/${shareSlug}${isPaid ? '' : '?preview=true'}`;
     navigator.clipboard.writeText(shareUrl);
     showToast("Invitation preview link copied!", "success");
   };
@@ -449,7 +450,7 @@ export default function InvitationEditor() {
         isOpen={showGuestModal}
         onClose={() => setShowGuestModal(false)}
         guests={invitation?.guestList || []}
-        inviteUrl={id ? `${window.location.origin}/invite/${id}` : ""}
+        inviteUrl={id ? `${window.location.origin}/invite/${dbStore.getInvitationShareSlug(invitation || { id, config })}` : ""}
         brideName={config.brideName || "Ananya"}
         groomName={config.groomName || "Aarav"}
         onUpdateGuests={(newList) => {
@@ -463,6 +464,7 @@ export default function InvitationEditor() {
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
         invitationId={id}
+        invitation={invitation}
         config={config}
         isPaid={isPaid}
         showToast={showToast}

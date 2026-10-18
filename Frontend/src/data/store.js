@@ -1012,26 +1012,39 @@ function getDb() {
           : { ...(inv.config || {}) };
 
         // Clean out legacy starter names Suman & Vishal to fresh placeholder names Ananya & Aarav
-        if (updatedConfig.brideName === "Suman" || !updatedConfig.brideName) {
+        if (!updatedConfig.brideName || /suman/i.test(updatedConfig.brideName)) {
           updatedConfig.brideName = "Ananya";
         }
-        if (updatedConfig.groomName === "Vishal" || !updatedConfig.groomName) {
+        if (!updatedConfig.groomName || /vishal/i.test(updatedConfig.groomName)) {
           updatedConfig.groomName = "Aarav";
         }
-        if (updatedConfig.envelopeNamesText && (updatedConfig.envelopeNamesText.includes("Suman") || updatedConfig.envelopeNamesText.includes("Vishal"))) {
-          updatedConfig.envelopeNamesText = updatedConfig.envelopeNamesText.replace(/Suman/g, "Ananya").replace(/Vishal/g, "Aarav");
+        if (updatedConfig.envelopeNamesText && (/suman/i.test(updatedConfig.envelopeNamesText) || /vishal/i.test(updatedConfig.envelopeNamesText))) {
+          updatedConfig.envelopeNamesText = updatedConfig.envelopeNamesText.replace(/suman/gi, "Ananya").replace(/vishal/gi, "Aarav");
         }
         let updatedTitle = inv.title;
-        if (updatedTitle && (updatedTitle.includes("Suman") || updatedTitle.includes("Vishal"))) {
-          updatedTitle = updatedTitle.replace(/Suman/g, "Ananya").replace(/Vishal/g, "Aarav");
+        if (updatedTitle && (/suman/i.test(updatedTitle) || /vishal/i.test(updatedTitle))) {
+          updatedTitle = updatedTitle.replace(/suman/gi, "Ananya").replace(/vishal/gi, "Aarav");
         }
         let updatedShareText = inv.shareText;
-        if (updatedShareText && (updatedShareText.includes("Suman") || updatedShareText.includes("Vishal"))) {
-          updatedShareText = updatedShareText.replace(/Suman/g, "Ananya").replace(/Vishal/g, "Aarav");
+        if (updatedShareText && (/suman/i.test(updatedShareText) || /vishal/i.test(updatedShareText))) {
+          updatedShareText = updatedShareText.replace(/suman/gi, "Ananya").replace(/vishal/gi, "Aarav");
         }
+
+        const brideName = updatedConfig.brideName || "Ananya";
+        const groomName = updatedConfig.groomName || "Aarav";
+        const defaultNameSlug = ((brideName && groomName) ? `${brideName}-${groomName}` : (updatedTitle || "wedding"))
+          .toLowerCase()
+          .replace(/&/g, "and")
+          .replace(/['’]/g, "")
+          .replace(/[^a-z0-9]+/g, "-")
+          .replace(/^-+|-+$/g, "");
+        const rawId = (inv.id || "").replace(/^invite-/, "");
+        const computedSlug = inv.customSlug || inv.slug || `${defaultNameSlug}-${rawId || "invite"}`;
 
         return {
           ...inv,
+          slug: computedSlug,
+          customSlug: inv.customSlug || computedSlug,
           title: updatedTitle,
           shareText: updatedShareText,
           wishes: cleanWishes,
@@ -1297,20 +1310,110 @@ export const dbStore = {
   getInvitationsByCustomer(customerId) {
     return this.getInvitations().filter(inv => inv.customerId === customerId);
   },
-  getInvitationById(id) {
-    return this.getInvitations().find(inv => inv.id === id);
+  slugify(text) {
+    return (text || "")
+      .toString()
+      .toLowerCase()
+      .replace(/&/g, "and")
+      .replace(/['’]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+  },
+
+  getInvitationShareSlug(invitation, configOverride = null) {
+    if (!invitation) return "wedding-invitation";
+    if (invitation.customSlug && typeof invitation.customSlug === "string" && invitation.customSlug.trim()) {
+      return this.slugify(invitation.customSlug.trim());
+    }
+
+    const cfg = configOverride || invitation.config || {};
+    const bride = (cfg.brideName || "").trim();
+    const groom = (cfg.groomName || "").trim();
+    const title = (invitation.title || "").trim();
+
+    let namePart = "";
+    if (bride && groom) {
+      namePart = `${bride}-${groom}`;
+    } else if (bride || groom) {
+      namePart = bride || groom;
+    } else if (title && !title.toLowerCase().includes("untitled")) {
+      namePart = title.replace(/\bwedding\b/gi, "").replace(/\binvitation\b/gi, "").trim();
+    } else if (invitation.customerId) {
+      const user = this.getUserById(invitation.customerId);
+      if (user?.displayName) {
+        namePart = user.displayName;
+      }
+    }
+
+    const cleanName = this.slugify(namePart) || "wedding";
+    const rawId = (invitation.id || "").replace(/^invite-/, "");
+    const uniqueSuffix = rawId || "invite";
+
+    if (cleanName.endsWith(uniqueSuffix)) {
+      return cleanName;
+    }
+
+    return `${cleanName}-${uniqueSuffix}`;
+  },
+
+  getInvitationById(idOrSlug) {
+    if (!idOrSlug) return null;
+    const invs = this.getInvitations();
+
+    // 1. Direct match on id
+    let found = invs.find(inv => inv.id === idOrSlug);
+    if (found) return found;
+
+    // 2. Direct match on customSlug or slug
+    found = invs.find(inv => inv.slug === idOrSlug || inv.customSlug === idOrSlug);
+    if (found) return found;
+
+    // 3. Extract embedded numeric ID timestamp (e.g. 1791722047377)
+    const numMatch = String(idOrSlug).match(/(\d{6,})/);
+    if (numMatch) {
+      const num = numMatch[1];
+      found = invs.find(inv => 
+        (inv.id && inv.id.includes(num)) || 
+        (inv.slug && inv.slug.includes(num)) || 
+        (inv.customSlug && inv.customSlug.includes(num))
+      );
+      if (found) return found;
+    }
+
+    // 4. Match stripped "invite-" prefix or suffix
+    const stripped = String(idOrSlug).replace(/^invite-/, "");
+    found = invs.find(inv => {
+      const invStripped = (inv.id || "").replace(/^invite-/, "");
+      return invStripped === stripped || String(idOrSlug).endsWith(invStripped) || (inv.slug && inv.slug.endsWith(stripped));
+    });
+    if (found) return found;
+
+    // 5. Match by computed share slug
+    found = invs.find(inv => this.getInvitationShareSlug(inv) === idOrSlug);
+    if (found) return found;
+
+    return null;
   },
   createInvitation(customerId, title, config = DEFAULT_CONFIG, isPaid = false, status = "draft") {
     const db = getDb();
+    const timestamp = Date.now();
+    const bride = config.brideName || "Ananya";
+    const groom = config.groomName || "Aarav";
+    const nameSlug = this.slugify(`${bride}-${groom}`) || "wedding";
+    const uniqueId = `invite-${timestamp}`;
+    const initialSlug = `${nameSlug}-${timestamp}`;
+
     const newInv = {
-      id: `invite-${Date.now()}`,
+      id: uniqueId,
+      slug: initialSlug,
+      customSlug: initialSlug,
       customerId,
-      title,
+      title: title || `${bride} & ${groom}'s Wedding`,
       config: { ...DEFAULT_CONFIG, ...config },
       rsvps: [],
       wishes: [],
       isPaid,
-      shareText: `We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - ${config.brideName || 'Bride'} & ${config.groomName || 'Groom'}`,
+      shareText: `We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - ${bride} & ${groom}`,
       status,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
