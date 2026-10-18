@@ -31,8 +31,8 @@ export default function PresetGallery() {
     const cfg = preset.config || {};
     setPreviewPreset(preset);
     setPreviewForm({
-      brideName: currentUser?.displayName?.split("&")[0]?.trim() || cfg.brideName || "Suman",
-      groomName: currentUser?.displayName?.split("&")[1]?.trim() || cfg.groomName || "Vishal",
+      brideName: currentUser?.displayName?.split("&")[0]?.trim() || cfg.brideName || "Ananya",
+      groomName: currentUser?.displayName?.split("&")[1]?.trim() || cfg.groomName || "Aarav",
       weddingDate: cfg.weddingDate ? cfg.weddingDate.slice(0, 10) : new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       weddingVenue: cfg.weddingVenue || "The Starlight Cathedral",
       introQuote: cfg.introQuote || "Joined in holy matrimony, we celebrate a bond written in heaven."
@@ -485,7 +485,7 @@ export default function PresetGallery() {
                     value={previewForm.brideName}
                     onChange={(e) => setPreviewForm(prev => ({ ...prev, brideName: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded text-xs focus:outline-none focus:border-amber-500 text-slate-100"
-                    placeholder="Suman"
+                    placeholder="Ananya"
                   />
                 </div>
                 <div>
@@ -495,7 +495,7 @@ export default function PresetGallery() {
                     value={previewForm.groomName}
                     onChange={(e) => setPreviewForm(prev => ({ ...prev, groomName: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded text-xs focus:outline-none focus:border-amber-500 text-slate-100"
-                    placeholder="Vishal"
+                    placeholder="Aarav"
                   />
                 </div>
               </div>

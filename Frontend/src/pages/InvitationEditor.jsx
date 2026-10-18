@@ -239,20 +239,20 @@ export default function InvitationEditor() {
 
       {/* Split screen content: Live preview with floating control bar */}
       <div className={`flex-1 flex flex-col relative overflow-hidden w-full order-first md:order-last ${
-        sidebarOpen ? 'h-[45vh] md:h-full' : 'h-full'
+        sidebarOpen ? 'h-[45vh] md:h-full sidebar-open' : 'h-full sidebar-closed'
       }`}>
         
-        {/* Editor floating toolbar with smooth horizontal scrolling */}
-        <div className="editor-top-toolbar w-full border-b border-[#E9DCCB] bg-[#F7EFE5] px-2 shrink-0 z-20 shadow-xs">
-          <div className="flex items-center gap-1.5 py-1 flex-nowrap shrink-0">
+        {/* Editor floating toolbar with smooth responsive fit */}
+        <div className="editor-top-toolbar w-full border-b border-[#E9DCCB] bg-[#F7EFE5] px-1 sm:px-2 shrink-0 z-20 shadow-xs">
+          <div className="editor-toolbar-inner flex items-center gap-1 py-0.5 w-full min-w-0">
             {!sidebarOpen && (
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
+                className="editor-toolbar-btn editor-toolbar-btn-collapsible"
                 title="Open Customization Controls"
               >
-                <SvgSliders className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
-                <span>Customize</span>
+                <SvgSliders className="w-3 h-3 shrink-0 text-[#513321]" />
+                <span className="editor-btn-text">Customize</span>
               </button>
             )}
 
@@ -260,45 +260,45 @@ export default function InvitationEditor() {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs shrink-0 w-[110px] xl:w-[125px] 2xl:w-[140px] focus:outline-none focus:border-[#C49A4A]"
+              className="editor-toolbar-input w-[70px] sm:w-[80px] 2xl:w-[95px] focus:outline-none focus:border-[#C49A4A]"
               placeholder="Title"
               title="Invitation Title"
             />
 
             <button
               onClick={() => setShowAiModal(true)}
-              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
+              className="editor-toolbar-btn editor-toolbar-btn-collapsible"
               title="Generate AI Wedding Wording with Gemini AI"
             >
-              <SvgSparkles className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
-              <span>AI Wording</span>
+              <SvgSparkles className="w-3 h-3 shrink-0 text-[#513321]" />
+              <span className="editor-btn-text">AI Wording</span>
             </button>
 
             <button
               onClick={() => setShowGuestModal(true)}
-              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
+              className="editor-toolbar-btn editor-toolbar-btn-collapsible"
               title="Manage Guests & RSVP List"
             >
-              <SvgUsers className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
-              <span>Guests</span>
+              <SvgUsers className="w-3 h-3 shrink-0 text-[#513321]" />
+              <span className="editor-btn-text">Guests</span>
             </button>
 
             <button
               onClick={() => downloadPrintablePdfCard(config, id)}
-              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
+              className="editor-toolbar-btn editor-toolbar-btn-collapsible"
               title="Download Printable PDF Invitation Card"
             >
-              <SvgDownload className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
-              <span>PDF</span>
+              <SvgDownload className="w-3 h-3 shrink-0 text-[#513321]" />
+              <span className="editor-btn-text">PDF</span>
             </button>
 
             <button
               onClick={() => downloadInvitationImage(config)}
-              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
+              className="editor-toolbar-btn editor-toolbar-btn-collapsible"
               title="Export High-Res PNG Image"
             >
-              <SvgImage className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
-              <span>PNG</span>
+              <SvgImage className="w-3 h-3 shrink-0 text-[#513321]" />
+              <span className="editor-btn-text">PNG</span>
             </button>
 
             <button
@@ -306,65 +306,61 @@ export default function InvitationEditor() {
                 downloadStandaloneHtmlWebsite(config, { id });
                 showToast("Standalone HTML website downloaded! Opens in any browser with zero login.", "success");
               }}
-              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
+              className="editor-toolbar-btn editor-toolbar-btn-collapsible"
               title="Download 100% Independent Standalone Interactive HTML Website (Runs offline & online without any login)"
             >
-              <span className="text-[11px] leading-none">🌐</span>
-              <span>HTML</span>
+              <span className="text-[10px] leading-none">🌐</span>
+              <span className="editor-btn-text">HTML</span>
             </button>
 
             <button
               onClick={() => setPreviewEnvelope(!previewEnvelope)}
-              className={`h-8 px-3 rounded-full border text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer transition ${
-                previewEnvelope 
-                  ? 'bg-[#FFFDF9] border-[#C49A4A] text-[#8A4B1A] ring-1 ring-[#C49A4A]' 
-                  : 'bg-white border-[#E9DCCB] text-[#513321] hover:bg-[#FAF7F2] hover:border-[#C49A4A]'
+              className={`editor-toolbar-btn editor-toolbar-btn-collapsible ${
+                previewEnvelope ? 'editor-toolbar-btn-active' : ''
               }`}
               title="Toggle Full-Screen Envelope Live Preview"
             >
-              <SvgMail className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
-              <span>{previewEnvelope ? "Card" : "Envelope"}</span>
+              <SvgMail className="w-3 h-3 shrink-0 text-[#513321]" />
+              <span className="editor-btn-text">{previewEnvelope ? "Card" : "Envelope"}</span>
             </button>
 
             <button
               onClick={() => handleFieldChange("showGlobalBorder", config.showGlobalBorder === false ? true : false)}
-              className={`h-8 px-3 rounded-full border text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer transition ${
-                config.showGlobalBorder !== false 
-                  ? 'bg-[#FFFDF9] border-[#C49A4A] text-[#8A4B1A] ring-1 ring-[#C49A4A]' 
-                  : 'bg-white border-[#E9DCCB] text-[#513321] hover:bg-[#FAF7F2] hover:border-[#C49A4A]'
+              className={`editor-toolbar-btn editor-toolbar-btn-collapsible ${
+                config.showGlobalBorder !== false ? 'editor-toolbar-btn-active' : ''
               }`}
               title="Toggle Luxury Border Frame ON/OFF"
             >
-              <span className="text-[11px] leading-none">🖼️</span>
-              <span>Frame: {config.showGlobalBorder !== false ? "ON" : "OFF"}</span>
+              <span className="text-[10px] leading-none">🖼️</span>
+              <span className="editor-btn-text">Frame: {config.showGlobalBorder !== false ? "ON" : "OFF"}</span>
             </button>
 
             {id && (
               <button
                 onClick={() => setShowShareModal(true)}
-                className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
+                className="editor-toolbar-btn editor-toolbar-btn-collapsible"
                 title="Share Invitation Website (Copy Link, WhatsApp, Standalone HTML)"
               >
-                <SvgCopy className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
-                <span>Share</span>
+                <SvgCopy className="w-3 h-3 shrink-0 text-[#513321]" />
+                <span className="editor-btn-text">Share</span>
               </button>
             )}
 
             <button
               onClick={handleSave}
-              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
+              className="editor-toolbar-btn editor-toolbar-btn-primary"
               title="Save All Customization Changes"
             >
-              <SvgCheck className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
+              <SvgCheck className="w-3 h-3 shrink-0 text-[#513321]" />
               <span>Save</span>
             </button>
 
             <button
               onClick={() => navigate(currentUser?.role === 'customer' ? '/customer' : '/admin')}
-              className="h-8 px-3 rounded-full bg-white border border-[#E9DCCB] text-[#513321] text-[11.5px] font-bold shadow-xs inline-flex items-center justify-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer hover:bg-[#FAF7F2] hover:border-[#C49A4A] transition"
+              className="editor-toolbar-btn"
               title="Return to Dashboard"
             >
-              <SvgLogOut className="w-3.5 h-3.5 shrink-0 text-[#513321]" />
+              <SvgLogOut className="w-3 h-3 shrink-0 text-[#513321]" />
               <span>Dashboard</span>
             </button>
           </div>
@@ -440,8 +436,8 @@ export default function InvitationEditor() {
       <AiAssistantModal
         isOpen={showAiModal}
         onClose={() => setShowAiModal(false)}
-        brideName={config.brideName || "Suman"}
-        groomName={config.groomName || "Vishal"}
+        brideName={config.brideName || "Ananya"}
+        groomName={config.groomName || "Aarav"}
         religion={config.religionKey || "secular"}
         onApplyContent={(field, text) => {
           setConfig(prev => ({ ...prev, [field]: text }));
@@ -454,8 +450,8 @@ export default function InvitationEditor() {
         onClose={() => setShowGuestModal(false)}
         guests={invitation?.guestList || []}
         inviteUrl={id ? `${window.location.origin}/invite/${id}` : ""}
-        brideName={config.brideName || "Suman"}
-        groomName={config.groomName || "Vishal"}
+        brideName={config.brideName || "Ananya"}
+        groomName={config.groomName || "Aarav"}
         onUpdateGuests={(newList) => {
           if (id) {
             dbStore.updateInvitation(id, { guestList: newList });

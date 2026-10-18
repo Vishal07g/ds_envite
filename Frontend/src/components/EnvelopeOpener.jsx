@@ -92,7 +92,7 @@ export default function EnvelopeOpener({
   const envelopeBg = config.envelopeBgColor || "#5a0e1c"; // Deep rich burgundy/wine matching reference
   const envelopeBgImage = config.showEnvelopeTexture !== false ? config.envelopeBgImage : undefined;
   const sealColor = config.envelopeSealColor || "#c89f4b"; // Antique gold
-  const initials = config.envelopeInitials || `${(config.brideName || "S").charAt(0)} & ${(config.groomName || "V").charAt(0)}`;
+  const initials = config.envelopeInitials || `${(config.brideName || "A").charAt(0)} & ${(config.groomName || "A").charAt(0)}`;
   const tagline = config.envelopeTagline || "Cordially Invited";
   const animDuration = Math.max(1.0, parseFloat(config.envelopeSpeed || "1.2"));
   const particleCount = parseInt(config.envelopeParticles || "24");
@@ -100,7 +100,7 @@ export default function EnvelopeOpener({
 
   // Dynamic text values
   const symbolText = config.envelopeSymbolText || config.customSacredSymbol || "❤";
-  const namesText = config.envelopeNamesText || `${config.brideName || 'Suman'} & ${config.groomName || 'Vishal'}`;
+  const namesText = config.envelopeNamesText || `${config.brideName || 'Ananya'} & ${config.groomName || 'Aarav'}`;
   const inviteLabel = config.envelopeInviteLabelText || "Together with their families, request the pleasure of your company";
   const btnText = config.envelopeBtnText || "Open Invitation";
 

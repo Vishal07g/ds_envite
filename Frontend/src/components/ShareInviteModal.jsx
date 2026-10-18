@@ -14,8 +14,8 @@ export default function ShareInviteModal({
 
   if (!isOpen) return null;
 
-  const brideName = config.brideName || "Suman";
-  const groomName = config.groomName || "Vishal";
+  const brideName = config.brideName || "Ananya";
+  const groomName = config.groomName || "Aarav";
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const shareUrl = `${origin}/invite/${invitationId}${isPaid ? '' : '?preview=true'}`;
 

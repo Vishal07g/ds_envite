@@ -7,8 +7,8 @@ export default function GuestManagerModal({
   guests = [],
   onUpdateGuests,
   inviteUrl = "",
-  brideName = "Suman",
-  groomName = "Vishal"
+  brideName = "Ananya",
+  groomName = "Aarav"
 }) {
   const [activeTab, setActiveTab] = useState("list"); // "list" | "import" | "tables" | "analytics"
   const [guestList, setGuestList] = useState(guests.length > 0 ? guests : [

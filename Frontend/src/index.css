@@ -2300,74 +2300,55 @@ svg.active-icon,
   display: flex !important;
   align-items: center !important;
   box-sizing: border-box !important;
-  height: 44px !important;
-  min-height: 44px !important;
-  max-height: 44px !important;
-  white-space: nowrap !important;
-  width: 100% !important;
-}
-
-/* PC & Laptop Mode (>= 1024px): Strictly NO scrollbar, seamless fit */
-@media (min-width: 1024px) {
-  .editor-top-toolbar {
-    overflow-x: hidden !important;
-    overflow-y: hidden !important;
-    scrollbar-width: none !important;
-    -ms-overflow-style: none !important;
-  }
-  .editor-top-toolbar::-webkit-scrollbar {
-    display: none !important;
-    width: 0 !important;
-    height: 0 !important;
-  }
-}
-
-/* Phone & Tablet Mode (< 1024px): Smooth horizontal scroll preserved */
-@media (max-width: 1023px) {
-  .editor-top-toolbar {
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
-    -webkit-overflow-scrolling: touch !important;
-    scroll-behavior: smooth !important;
-    overscroll-behavior-x: contain !important;
-    scrollbar-width: thin !important;
-    scrollbar-color: rgba(196, 154, 74, 0.4) transparent !important;
-  }
-  .editor-top-toolbar::-webkit-scrollbar {
-    height: 3px !important;
-  }
-  .editor-top-toolbar::-webkit-scrollbar-track {
-    background: transparent !important;
-  }
-  .editor-top-toolbar::-webkit-scrollbar-thumb {
-    background: rgba(196, 154, 74, 0.35) !important;
-    border-radius: 99px !important;
-  }
-  .editor-top-toolbar::-webkit-scrollbar-thumb:hover {
-    background: rgba(196, 154, 74, 0.65) !important;
-  }
-}
-
-/* White Pill Input (Title) - 32px height, 12px horizontal padding, pill border-radius */
-.editor-toolbar-input {
   height: 32px !important;
   min-height: 32px !important;
   max-height: 32px !important;
+  white-space: nowrap !important;
+  width: 100% !important;
+  background: #F7EFE5 !important;
+  border-bottom: 1px solid #E9DCCB !important;
+  padding: 0 6px !important;
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.editor-top-toolbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.editor-toolbar-inner {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2.5px !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+/* White Pill Input (Title) - 25px compact height, 6px padding, pill border-radius */
+.editor-toolbar-input {
+  height: 25px !important;
+  min-height: 25px !important;
+  max-height: 25px !important;
   box-sizing: border-box !important;
   display: inline-flex !important;
   align-items: center !important;
-  line-height: 30px !important;
-  padding: 0 12px !important;
+  line-height: 23px !important;
+  padding: 0 6px !important;
   border-radius: 9999px !important;
   white-space: nowrap !important;
   flex-shrink: 0 !important;
   background-color: #FFFFFF !important;
   background: #FFFFFF !important;
   border: 1px solid #E9DCCB !important;
-  box-shadow: 0 1px 3px rgba(104, 71, 45, 0.05), inset 0 1px 0 #FFFFFF !important;
+  box-shadow: 0 1px 2px rgba(104, 71, 45, 0.05), inset 0 1px 0 #FFFFFF !important;
   color: #513321 !important;
   font-weight: 700 !important;
-  font-size: 11.5px !important;
+  font-size: 10px !important;
+  width: 68px !important;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
@@ -2376,7 +2357,7 @@ svg.active-icon,
   box-shadow: 0 0 0 2px rgba(196, 154, 74, 0.25), 0 2px 6px rgba(104, 71, 45, 0.08) !important;
 }
 
-/* White Pill Buttons - EXACT same solid white color, 9999px pill border-radius, 12px padding, and 32px height */
+/* White Pill Buttons - Scaled to 25px, 5px padding, solid white, 9999px pill */
 .editor-toolbar-btn,
 button.editor-toolbar-btn,
 a.editor-toolbar-btn,
@@ -2389,24 +2370,24 @@ a.editor-toolbar-btn-primary {
   border: 1px solid #E9DCCB !important;
   color: #513321 !important;
   border-radius: 9999px !important;
-  box-shadow: 0 1px 3px rgba(104, 71, 45, 0.05), inset 0 1px 0 #FFFFFF !important;
+  box-shadow: 0 1px 2px rgba(104, 71, 45, 0.05), inset 0 1px 0 #FFFFFF !important;
   font-weight: 700 !important;
-  font-size: 11.5px !important;
+  font-size: 10px !important;
   letter-spacing: 0.01em !important;
   text-transform: none !important;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
-  min-height: 32px !important;
-  height: 32px !important;
-  max-height: 32px !important;
+  min-height: 25px !important;
+  height: 25px !important;
+  max-height: 25px !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 0 12px !important;
-  gap: 5px !important;
+  padding: 0 5px !important;
+  gap: 2.5px !important;
   white-space: nowrap !important;
   flex-shrink: 0 !important;
   box-sizing: border-box !important;
-  line-height: 30px !important;
+  line-height: 23px !important;
   cursor: pointer !important;
 }
 
@@ -2420,7 +2401,7 @@ a.editor-toolbar-btn-primary:hover {
   background-color: #FAF7F2 !important;
   border-color: #C49A4A !important;
   color: #382416 !important;
-  box-shadow: 0 3px 8px rgba(104, 71, 45, 0.1), inset 0 1px 0 #FFFFFF !important;
+  box-shadow: 0 2px 5px rgba(104, 71, 45, 0.1), inset 0 1px 0 #FFFFFF !important;
   transform: translateY(-1px) !important;
 }
 
@@ -2442,26 +2423,26 @@ button.editor-toolbar-btn-active {
   background-color: #FFFDF9 !important;
   border-color: #C49A4A !important;
   color: #8A4B1A !important;
-  box-shadow: 0 0 0 1px #C49A4A, 0 2px 6px rgba(196, 154, 74, 0.15), inset 0 1px 0 #FFFFFF !important;
+  box-shadow: 0 0 0 1px #C49A4A, 0 1px 4px rgba(196, 154, 74, 0.15), inset 0 1px 0 #FFFFFF !important;
   font-weight: 700 !important;
 }
 
-/* Strict uniform horizontal icon size and warm bronze color for every button icon */
+/* Strict uniform icon size (11.5px) and warm bronze color for every button icon */
 .editor-toolbar-btn svg,
 button.editor-toolbar-btn svg,
 a.editor-toolbar-btn svg,
 .editor-toolbar-btn-primary svg,
 button.editor-toolbar-btn-primary svg,
 a.editor-toolbar-btn-primary svg {
-  width: 14px !important;
-  height: 14px !important;
-  min-width: 14px !important;
-  max-width: 14px !important;
-  min-height: 14px !important;
-  max-height: 14px !important;
+  width: 11.5px !important;
+  height: 11.5px !important;
+  min-width: 11.5px !important;
+  max-width: 11.5px !important;
+  min-height: 11.5px !important;
+  max-height: 11.5px !important;
   flex-shrink: 0 !important;
   display: inline-block !important;
-  color: #513321 !important;
+  color: inherit !important;
 }
 
 .editor-toolbar-btn span,
@@ -2470,31 +2451,13 @@ a.editor-toolbar-btn span,
 .editor-toolbar-btn-primary span,
 button.editor-toolbar-btn-primary span,
 a.editor-toolbar-btn-primary span {
-  color: #513321 !important;
+  color: inherit !important;
   font-weight: 700 !important;
   white-space: nowrap !important;
 }
 
-/* Responsive label adaptors for laptop & desktop fit:
-   Extra words (e.g., 'Card', 'Web', 'Changes', 'Link') are only displayed on ultra-wide screens (>= 1750px)
-   or touch devices (< 1024px) where touch scroll is active.
-   On standard laptops (1024px - 1749px), concise labels guarantee all 11 items fit seamlessly
-   with NO clipping, and Dashboard is 100% visible with ample room. */
-.toolbar-label-extra {
-  display: none !important;
-}
 
-@media (min-width: 1750px) {
-  .toolbar-label-extra {
-    display: inline !important;
-  }
-}
 
-@media (max-width: 1023px) {
-  .toolbar-label-extra {
-    display: inline !important;
-  }
-}
 
 /* ------------------------------------------------
    INVITATION QUALITY MODES (PAID HD vs PREVIEW)

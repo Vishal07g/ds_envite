@@ -3,8 +3,8 @@
 
 export async function generateWeddingContent({
   contentType = "poem", // "poem" | "story" | "venue" | "whatsapp"
-  brideName = "Suman",
-  groomName = "Vishal",
+  brideName = "Ananya",
+  groomName = "Aarav",
   style = "romantic", // "romantic" | "traditional" | "poetic" | "playful" | "royal"
   religion = "secular",
   details = "",

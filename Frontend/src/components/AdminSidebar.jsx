@@ -2416,7 +2416,7 @@ export default function AdminSidebar({
               children: (
                 <div className="space-y-3">
                   {renderCategorizedElementTool("Bride Card Title", "storyBrideTitle", config.storyBrideTitle || "The Beautiful Bride")}
-                  {renderCategorizedElementTool("Bride Name Text", "storyBrideName", config.brideName || "Suman")}
+                  {renderCategorizedElementTool("Bride Name Text", "storyBrideName", config.brideName || "Ananya")}
                   {renderCategorizedElementTool("Bride Parent Label", "storyBrideParentLabel", config.storyBrideParentLabel || "Daughter of")}
                   {renderCategorizedElementTool("Bride Family Text", "storyBrideFamily", config.brideFamily || "Daughter of Mr. & Mrs. Rajesh Sharma")}
                 </div>
@@ -2430,7 +2430,7 @@ export default function AdminSidebar({
               children: (
                 <div className="space-y-3">
                   {renderCategorizedElementTool("Groom Card Title", "storyGroomTitle", config.storyGroomTitle || "The Noble Groom")}
-                  {renderCategorizedElementTool("Groom Name Text", "storyGroomName", config.groomName || "Vishal")}
+                  {renderCategorizedElementTool("Groom Name Text", "storyGroomName", config.groomName || "Aarav")}
                   {renderCategorizedElementTool("Groom Parent Label", "storyGroomParentLabel", config.storyGroomParentLabel || "Son of")}
                   {renderCategorizedElementTool("Groom Family Text", "storyGroomFamily", config.groomFamily || "Son of Mr. & Mrs. Vijay Patel")}
                 </div>
@@ -5301,9 +5301,9 @@ export default function AdminSidebar({
 
             {renderCategorizedElementTool("Top Tagline Sentiment", "coverTopTaglineText", "Under the Auspices of Love and Destiny")}
             {renderCategorizedElementTool("Union Subheading Text", "coverSubheadingText", "The Union Ceremony of")}
-            {renderCategorizedElementTool("Bride Name Details", "coverBrideText", config.brideName || "Suman")}
+            {renderCategorizedElementTool("Bride Name Details", "coverBrideText", config.brideName || "Ananya")}
             {renderCategorizedElementTool("Ampersand (&) Symbol", "coverAmpersandText", "&")}
-            {renderCategorizedElementTool("Groom Name Details", "coverGroomText", config.groomName || "Vishal")}
+            {renderCategorizedElementTool("Groom Name Details", "coverGroomText", config.groomName || "Aarav")}
             {renderCategorizedElementTool("Intro Love Quote", "coverQuoteText", config.introQuote || "Joined in holy matrimony, we celebrate a bond written in heaven and lived in faith.")}
             {renderCategorizedElementTool("Bottom Tagline Banner", "coverBottomTaglineText", "Joined in holy matrimony, we celebrate a bond written in heaven and lived in faith.")}
             {renderCategorizedElementTool("Cover Reveal Button", "coverRevealBtnText", "Reveal Secret Save the Date")}

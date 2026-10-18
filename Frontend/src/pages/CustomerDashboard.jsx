@@ -1884,8 +1884,8 @@ export default function CustomerDashboard() {
       <AiAssistantModal
         isOpen={showAiModal}
         onClose={() => setShowAiModal(false)}
-        brideName={invitations[0]?.config?.brideName || "Suman"}
-        groomName={invitations[0]?.config?.groomName || "Vishal"}
+        brideName={invitations[0]?.config?.brideName || "Ananya"}
+        groomName={invitations[0]?.config?.groomName || "Aarav"}
         religion={invitations[0]?.config?.religionKey || "secular"}
         onApplyContent={(field, text) => {
           if (invitations[0]) {
@@ -1902,8 +1902,8 @@ export default function CustomerDashboard() {
         onClose={() => setShowGuestModal(false)}
         guests={invitations[0]?.guestList || []}
         inviteUrl={invitations[0] ? `${window.location.origin}/invite/${invitations[0].id}` : ""}
-        brideName={invitations[0]?.config?.brideName || "Suman"}
-        groomName={invitations[0]?.config?.groomName || "Vishal"}
+        brideName={invitations[0]?.config?.brideName || "Ananya"}
+        groomName={invitations[0]?.config?.groomName || "Aarav"}
         onUpdateGuests={(newList) => {
           if (invitations[0]) {
             dbStore.updateInvitation(invitations[0].id, { guestList: newList });
