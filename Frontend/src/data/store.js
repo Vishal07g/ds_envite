@@ -114,9 +114,9 @@ export const CURATED_CLIPARTS = [
 
 const DEFAULT_CONFIG = {
   ...DEFAULT_TIMELINE_CONFIG,
-  brideName: "Suman",
+  brideName: "Ananya",
   brideFamily: "Mr. & Mrs. Rajesh Sharma",
-  groomName: "Vishal",
+  groomName: "Aarav",
   groomFamily: "Mr. & Mrs. Vijay Patel",
   weddingDate: "2026-11-20T16:00:00",
   introQuote: "Celebrating love, togetherness and everlasting happiness.",
@@ -731,28 +731,30 @@ const INITIAL_PRESETS = [
 
 const INITIAL_USERS = [
   { id: "user-admin", username: "dsenviteadmin", password: "dsenvite1006", displayName: "Administrator", role: "admin" },
-  { id: "user-customer", username: "customer", password: "customer123", displayName: "Suman & Vishal", role: "customer" }
+  { id: "user-customer", username: "customer", password: "customer123", displayName: "Ananya & Aarav", role: "customer" }
 ];
 
 const INITIAL_INVITATIONS = [
   {
     id: "invite-demo",
     customerId: "user-customer",
-    title: "Suman & Vishal's Wedding",
+    title: "Ananya & Aarav's Wedding",
     config: {
       ...DEFAULT_CONFIG,
+      brideName: "Ananya",
+      groomName: "Aarav",
       presetId: "preset-classic"
     },
     rsvps: [
       { name: "Sophia & Daniel", attending: "yes", count: 2, note: "We wouldn't miss it for the world! Truly excited for you both." },
-      { name: "Julian Vance", attending: "yes", count: 1, note: "Can't wait to welcome Suman to our beautiful family!" }
+      { name: "Julian Vance", attending: "yes", count: 1, note: "Can't wait to welcome Ananya to our beautiful family!" }
     ],
     wishes: [
       { sender: "Eleanor Sterling", message: "To my darling daughter and new son, may your love grow richer with each changing season.", date: "Just now" },
-      { sender: "Marcus Sterling (Brother)", message: "Vishal, you are officially the best addition to our lives. Treat her right! Wishing you decades of joy.", date: "1 hour ago" }
+      { sender: "Marcus Sterling (Brother)", message: "Aarav, you are officially the best addition to our lives. Treat her right! Wishing you decades of joy.", date: "1 hour ago" }
     ],
     isPaid: false,
-    shareText: "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Suman & Vishal",
+    shareText: "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Ananya & Aarav",
     status: "preview",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -980,7 +982,12 @@ function getDb() {
     const brandSettings = localStorage.getItem("db_brand_settings");
 
     db = {
-      users: users !== null ? parseArrayData(JSON.parse(users), []) : (isInit ? [] : INITIAL_USERS),
+      users: (users !== null ? parseArrayData(JSON.parse(users), []) : (isInit ? [] : INITIAL_USERS)).map(u => {
+        if (u.displayName === "Suman & Vishal") {
+          return { ...u, displayName: "Ananya & Aarav" };
+        }
+        return u;
+      }),
       invitations: (invitations !== null ? parseArrayData(JSON.parse(invitations), []) : (isInit ? [] : INITIAL_INVITATIONS)).map(inv => {
         let cleanWishes = Array.isArray(inv.wishes) ? inv.wishes : [];
         const seenW = new Set();
@@ -1000,12 +1007,33 @@ function getDb() {
           return true;
         });
 
-        const updatedConfig = (inv.config?.scratchImage && typeof inv.config.scratchImage === 'string' && inv.config.scratchImage.includes('photo-1519225495810-7512c696505a'))
+        let updatedConfig = (inv.config?.scratchImage && typeof inv.config.scratchImage === 'string' && inv.config.scratchImage.includes('photo-1519225495810-7512c696505a'))
           ? { ...inv.config, scratchImage: "" }
-          : inv.config;
+          : { ...(inv.config || {}) };
+
+        // Clean out legacy starter names Suman & Vishal to fresh placeholder names Ananya & Aarav
+        if (updatedConfig.brideName === "Suman" || !updatedConfig.brideName) {
+          updatedConfig.brideName = "Ananya";
+        }
+        if (updatedConfig.groomName === "Vishal" || !updatedConfig.groomName) {
+          updatedConfig.groomName = "Aarav";
+        }
+        if (updatedConfig.envelopeNamesText && (updatedConfig.envelopeNamesText.includes("Suman") || updatedConfig.envelopeNamesText.includes("Vishal"))) {
+          updatedConfig.envelopeNamesText = updatedConfig.envelopeNamesText.replace(/Suman/g, "Ananya").replace(/Vishal/g, "Aarav");
+        }
+        let updatedTitle = inv.title;
+        if (updatedTitle && (updatedTitle.includes("Suman") || updatedTitle.includes("Vishal"))) {
+          updatedTitle = updatedTitle.replace(/Suman/g, "Ananya").replace(/Vishal/g, "Aarav");
+        }
+        let updatedShareText = inv.shareText;
+        if (updatedShareText && (updatedShareText.includes("Suman") || updatedShareText.includes("Vishal"))) {
+          updatedShareText = updatedShareText.replace(/Suman/g, "Ananya").replace(/Vishal/g, "Aarav");
+        }
 
         return {
           ...inv,
+          title: updatedTitle,
+          shareText: updatedShareText,
           wishes: cleanWishes,
           rsvps: cleanRsvps,
           config: updatedConfig

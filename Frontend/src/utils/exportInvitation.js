@@ -16,8 +16,8 @@ export function downloadPrintablePdfCard(config = {}, invitationId = null) {
 
 export function downloadInvitationImage(config = {}) {
   // Generate HTML5 canvas snapshot download
-  const brideName = config.brideName || "Suman";
-  const groomName = config.groomName || "Vishal";
+  const brideName = config.brideName || "Ananya";
+  const groomName = config.groomName || "Aarav";
 
   const canvas = document.createElement("canvas");
   canvas.width = 1200;
@@ -96,8 +96,8 @@ export function downloadInvitationImage(config = {}) {
  * as a single .html file that runs locally or on any server without any login requirement.
  */
 export function downloadStandaloneHtmlWebsite(config = {}, invitation = {}) {
-  const brideName = config.brideName || "Suman";
-  const groomName = config.groomName || "Vishal";
+  const brideName = config.brideName || "Ananya";
+  const groomName = config.groomName || "Aarav";
   const primaryColor = config.primaryColor || "#0b1329";
   const accentGold = config.accentGold || "#e5b858";
   const lightBgColor = config.lightBgColor || "#fffaf0";

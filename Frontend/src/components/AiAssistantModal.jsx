@@ -5,8 +5,8 @@ import { SvgSparkles, SvgCopy, SvgCheck, SvgX, SvgSend, SvgHeart } from './icons
 export default function AiAssistantModal({ 
   isOpen, 
   onClose, 
-  brideName = "Suman", 
-  groomName = "Vishal", 
+  brideName = "Ananya", 
+  groomName = "Aarav", 
   religion = "secular",
   onApplyContent 
 }) {

@@ -17,8 +17,8 @@ export default function ThemeEditorModal({ isOpen, preset, onClose, onSave, show
   const [formData, setFormData] = useState({
     title: "",
     religion: "secular",
-    brideName: "Suman",
-    groomName: "Vishal",
+    brideName: "Ananya",
+    groomName: "Aarav",
     brideFatherName: "Mr. Rajesh Sharma",
     brideMotherName: "Mrs. Anita Sharma",
     groomFatherName: "Mr. Vijay Patel",
@@ -819,7 +819,7 @@ export default function ThemeEditorModal({ isOpen, preset, onClose, onSave, show
                     value={formData.brideName}
                     onChange={(e) => setFormData(prev => ({ ...prev, brideName: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
-                    placeholder="e.g. Suman"
+                    placeholder="e.g. Ananya"
                     required
                   />
                 </div>
@@ -830,7 +830,7 @@ export default function ThemeEditorModal({ isOpen, preset, onClose, onSave, show
                     value={formData.groomName}
                     onChange={(e) => setFormData(prev => ({ ...prev, groomName: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-xs text-slate-100 focus:outline-none focus:border-amber-500"
-                    placeholder="e.g. Vishal"
+                    placeholder="e.g. Aarav"
                     required
                   />
                 </div>
