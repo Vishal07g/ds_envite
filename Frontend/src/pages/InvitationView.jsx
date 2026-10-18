@@ -113,7 +113,15 @@ export default function InvitationView() {
         if (snap.exists()) {
           const cloudDb = snap.val();
           const cloudInvs = cloudDb.invitations ? (Array.isArray(cloudDb.invitations) ? cloudDb.invitations : Object.values(cloudDb.invitations)) : [];
-          const foundCloud = cloudInvs.find(i => i.id === id);
+          const numMatch = String(id).match(/(\d{6,})/);
+          const num = numMatch ? numMatch[1] : null;
+          const foundCloud = cloudInvs.find(i => 
+            i.id === id || 
+            i.slug === id || 
+            i.customSlug === id ||
+            (num && ((i.id && i.id.includes(num)) || (i.slug && i.slug.includes(num)) || (i.customSlug && i.customSlug.includes(num)))) ||
+            (String(id).replace(/^invite-/, '') === String(i.id || '').replace(/^invite-/, ''))
+          );
           if (foundCloud) {
             inv = foundCloud;
           }

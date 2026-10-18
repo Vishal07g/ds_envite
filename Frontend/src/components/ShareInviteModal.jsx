@@ -1,23 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SvgX, SvgCopy, SvgCheck, SvgDownload, SvgSend, SvgSparkles, SvgHeart } from './icons';
 import { downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
+import { dbStore } from '../data/store';
 
 export default function ShareInviteModal({
   isOpen,
   onClose,
   invitationId,
+  invitation,
   config = {},
   isPaid = false,
   showToast
 }) {
   const [copied, setCopied] = useState(false);
+  const [isEditingSlug, setIsEditingSlug] = useState(false);
+  const [customSlugInput, setCustomSlugInput] = useState("");
+
+  const invObj = invitation || (invitationId ? dbStore.getInvitationById(invitationId) : null);
+  const targetId = invObj?.id || invitationId;
+  const currentConfig = invObj?.config || config || {};
+  const effectivePaid = invObj ? (invObj.isPaid || false) : isPaid;
+
+  const brideName = currentConfig.brideName || "Ananya";
+  const groomName = currentConfig.groomName || "Aarav";
+
+  const autoSlug = dbStore.getInvitationShareSlug(invObj || { id: targetId, config: currentConfig });
+  const activeSlug = invObj?.customSlug || autoSlug;
+
+  useEffect(() => {
+    if (isOpen) {
+      setCustomSlugInput(activeSlug);
+      setIsEditingSlug(false);
+    }
+  }, [isOpen, activeSlug]);
 
   if (!isOpen) return null;
 
-  const brideName = config.brideName || "Ananya";
-  const groomName = config.groomName || "Aarav";
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const shareUrl = `${origin}/invite/${invitationId}${isPaid ? '' : '?preview=true'}`;
+  const shareUrl = `${origin}/invite/${activeSlug}${effectivePaid ? '' : '?preview=true'}`;
 
   const defaultWhatsappMsg = `✨ Warmest Wedding Invitation ✨\n\nDear Friends & Family,\n\nWith immense joy and love, ${brideName} & ${groomName} invite you to celebrate our wedding union! 💍\n\nExperience our interactive digital invitation, scratch our secret date card, RSVP, and share your warm blessings with us online:\n👉 ${shareUrl}\n\nWe look forward to celebrating together! ❤️`;
 
@@ -28,13 +48,40 @@ export default function ShareInviteModal({
     setTimeout(() => setCopied(false), 2500);
   };
 
+  const handleSaveSlug = () => {
+    const cleaned = dbStore.slugify(customSlugInput);
+    if (!cleaned) {
+      if (showToast) showToast("Link name cannot be empty", "error");
+      return;
+    }
+    if (targetId) {
+      dbStore.updateInvitation(targetId, { customSlug: cleaned, slug: cleaned });
+      window.dispatchEvent(new Event("db_synced"));
+      if (showToast) showToast("Custom sharing link updated successfully!", "success");
+    }
+    setIsEditingSlug(false);
+  };
+
+  const handleResetSlug = () => {
+    const rawId = (targetId || "").replace(/^invite-/, "");
+    const namePart = dbStore.slugify(`${brideName}-${groomName}`) || "wedding";
+    const resetVal = `${namePart}-${rawId || "invite"}`;
+    setCustomSlugInput(resetVal);
+    if (targetId) {
+      dbStore.updateInvitation(targetId, { customSlug: resetVal, slug: resetVal });
+      window.dispatchEvent(new Event("db_synced"));
+      if (showToast) showToast("Sharing link reset to default couple name!", "success");
+    }
+    setIsEditingSlug(false);
+  };
+
   const handleWhatsAppShare = () => {
     const encoded = encodeURIComponent(defaultWhatsappMsg);
     window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
   };
 
   const handleDownloadHtml = () => {
-    downloadStandaloneHtmlWebsite(config, { id: invitationId });
+    downloadStandaloneHtmlWebsite(currentConfig, { id: targetId });
     if (showToast) showToast("Standalone interactive HTML website downloaded successfully!", "success");
   };
 
@@ -70,7 +117,7 @@ export default function ShareInviteModal({
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar text-xs">
+        <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar text-xs">
           
           {/* Public Link Box */}
           <div className="space-y-2">
@@ -101,6 +148,74 @@ export default function ShareInviteModal({
                 {copied ? <SvgCheck className="w-4 h-4" /> : <SvgCopy className="w-4 h-4" />}
                 <span>{copied ? 'Copied!' : 'Copy'}</span>
               </button>
+            </div>
+
+            {/* Link Customizer for Couple / Owner Name */}
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-semibold text-amber-200 flex items-center gap-1.5">
+                  <span>🔗</span>
+                  <span>Sharing Link Couple / Owner Name</span>
+                </span>
+                {!isEditingSlug ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomSlugInput(activeSlug);
+                      setIsEditingSlug(true);
+                    }}
+                    className="text-[10px] uppercase font-bold text-amber-300 hover:text-amber-100 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-2.5 py-0.5 rounded-lg transition cursor-pointer"
+                  >
+                    ✎ Edit Link Name
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingSlug(false)}
+                    className="text-[10px] text-slate-400 hover:text-white transition cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+
+              {isEditingSlug ? (
+                <div className="space-y-2 pt-1">
+                  <p className="text-[10px] text-slate-300">
+                    Set a custom couple name or unique identifier in your invitation URL:
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-slate-400 font-mono select-none">/invite/</span>
+                    <input
+                      type="text"
+                      value={customSlugInput}
+                      onChange={(e) => setCustomSlugInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-'))}
+                      placeholder={`${dbStore.slugify(brideName)}-${dbStore.slugify(groomName)}-${(targetId || '').replace(/^invite-/, '')}`}
+                      className="flex-1 px-2.5 py-1.5 rounded-lg bg-slate-950 border border-amber-500/50 font-mono text-xs text-amber-100 focus:outline-none focus:border-amber-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleSaveSlug}
+                      className="px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs uppercase cursor-pointer transition shadow"
+                    >
+                      Save
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleResetSlug}
+                      title="Reset to default couple name"
+                      className="px-2.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-slate-300 text-xs cursor-pointer transition"
+                    >
+                      ↺
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between text-[11px] text-slate-300 font-mono">
+                  <span>Current Link ID: <strong className="text-amber-300">{activeSlug}</strong></span>
+                  <span className="text-[10px] text-emerald-400 font-sans">✓ Unique ID attached</span>
+                </div>
+              )}
             </div>
 
             <div className="flex items-center justify-end space-x-3 pt-1">

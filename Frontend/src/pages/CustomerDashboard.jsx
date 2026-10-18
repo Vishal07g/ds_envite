@@ -298,7 +298,8 @@ export default function CustomerDashboard() {
   const handleOpenShare = (inv) => {
     setActiveShareInvite(inv);
     const origin = window.location.origin;
-    const shareUrl = `${origin}/invite/${inv.id}`;
+    const shareSlug = dbStore.getInvitationShareSlug(inv);
+    const shareUrl = `${origin}/invite/${shareSlug}`;
     
     // Set custom template or standard template
     const template = inv.shareText || "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - {bride} & {groom}";
@@ -312,7 +313,9 @@ export default function CustomerDashboard() {
 
   const handleCopyLink = (invId) => {
     const origin = window.location.origin;
-    const shareUrl = `${origin}/invite/${invId}`;
+    const inv = dbStore.getInvitationById(invId);
+    const shareSlug = dbStore.getInvitationShareSlug(inv || { id: invId });
+    const shareUrl = `${origin}/invite/${shareSlug}`;
     navigator.clipboard.writeText(shareUrl);
     showToast("Final invitation link copied to clipboard!", "success");
   };
@@ -473,7 +476,7 @@ export default function CustomerDashboard() {
                         <div className="space-y-2">
                           <div className="grid grid-cols-3 gap-2">
                             <Link
-                              to={`/invite/${inv.id}`}
+                              to={`/invite/${dbStore.getInvitationShareSlug(inv)}`}
                               className="px-2.5 py-2 rounded bg-slate-950 border border-slate-800 text-[11px] font-semibold text-center hover:bg-slate-900 transition flex items-center justify-center space-x-1"
                             >
                               <SvgEye className="w-3.5 h-3.5 text-amber-400" />
@@ -533,7 +536,7 @@ export default function CustomerDashboard() {
                           
                           <div className="grid grid-cols-2 gap-2">
                             <Link
-                              to={`/invite/${inv.id}?preview=true`}
+                              to={`/invite/${dbStore.getInvitationShareSlug(inv)}?preview=true`}
                               className="px-3 py-2 rounded bg-slate-950 border border-slate-800 text-xs font-semibold text-center hover:bg-slate-900 transition flex items-center justify-center space-x-1"
                             >
                               <SvgEye className="w-3.5 h-3.5" />
@@ -1901,7 +1904,7 @@ export default function CustomerDashboard() {
         isOpen={showGuestModal}
         onClose={() => setShowGuestModal(false)}
         guests={invitations[0]?.guestList || []}
-        inviteUrl={invitations[0] ? `${window.location.origin}/invite/${invitations[0].id}` : ""}
+        inviteUrl={invitations[0] ? `${window.location.origin}/invite/${dbStore.getInvitationShareSlug(invitations[0])}` : ""}
         brideName={invitations[0]?.config?.brideName || "Ananya"}
         groomName={invitations[0]?.config?.groomName || "Aarav"}
         onUpdateGuests={(newList) => {
