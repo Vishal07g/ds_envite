@@ -527,12 +527,50 @@ export default function InvitationRenderer({
   const isScratchingRef = useRef(false);
   const lastScratchPosRef = useRef({ x: 0, y: 0 });
 
-  const hasStartingSong = Boolean(config.startingMusicEnabled !== false && config.startingMusicUrl);
+  const startingSongUrl = config.startingMusicUrl || (config.startingMusicEnabled !== false ? "https://cdn.pixabay.com/download/audio/2022/11/06/audio_c1c4b7520e.mp3" : "");
+  const hasStartingSong = Boolean(config.startingMusicEnabled !== false && startingSongUrl);
   const hasMainSong = Boolean(config.mainMusicEnabled !== false && config.musicUrl);
   const [currentTrack, setCurrentTrack] = useState(() => {
     if (!isEnvelopeOpened && hasStartingSong) return "starting";
     return hasMainSong ? "main" : (hasStartingSong ? "starting" : "main");
   });
+
+  // Automatically start playing Song 1 (Starting Song) on envelope arrival / interaction
+  useEffect(() => {
+    if (!isEnvelopeOpened && hasStartingSong && config.showMusic !== false) {
+      setCurrentTrack("starting");
+      const startEl = startingAudioRef.current;
+      if (!startEl) return;
+
+      const playStartingSong = () => {
+        if (startEl && startEl.paused && !isEnvelopeOpened) {
+          startEl.play().then(() => {
+            if (onMusicToggle) onMusicToggle(true);
+          }).catch(err => {
+            console.log("Autoplay waiting for guest interaction on envelope:", err);
+          });
+        }
+      };
+
+      // 1. Try immediate autoplay
+      playStartingSong();
+
+      // 2. Play on first interaction anywhere on envelope
+      const onFirstGesture = () => {
+        playStartingSong();
+      };
+
+      window.addEventListener('pointerdown', onFirstGesture, { once: true });
+      window.addEventListener('touchstart', onFirstGesture, { once: true });
+      window.addEventListener('click', onFirstGesture, { once: true });
+
+      return () => {
+        window.removeEventListener('pointerdown', onFirstGesture);
+        window.removeEventListener('touchstart', onFirstGesture);
+        window.removeEventListener('click', onFirstGesture);
+      };
+    }
+  }, [isEnvelopeOpened, hasStartingSong, startingSongUrl, config.showMusic]);
 
   // Music Volume, Drag & Widget Toggle state
   const [audioVolume, setAudioVolume] = useState(config.musicVolume !== undefined ? Number(config.musicVolume) : 0.8);
@@ -939,6 +977,21 @@ export default function InvitationRenderer({
 
   const handleEnvelopeOpen = () => {
     setEnvelopeOpeningAnim(true);
+
+    // Immediately transition to Song 2 on the user's envelope click gesture!
+    if (hasMainSong) {
+      if (startingAudioRef.current) {
+        startingAudioRef.current.pause();
+      }
+      setCurrentTrack("main");
+      const mainEl = mainAudioRef.current || audioRef.current;
+      if (mainEl) {
+        mainEl.currentTime = 0;
+        mainEl.play().then(() => {
+          if (onMusicToggle) onMusicToggle(true);
+        }).catch(e => console.log("Main audio play on envelope click:", e));
+      }
+    }
   };
 
   const handleEnvelopeComplete = () => {
@@ -956,10 +1009,10 @@ export default function InvitationRenderer({
       if (startingAudioRef.current) startingAudioRef.current.pause();
       setCurrentTrack("main");
       const mainEl = mainAudioRef.current || audioRef.current;
-      if (mainEl) {
+      if (mainEl && mainEl.paused) {
         mainEl.play().then(() => {
           if (onMusicToggle) onMusicToggle(true);
-        }).catch(e => console.log("Main audio play on envelope open:", e));
+        }).catch(e => console.log("Main audio play on envelope complete:", e));
       }
     } else if (hasStartingSong && isPlayingMusic) {
       if (startingAudioRef.current && startingAudioRef.current.paused) {
@@ -977,7 +1030,7 @@ export default function InvitationRenderer({
           {hasStartingSong && (
             <audio
               ref={startingAudioRef}
-              src={config.startingMusicUrl}
+              src={startingSongUrl}
               loop={config.startingMusicLoop !== false}
               preload="auto"
             />
@@ -1051,7 +1104,7 @@ export default function InvitationRenderer({
           {hasStartingSong && (
             <audio
               ref={startingAudioRef}
-              src={config.startingMusicUrl}
+              src={startingSongUrl}
               loop={config.startingMusicLoop !== false}
               preload="auto"
             />
@@ -1215,7 +1268,7 @@ export default function InvitationRenderer({
         {hasStartingSong && (
           <audio
             ref={startingAudioRef}
-            src={config.startingMusicUrl}
+            src={startingSongUrl}
             loop={config.startingMusicLoop !== false}
             preload="auto"
           />

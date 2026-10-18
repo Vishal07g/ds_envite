@@ -132,9 +132,9 @@ const DEFAULT_CONFIG = {
 
   // Custom Dual Song Music System (Starting / Intro Song & Main Song)
   startingMusicEnabled: true,
-  startingMusicUrl: "",
-  startingMusicTitle: "",
-  startingMusicArtist: "",
+  startingMusicUrl: "https://cdn.pixabay.com/download/audio/2022/11/06/audio_c1c4b7520e.mp3",
+  startingMusicTitle: "Soft Flute & Divine Harp",
+  startingMusicArtist: "Opening Prelude",
   startingMusicVolume: 0.8,
   startingMusicLoop: true,
 
