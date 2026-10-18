@@ -18,14 +18,15 @@ export default function ShareInviteModal({
 
   const invObj = invitation || (invitationId ? dbStore.getInvitationById(invitationId) : null);
   const targetId = invObj?.id || invitationId;
-  const currentConfig = invObj?.config || config || {};
+  const currentConfig = { ...(invObj?.config || {}), ...(config || {}) };
   const effectivePaid = invObj ? (invObj.isPaid || false) : isPaid;
 
   const brideName = currentConfig.brideName || "Ananya";
   const groomName = currentConfig.groomName || "Aarav";
 
-  const autoSlug = dbStore.getInvitationShareSlug(invObj || { id: targetId, config: currentConfig });
-  const activeSlug = invObj?.customSlug || autoSlug;
+  const autoSlug = dbStore.getInvitationShareSlug(invObj || { id: targetId }, currentConfig);
+  const isManuallySet = Boolean(invObj?.isCustomSlugManuallySet && invObj?.customSlug && !invObj.customSlug.startsWith("ananya-aarav") && !invObj.customSlug.startsWith("suman-vishal"));
+  const activeSlug = isManuallySet ? invObj.customSlug : autoSlug;
 
   useEffect(() => {
     if (isOpen) {
@@ -55,7 +56,7 @@ export default function ShareInviteModal({
       return;
     }
     if (targetId) {
-      dbStore.updateInvitation(targetId, { customSlug: cleaned, slug: cleaned });
+      dbStore.updateInvitation(targetId, { customSlug: cleaned, slug: cleaned, isCustomSlugManuallySet: true });
       window.dispatchEvent(new Event("db_synced"));
       if (showToast) showToast("Custom sharing link updated successfully!", "success");
     }
@@ -68,9 +69,9 @@ export default function ShareInviteModal({
     const resetVal = `${namePart}-${rawId || "invite"}`;
     setCustomSlugInput(resetVal);
     if (targetId) {
-      dbStore.updateInvitation(targetId, { customSlug: resetVal, slug: resetVal });
+      dbStore.updateInvitation(targetId, { customSlug: resetVal, slug: resetVal, isCustomSlugManuallySet: false });
       window.dispatchEvent(new Event("db_synced"));
-      if (showToast) showToast("Sharing link reset to default couple name!", "success");
+      if (showToast) showToast("Sharing link reset to couple name!", "success");
     }
     setIsEditingSlug(false);
   };
