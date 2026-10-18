@@ -1039,12 +1039,15 @@ function getDb() {
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-+|-+$/g, "");
         const rawId = (inv.id || "").replace(/^invite-/, "");
-        const computedSlug = inv.customSlug || inv.slug || `${defaultNameSlug}-${rawId || "invite"}`;
+        const isManuallySet = Boolean(inv.isCustomSlugManuallySet && inv.customSlug && !inv.customSlug.startsWith("ananya-aarav") && !inv.customSlug.startsWith("suman-vishal"));
+        const dynamicSlug = `${defaultNameSlug}-${rawId || "invite"}`;
+        const computedSlug = isManuallySet ? inv.customSlug : dynamicSlug;
 
         return {
           ...inv,
+          isCustomSlugManuallySet: isManuallySet,
           slug: computedSlug,
-          customSlug: inv.customSlug || computedSlug,
+          customSlug: computedSlug,
           title: updatedTitle,
           shareText: updatedShareText,
           wishes: cleanWishes,
@@ -1322,13 +1325,24 @@ export const dbStore = {
 
   getInvitationShareSlug(invitation, configOverride = null) {
     if (!invitation) return "wedding-invitation";
-    if (invitation.customSlug && typeof invitation.customSlug === "string" && invitation.customSlug.trim()) {
-      return this.slugify(invitation.customSlug.trim());
-    }
 
     const cfg = configOverride || invitation.config || {};
     const bride = (cfg.brideName || "").trim();
     const groom = (cfg.groomName || "").trim();
+
+    // Respect customSlug only if explicitly manually configured and not legacy default starter names
+    const isManual = Boolean(
+      invitation.isCustomSlugManuallySet &&
+      invitation.customSlug &&
+      typeof invitation.customSlug === "string" &&
+      invitation.customSlug.trim() &&
+      !invitation.customSlug.startsWith("ananya-aarav") &&
+      !invitation.customSlug.startsWith("suman-vishal")
+    );
+
+    if (isManual) {
+      return this.slugify(invitation.customSlug.trim());
+    }
     const title = (invitation.title || "").trim();
 
     let namePart = "";
@@ -1427,12 +1441,45 @@ export const dbStore = {
     const idx = db.invitations.findIndex(inv => inv.id === id);
     if (idx === -1) return null;
     
+    const current = db.invitations[idx];
+    const newConfig = updates.config ? { ...(current.config || {}), ...updates.config } : (current.config || {});
+    
+    const bride = (newConfig.brideName || "").trim();
+    const groom = (newConfig.groomName || "").trim();
+    const rawId = (current.id || "").replace(/^invite-/, "");
+    const namePart = this.slugify(`${bride || "wedding"}-${groom || ""}`) || "wedding";
+    const dynamicSlug = `${namePart}-${rawId || "invite"}`;
+
+    const isManual = updates.isCustomSlugManuallySet !== undefined
+      ? updates.isCustomSlugManuallySet
+      : Boolean(current.isCustomSlugManuallySet && current.customSlug && !current.customSlug.startsWith("ananya-aarav") && !current.customSlug.startsWith("suman-vishal"));
+
+    let newSlug = dynamicSlug;
+    let newCustomSlug = dynamicSlug;
+
+    if (isManual && updates.customSlug) {
+      newSlug = this.slugify(updates.customSlug);
+      newCustomSlug = newSlug;
+    } else if (isManual && current.customSlug) {
+      const oldBride = (current.config?.brideName || "").trim();
+      const oldGroom = (current.config?.groomName || "").trim();
+      const namesChanged = updates.config && (updates.config.brideName !== undefined || updates.config.groomName !== undefined) && (oldBride !== bride || oldGroom !== groom);
+      if (!namesChanged) {
+        newSlug = current.customSlug;
+        newCustomSlug = current.customSlug;
+      }
+    }
+
     db.invitations[idx] = {
-      ...db.invitations[idx],
+      ...current,
       ...updates,
+      isCustomSlugManuallySet: isManual,
+      slug: newSlug,
+      customSlug: newCustomSlug,
       updatedAt: new Date().toISOString()
     };
     saveDb(db);
+    window.dispatchEvent(new Event("db_synced"));
     return db.invitations[idx];
   },
   deleteInvitation(id) {

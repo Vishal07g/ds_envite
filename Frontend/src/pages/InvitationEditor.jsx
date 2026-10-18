@@ -101,7 +101,10 @@ export default function InvitationEditor() {
     try {
       let targetId = id;
       if (id) {
-        dbStore.updateInvitation(id, dataToSave);
+        const savedInv = dbStore.updateInvitation(id, dataToSave);
+        if (savedInv) {
+          setInvitation(savedInv);
+        }
         
         // Also update preset config if linked to a preset to keep visual gallery cards and thumbnails in sync!
         if (config.presetId) {
