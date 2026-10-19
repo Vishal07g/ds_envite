@@ -177,7 +177,7 @@ export default function InvitationView() {
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ds-envite.vercel.app';
       const cleanSlug = dbStore.getInvitationShareSlug(invitation);
       const shareUrl = `${origin}/invite/${cleanSlug}`;
-      const thumbUrl = `${origin}/wedding_monogram_thumbnail.jpg`;
+      const thumbUrl = `${origin}/api/og-image?bride=${encodeURIComponent(bride)}&groom=${encodeURIComponent(groom)}`;
 
       updateSocialMetaTags({
         brideName: bride,
