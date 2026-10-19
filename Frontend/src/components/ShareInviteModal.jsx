@@ -259,11 +259,11 @@ export default function ShareInviteModal({
               <div className="flex items-center space-x-2">
                 <span className="text-base">👑</span>
                 <span className="text-[11px] font-bold text-amber-200 uppercase tracking-wider">
-                  Social &amp; WhatsApp Monogram Thumbnail
+                  Automatic WhatsApp &amp; Social Media Preview
                 </span>
               </div>
-              <span className="text-[10px] bg-amber-500/20 text-amber-300 font-extrabold px-2.5 py-0.5 rounded-full border border-amber-500/40">
-                Initials: {getCoupleInitials(brideName, groomName)}
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-500/40">
+                ⚡ 100% Auto-Integrated
               </span>
             </div>
 
@@ -271,12 +271,13 @@ export default function ShareInviteModal({
             <div className="rounded-xl overflow-hidden border border-amber-500/40 bg-[#0d141e] shadow-lg max-w-md mx-auto">
               <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
                 <img
-                  src={monogramDataUrl || "/wedding_monogram_thumbnail.jpg"}
+                  src={monogramDataUrl || "/wedding_monogram_thumbnail.png"}
                   alt={`${brideName} & ${groomName} Monogram Thumbnail`}
                   className="w-full h-full object-cover"
                 />
-                <div className="absolute top-2 right-2 bg-slate-950/80 backdrop-blur-xs px-2 py-0.5 rounded text-[9px] font-mono text-amber-300 border border-amber-500/30">
-                  HD 1200×630
+                <div className="absolute top-2 right-2 bg-emerald-950/80 backdrop-blur-xs px-2 py-0.5 rounded text-[9px] font-mono text-emerald-300 border border-emerald-500/40 flex items-center space-x-1">
+                  <span>✓</span>
+                  <span>Auto-Generated Thumbnail</span>
                 </div>
               </div>
               <div className="p-3 bg-[#131c2a] border-t border-slate-800 space-y-1">
@@ -293,17 +294,19 @@ export default function ShareInviteModal({
               </div>
             </div>
 
-            <div className="flex items-center justify-between pt-1">
-              <p className="text-[10px] text-slate-300">
-                ✓ Clutter-free preview card with royal initials monogram for WhatsApp &amp; social media.
-              </p>
+            <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-start space-x-2">
+              <span className="text-emerald-400 text-sm mt-0.5">✨</span>
+              <div className="text-[10px] text-slate-300 leading-relaxed flex-1">
+                <strong className="text-emerald-300">Automatic Thumbnail: </strong>
+                Whenever you copy or share this link on WhatsApp, iMessage, Facebook, or Telegram, this royal monogram preview and title will appear <strong>automatically</strong>. You do <strong>not</strong> need to download or manually attach any picture!
+              </div>
               <button
                 type="button"
                 onClick={handleDownloadMonogram}
-                className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 hover:text-amber-200 border border-amber-500/40 text-[10px] font-bold uppercase tracking-wider flex items-center space-x-1.5 transition cursor-pointer shrink-0"
+                title="Optional: download a copy of this monogram"
+                className="text-[9px] text-slate-400 hover:text-amber-300 underline shrink-0 cursor-pointer pt-0.5"
               >
-                <SvgDownload className="w-3.5 h-3.5" />
-                <span>Save Monogram</span>
+                Save copy
               </button>
             </div>
           </div>

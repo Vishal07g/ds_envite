@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/og-image",
+      "destination": "/api/og-image"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
