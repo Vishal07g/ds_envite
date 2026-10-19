@@ -535,39 +535,51 @@ export default function InvitationRenderer({
     return hasMainSong ? "main" : (hasStartingSong ? "starting" : "main");
   });
 
-  // Automatically start playing Song 1 (Starting Song) on envelope arrival / interaction
+  // Automatically start playing Song 1 (Starting Song) as soon as invitation link is opened
   useEffect(() => {
     if (!isEnvelopeOpened && hasStartingSong && config.showMusic !== false) {
       setCurrentTrack("starting");
-      const startEl = startingAudioRef.current;
-      if (!startEl) return;
 
       const playStartingSong = () => {
-        if (startEl && startEl.paused && !isEnvelopeOpened) {
+        const startEl = startingAudioRef.current;
+        if (!startEl || isEnvelopeOpened) return;
+
+        if (startEl.paused) {
           startEl.play().then(() => {
             if (onMusicToggle) onMusicToggle(true);
           }).catch(err => {
-            console.log("Autoplay waiting for guest interaction on envelope:", err);
+            console.log("Audio autoplay waiting for user activity:", err);
           });
         }
       };
 
-      // 1. Try immediate autoplay
+      // 1. Try immediate autoplay right on page load
       playStartingSong();
 
-      // 2. Play on first interaction anywhere on envelope
+      // 2. Fallback on any initial activity/gesture (pointer, mouse, touch, scroll, focus)
+      const gestureEvents = ['pointerdown', 'touchstart', 'click', 'mousemove', 'pointermove', 'scroll', 'wheel', 'keydown', 'focus'];
       const onFirstGesture = () => {
         playStartingSong();
+        gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture));
       };
 
-      window.addEventListener('pointerdown', onFirstGesture, { once: true });
-      window.addEventListener('touchstart', onFirstGesture, { once: true });
-      window.addEventListener('click', onFirstGesture, { once: true });
+      gestureEvents.forEach(evt => {
+        window.addEventListener(evt, onFirstGesture, { once: true, passive: true });
+      });
+
+      // Also retry once audio element finishes buffering
+      const startEl = startingAudioRef.current;
+      if (startEl) {
+        startEl.addEventListener('canplay', playStartingSong, { once: true });
+        startEl.addEventListener('loadeddata', playStartingSong, { once: true });
+      }
 
       return () => {
-        window.removeEventListener('pointerdown', onFirstGesture);
-        window.removeEventListener('touchstart', onFirstGesture);
-        window.removeEventListener('click', onFirstGesture);
+        gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture));
+        if (startEl) {
+          startEl.removeEventListener('canplay', playStartingSong);
+          startEl.removeEventListener('loadeddata', playStartingSong);
+        }
       };
     }
   }, [isEnvelopeOpened, hasStartingSong, startingSongUrl, config.showMusic]);

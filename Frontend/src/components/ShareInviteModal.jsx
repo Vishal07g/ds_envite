@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SvgX, SvgCopy, SvgCheck, SvgDownload, SvgSend, SvgSparkles, SvgHeart } from './icons';
 import { downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
 import { dbStore } from '../data/store';
+import { getCoupleInitials, getMonogramThumbnailDataUrl } from '../utils/monogramThumbnail';
 
 export default function ShareInviteModal({
   isOpen,
@@ -15,6 +16,7 @@ export default function ShareInviteModal({
   const [copied, setCopied] = useState(false);
   const [isEditingSlug, setIsEditingSlug] = useState(false);
   const [customSlugInput, setCustomSlugInput] = useState("");
+  const [monogramDataUrl, setMonogramDataUrl] = useState(null);
 
   const invObj = invitation || (invitationId ? dbStore.getInvitationById(invitationId) : null);
   const targetId = invObj?.id || invitationId;
@@ -32,15 +34,27 @@ export default function ShareInviteModal({
     if (isOpen) {
       setCustomSlugInput(activeSlug);
       setIsEditingSlug(false);
+      try {
+        const url = getMonogramThumbnailDataUrl({
+          brideName,
+          groomName,
+          weddingDate: currentConfig.weddingDate,
+          primaryColor: currentConfig.primaryColor || "#400d18",
+          accentGold: currentConfig.accentGold || "#d4af37"
+        });
+        setMonogramDataUrl(url);
+      } catch (e) {
+        console.warn("Could not generate monogram:", e);
+      }
     }
-  }, [isOpen, activeSlug]);
+  }, [isOpen, activeSlug, brideName, groomName, currentConfig.weddingDate]);
 
   if (!isOpen) return null;
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
-  const shareUrl = `${origin}/invite/${activeSlug}${effectivePaid ? '' : '?preview=true'}`;
+  const shareUrl = `${origin}/invite/${activeSlug}`;
 
-  const defaultWhatsappMsg = `✨ Warmest Wedding Invitation ✨\n\nDear Friends & Family,\n\nWith immense joy and love, ${brideName} & ${groomName} invite you to celebrate our wedding union! 💍\n\nExperience our interactive digital invitation, scratch our secret date card, RSVP, and share your warm blessings with us online:\n👉 ${shareUrl}\n\nWe look forward to celebrating together! ❤️`;
+  const defaultWhatsappMsg = `💌 *Wedding Invitation* 💌\n*${brideName} & ${groomName}*\n\nWe warmly invite you to celebrate our wedding union! 💍\n\n✨ *View our interactive invitation & RSVP:*\n${shareUrl}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -79,6 +93,16 @@ export default function ShareInviteModal({
   const handleWhatsAppShare = () => {
     const encoded = encodeURIComponent(defaultWhatsappMsg);
     window.open(`https://api.whatsapp.com/send?text=${encoded}`, '_blank');
+  };
+
+  const handleDownloadMonogram = () => {
+    const link = document.createElement("a");
+    link.download = `${dbStore.slugify(brideName)}-${dbStore.slugify(groomName)}-monogram-thumbnail.png`;
+    link.href = monogramDataUrl || "/wedding_monogram_thumbnail.jpg";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    if (showToast) showToast("Monogram initial thumbnail downloaded!", "success");
   };
 
   const handleDownloadHtml = () => {
@@ -225,6 +249,61 @@ export default function ShareInviteModal({
                 className="text-[11px] text-amber-300 hover:text-amber-200 underline font-semibold flex items-center space-x-1 cursor-pointer"
               >
                 <span>Preview / Test Link in New Tab ↗</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Social Preview / WhatsApp Monogram Thumbnail Showcase */}
+          <div className="p-4 rounded-xl bg-gradient-to-br from-amber-500/10 via-slate-900/90 to-amber-950/20 border border-amber-500/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="text-base">👑</span>
+                <span className="text-[11px] font-bold text-amber-200 uppercase tracking-wider">
+                  Social &amp; WhatsApp Monogram Thumbnail
+                </span>
+              </div>
+              <span className="text-[10px] bg-amber-500/20 text-amber-300 font-extrabold px-2.5 py-0.5 rounded-full border border-amber-500/40">
+                Initials: {getCoupleInitials(brideName, groomName)}
+              </span>
+            </div>
+
+            {/* WhatsApp Link Card Simulation */}
+            <div className="rounded-xl overflow-hidden border border-amber-500/40 bg-[#0d141e] shadow-lg max-w-md mx-auto">
+              <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
+                <img
+                  src={monogramDataUrl || "/wedding_monogram_thumbnail.jpg"}
+                  alt={`${brideName} & ${groomName} Monogram Thumbnail`}
+                  className="w-full h-full object-cover"
+                />
+                <div className="absolute top-2 right-2 bg-slate-950/80 backdrop-blur-xs px-2 py-0.5 rounded text-[9px] font-mono text-amber-300 border border-amber-500/30">
+                  HD 1200×630
+                </div>
+              </div>
+              <div className="p-3 bg-[#131c2a] border-t border-slate-800 space-y-1">
+                <div className="text-[10px] text-slate-400 font-mono flex items-center space-x-1">
+                  <span>🔒</span>
+                  <span>{origin ? origin.replace(/^https?:\/\//, '') : 'ds-envite.vercel.app'}</span>
+                </div>
+                <h4 className="font-cinzel text-xs font-bold text-amber-100 truncate">
+                  {brideName} &amp; {groomName} — Royal Wedding Invitation
+                </h4>
+                <p className="text-[10px] text-slate-300 line-clamp-1">
+                  Tap to open our interactive digital invitation card, music, timeline &amp; RSVP.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <p className="text-[10px] text-slate-300">
+                ✓ Clutter-free preview card with royal initials monogram for WhatsApp &amp; social media.
+              </p>
+              <button
+                type="button"
+                onClick={handleDownloadMonogram}
+                className="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 hover:text-amber-200 border border-amber-500/40 text-[10px] font-bold uppercase tracking-wider flex items-center space-x-1.5 transition cursor-pointer shrink-0"
+              >
+                <SvgDownload className="w-3.5 h-3.5" />
+                <span>Save Monogram</span>
               </button>
             </div>
           </div>

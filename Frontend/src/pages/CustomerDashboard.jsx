@@ -15,6 +15,7 @@ import InvitationTypeDropdown from '../components/InvitationTypeDropdown';
 import AiAssistantModal from '../components/AiAssistantModal';
 import GuestManagerModal from '../components/GuestManagerModal';
 import { downloadPrintablePdfCard, downloadInvitationImage, downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
+import { getCoupleInitials } from '../utils/monogramThumbnail';
 
 export default function CustomerDashboard() {
   const { currentUser } = useAuth();
@@ -275,6 +276,16 @@ export default function CustomerDashboard() {
     });
   };
 
+  const handleDuplicateInvitation = (id) => {
+    const duplicated = dbStore.duplicateInvitation(id);
+    if (duplicated) {
+      showToast(`Invitation duplicated as "${duplicated.title}"!`, "success");
+      setTick(t => t + 1);
+    } else {
+      showToast("Failed to duplicate invitation", "error");
+    }
+  };
+
   useEffect(() => {
     const handleSync = () => setTick(t => t + 1);
     window.addEventListener("db_synced", handleSync);
@@ -300,13 +311,15 @@ export default function CustomerDashboard() {
     const origin = window.location.origin;
     const shareSlug = dbStore.getInvitationShareSlug(inv);
     const shareUrl = `${origin}/invite/${shareSlug}`;
+    const bride = inv.config?.brideName || "Bride";
+    const groom = inv.config?.groomName || "Groom";
     
-    // Set custom template or standard template
-    const template = inv.shareText || "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - {bride} & {groom}";
+    // Set clean, uncluttered wedding invitation template
+    const template = inv.shareText || "💌 *Wedding Invitation* 💌\n*{bride} & {groom}*\n\nWe warmly invite you to celebrate our wedding union! 💍\n\n✨ *View our interactive invitation & RSVP:*\n{url}";
     const replaced = template
       .replace("{url}", shareUrl)
-      .replace("{bride}", inv.config.brideName)
-      .replace("{groom}", inv.config.groomName);
+      .replace("{bride}", bride)
+      .replace("{groom}", groom);
     
     setCustomShareText(replaced);
   };
@@ -509,13 +522,24 @@ export default function CustomerDashboard() {
                               </span>
                             )}
                           </button>
-                          <Link
-                            to={`/admin/editor/${inv.id}`}
-                            className="w-full py-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-center text-amber-400 hover:text-amber-300 transition flex items-center justify-center space-x-1.5"
-                          >
-                            <SvgEdit className="w-4 h-4" />
-                            <span>Customize Theme &amp; Content</span>
-                          </Link>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Link
+                              to={`/admin/editor/${inv.id}`}
+                              className="py-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-center text-amber-400 hover:text-amber-300 transition flex items-center justify-center space-x-1.5"
+                            >
+                              <SvgEdit className="w-4 h-4" />
+                              <span>Customize</span>
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateInvitation(inv.id)}
+                              className="py-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-center text-sky-400 hover:text-sky-300 transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                              title="Duplicate / Clone this invitation"
+                            >
+                              <SvgCopy className="w-4 h-4" />
+                              <span>Duplicate</span>
+                            </button>
+                          </div>
                         </div>
                       ) : (
                         <div className="space-y-2">
@@ -571,13 +595,24 @@ export default function CustomerDashboard() {
                               </span>
                             )}
                           </button>
-                          <Link
-                            to={`/admin/editor/${inv.id}`}
-                            className="w-full py-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-center text-amber-400 hover:text-amber-300 transition flex items-center justify-center space-x-1.5"
-                          >
-                            <SvgEdit className="w-4 h-4" />
-                            <span>Customize Theme &amp; Content</span>
-                          </Link>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Link
+                              to={`/admin/editor/${inv.id}`}
+                              className="py-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-center text-amber-400 hover:text-amber-300 transition flex items-center justify-center space-x-1.5"
+                            >
+                              <SvgEdit className="w-4 h-4" />
+                              <span>Customize</span>
+                            </Link>
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicateInvitation(inv.id)}
+                              className="py-2 rounded bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-center text-sky-400 hover:text-sky-300 transition flex items-center justify-center space-x-1.5 cursor-pointer"
+                              title="Duplicate / Clone this invitation"
+                            >
+                              <SvgCopy className="w-4 h-4" />
+                              <span>Duplicate</span>
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -741,6 +776,29 @@ export default function CustomerDashboard() {
               <p className="text-xs text-slate-200 font-medium">
                 Craft a beautiful message to go along with your digital invitation card. You can share it directly onto social media.
               </p>
+
+              {/* Monogram Thumbnail Showcase */}
+              <div className="rounded-xl overflow-hidden border border-amber-500/30 bg-slate-950/70 p-3 space-y-2">
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1">
+                    <span>👑</span>
+                    <span>Initials Thumbnail Preview</span>
+                  </span>
+                  <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-extrabold border border-amber-500/40">
+                    Initials: {getCoupleInitials(activeShareInvite.config?.brideName || "Bride", activeShareInvite.config?.groomName || "Groom")}
+                  </span>
+                </div>
+                <div className="relative aspect-[16/9] w-full rounded-lg overflow-hidden border border-amber-500/20">
+                  <img
+                    src="/wedding_monogram_thumbnail.jpg"
+                    alt="Wedding Initial Monogram Thumbnail"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute bottom-1 right-1 bg-slate-950/80 px-1.5 py-0.5 rounded text-[8px] font-mono text-amber-300">
+                    WhatsApp Link Preview
+                  </div>
+                </div>
+              </div>
 
               <div>
                 <label className="text-[10px] uppercase font-bold tracking-wider text-amber-300 block mb-1">WhatsApp &amp; Email Message</label>

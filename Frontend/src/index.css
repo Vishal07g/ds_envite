@@ -2483,6 +2483,48 @@ a.editor-toolbar-btn-primary span {
   filter: contrast(98%);
 }
 
+/* ------------------------------------------------
+   PRIVACY SHIELD & ANTI-SCREENSHOT PROTECTION
+   ------------------------------------------------ */
+.privacy-shield-obfuscated {
+  filter: blur(60px) grayscale(100%) !important;
+  opacity: 0.02 !important;
+  pointer-events: none !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  transition: filter 0.1s ease, opacity 0.1s ease !important;
+}
+
+#invitation-view-container {
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
+#invitation-view-container img {
+  -webkit-user-drag: none !important;
+  user-drag: none !important;
+}
+
+/* Hardened Print Blocking to prevent Print-to-PDF scraping */
+@media print {
+  html, body, #root, #invitation-view-container {
+    display: none !important;
+    visibility: hidden !important;
+  }
+  body::before {
+    content: "🔒 CONFIDENTIAL INVITATION: Printing and digital screen capture are strictly restricted to safeguard host and invitee privacy." !important;
+    display: block !important;
+    visibility: visible !important;
+    text-align: center !important;
+    font-family: serif !important;
+    font-size: 22pt !important;
+    color: #111827 !important;
+    padding: 120px 40px !important;
+  }
+}
+
+
 
 
 
