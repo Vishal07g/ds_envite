@@ -8,6 +8,8 @@ import InvitationRenderer from '../components/InvitationRenderer';
 import Watermark from '../components/Watermark';
 import PaymentModal from '../components/PaymentModal';
 import Toast from '../components/Toast';
+import PrivacyShield from '../components/PrivacyShield';
+import { updateSocialMetaTags } from '../utils/monogramThumbnail';
 import { useAuth } from '../context/AuthContext';
 import { SvgEdit, SvgSparkles, SvgCheck, SvgAward, SvgHeart } from '../components/icons';
 
@@ -19,7 +21,7 @@ export default function InvitationView() {
   const [invitation, setInvitation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [musicPlaying, setMusicPlaying] = useState(true);
   const [toast, setToast] = useState({ show: false, message: "", type: "info" });
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
@@ -170,11 +172,20 @@ export default function InvitationView() {
 
   useEffect(() => {
     if (invitation?.config) {
-      const bride = invitation.config.brideName || "";
-      const groom = invitation.config.groomName || "";
-      if (bride && groom) {
-        document.title = `${bride} & ${groom} | Wedding Invitation — DS Envite`;
-      }
+      const bride = invitation.config.brideName || "Bride";
+      const groom = invitation.config.groomName || "Groom";
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ds-envite.vercel.app';
+      const cleanSlug = dbStore.getInvitationShareSlug(invitation);
+      const shareUrl = `${origin}/invite/${cleanSlug}`;
+      const thumbUrl = `${origin}/wedding_monogram_thumbnail.jpg`;
+
+      updateSocialMetaTags({
+        brideName: bride,
+        groomName: groom,
+        weddingDate: invitation.config.weddingDate,
+        thumbnailUrl: thumbUrl,
+        shareUrl: shareUrl
+      });
     }
   }, [invitation]);
 
@@ -505,6 +516,13 @@ export default function InvitationView() {
         isPaid ? "invitation-hd-ultra" : "invitation-preview-quality"
       }`}
     >
+      {/* Multi-Layer Invitee Privacy & Anti-Screenshot Protection */}
+      <PrivacyShield 
+        targetContainerId="invitation-view-container"
+        coupleNames={`${invitation?.config?.brideName || "Celebration"} & ${invitation?.config?.groomName || "Wedding"}`}
+        enableWatermarkPattern={true}
+      />
+
       {toast.show && (
         <Toast message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: "" })} />
       )}

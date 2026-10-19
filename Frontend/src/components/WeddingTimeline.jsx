@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { TIMELINE_CLIPARTS, formatCeremonyDate, DEFAULT_CEREMONIES, DEFAULT_TIMELINE_CONFIG } from '../data/timelineDefaults';
 import { SvgCalendar, SvgMapPin, SvgExternalLink, SvgHeart } from './icons';
+import { hexToRgb } from '../utils/helpers';
 
 export default function WeddingTimeline({ config = {}, isPrintMode = false }) {
   // Merge timeline configuration with defaults
@@ -128,26 +129,51 @@ export default function WeddingTimeline({ config = {}, isPrintMode = false }) {
     return 'text-lg sm:text-xl md:text-2xl';
   };
 
+  // Calculate a luxurious card background that inherits a subtle, delicate tint from the primary background
+  const inheritedTintedBg = useMemo(() => {
+    // If user explicitly chose a custom card background other than default white/ivory, honor it
+    if (config.timelineCardBg && config.timelineCardBg !== "#fffcf9" && config.timelineCardBg !== "#ffffff" && config.timelineCardBg !== "white") {
+      return config.timelineCardBg;
+    }
+
+    const baseHex = (config.primaryColor || "#0b1329").trim();
+    const rgb = hexToRgb(baseHex);
+
+    if (isLightBackground) {
+      // Light background: blend soft ivory with 12% of the theme background color
+      const r = Math.round(255 * 0.88 + rgb.r * 0.12);
+      const g = Math.round(253 * 0.88 + rgb.g * 0.12);
+      const b = Math.round(249 * 0.88 + rgb.b * 0.12);
+      return `rgba(${r}, ${g}, ${b}, 0.88)`;
+    } else {
+      // Dark/rich background (e.g. burgundy, wine, navy, deep teal, emerald):
+      // Blend 84% warm ivory with 16% of the deep background color and subtle glass translucency
+      // This produces a soft, harmonious blush-wine or tinted ivory that naturally matches the theme
+      const r = Math.round(255 * 0.84 + rgb.r * 0.16);
+      const g = Math.round(250 * 0.84 + rgb.g * 0.16);
+      const b = Math.round(244 * 0.84 + rgb.b * 0.16);
+      return `rgba(${r}, ${g}, ${b}, 0.88)`;
+    }
+  }, [config.timelineCardBg, config.primaryColor, isLightBackground]);
+
   // Glassmorphic styling tokens for the Details side (WITH border line)
   const detailsCardStyle = {
-    background: timelineCardBg || (isLightBackground 
-      ? 'rgba(255, 255, 255, 0.75)' 
-      : 'rgba(15, 23, 42, 0.65)'),
-    backdropFilter: 'blur(16px)',
-    WebkitBackdropFilter: 'blur(16px)',
+    background: inheritedTintedBg,
+    backdropFilter: 'blur(18px)',
+    WebkitBackdropFilter: 'blur(18px)',
     border: showDetailsCardBorder !== false 
-      ? `1px solid ${timelineCardBorder || (isLightBackground ? 'rgba(205, 164, 82, 0.38)' : 'rgba(205, 164, 82, 0.30)')}`
+      ? `1px solid ${timelineCardBorder || (isLightBackground ? 'rgba(205, 164, 82, 0.40)' : 'rgba(205, 164, 82, 0.32)')}`
       : 'none',
     borderRadius: `${timelineCardCornerRadius || 18}px`,
     boxShadow: isLightBackground
       ? '0 6px 20px -3px rgba(120, 20, 40, 0.05), 0 2px 6px rgba(205, 164, 82, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.85)'
-      : '0 8px 24px -4px rgba(0, 0, 0, 0.40), 0 2px 6px rgba(205, 164, 82, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.12)'
+      : '0 8px 24px -4px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(205, 164, 82, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.20)'
   };
 
   // Styling for the Ceremony Name + Icon side (NO border line per user request)
   const ceremonySideStyle = {
     background: showCeremonyCardBorder 
-      ? (timelineCardBg || (isLightBackground ? 'rgba(255, 255, 255, 0.72)' : 'rgba(15, 23, 42, 0.62)'))
+      ? inheritedTintedBg
       : 'transparent',
     border: showCeremonyCardBorder 
       ? `1px solid ${timelineCardBorder || (isLightBackground ? 'rgba(205, 164, 82, 0.35)' : 'rgba(205, 164, 82, 0.30)')}`

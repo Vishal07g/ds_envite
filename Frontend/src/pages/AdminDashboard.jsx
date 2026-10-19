@@ -1089,6 +1089,16 @@ export default function AdminDashboard() {
     });
   };
 
+  const handleDuplicateInvitation = (id) => {
+    const duplicated = dbStore.duplicateInvitation(id);
+    if (duplicated) {
+      showToast(`Invitation successfully duplicated as "${duplicated.title}"!`, "success");
+      setTick(t => t + 1);
+    } else {
+      showToast("Failed to duplicate invitation", "error");
+    }
+  };
+
   const handleAcceptOrder = (order) => {
     dbStore.updateOrderStatus(order.id, "accepted");
     // Create new invitation based on selected preset config
@@ -1408,6 +1418,13 @@ export default function AdminDashboard() {
                             >
                               <SvgEdit className="w-4 h-4" />
                             </Link>
+                            <button
+                              onClick={() => handleDuplicateInvitation(inv.id)}
+                              className="p-2 rounded bg-slate-900 border border-slate-800 text-sky-400 hover:text-sky-300 transition inline-flex items-center cursor-pointer"
+                              title="Duplicate / Clone Invitation"
+                            >
+                              <SvgCopy className="w-4 h-4" />
+                            </button>
                             <button
                               onClick={() => handleDeleteInvitation(inv.id)}
                               className="p-2 rounded bg-slate-900 border border-slate-800 text-rose-500/80 hover:text-rose-500 transition"

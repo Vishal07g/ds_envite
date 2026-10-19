@@ -1493,6 +1493,44 @@ export const dbStore = {
     window.dispatchEvent(new Event("db_synced"));
     return true;
   },
+  duplicateInvitation(id, customTitle = null) {
+    const db = getDb();
+    const source = this.getInvitationById(id);
+    if (!source) return null;
+
+    const timestamp = Date.now();
+    const newId = `invite-${timestamp}`;
+    const cleanConfig = JSON.parse(JSON.stringify(source.config || DEFAULT_CONFIG));
+
+    const bride = cleanConfig.brideName || "Ananya";
+    const groom = cleanConfig.groomName || "Aarav";
+    const nameSlug = this.slugify(`${bride}-${groom}`) || "wedding";
+    const newSlug = `${nameSlug}-${timestamp}`;
+
+    const newTitle = customTitle || `${source.title || `${bride} & ${groom}'s Wedding`} (Copy)`;
+
+    const duplicated = {
+      ...JSON.parse(JSON.stringify(source)),
+      id: newId,
+      slug: newSlug,
+      customSlug: newSlug,
+      isCustomSlugManuallySet: false,
+      title: newTitle,
+      config: cleanConfig,
+      rsvps: [],
+      wishes: [],
+      guestList: Array.isArray(source.guestList) ? JSON.parse(JSON.stringify(source.guestList)) : [],
+      isPaid: false,
+      status: "draft",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    db.invitations.unshift(duplicated);
+    saveDb(db);
+    window.dispatchEvent(new Event("db_synced"));
+    return duplicated;
+  },
   ensureInvitationCached(inv) {
     if (!inv || !inv.id) return;
     const db = getDb();

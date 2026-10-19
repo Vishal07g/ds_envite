@@ -132,6 +132,20 @@ export default function InvitationEditor() {
     }
   };
 
+  const handleDuplicateInvitation = () => {
+    if (!id) {
+      showToast("Please save the invitation first before duplicating.", "info");
+      return;
+    }
+    const dup = dbStore.duplicateInvitation(id);
+    if (dup) {
+      showToast(`Duplicated as "${dup.title}"! Loading new copy...`, "success");
+      navigate(`/admin/editor/${dup.id}`);
+    } else {
+      showToast("Failed to duplicate invitation", "error");
+    }
+  };
+
   // real Google Imagen 4.0 fetch with prompt settings
   const handleAIImageGen = async (imageType) => {
     setIsGeneratingImg(prev => ({ ...prev, [imageType]: true }));
@@ -340,14 +354,24 @@ export default function InvitationEditor() {
             </button>
 
             {id && (
-              <button
-                onClick={() => setShowShareModal(true)}
-                className="editor-toolbar-btn editor-toolbar-btn-collapsible"
-                title="Share Invitation Website (Copy Link, WhatsApp, Standalone HTML)"
-              >
-                <SvgCopy className="w-3 h-3 shrink-0 text-[#513321]" />
-                <span className="editor-btn-text">Share</span>
-              </button>
+              <>
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="editor-toolbar-btn editor-toolbar-btn-collapsible"
+                  title="Share Invitation Website (Copy Link, WhatsApp, Standalone HTML)"
+                >
+                  <SvgCopy className="w-3 h-3 shrink-0 text-[#513321]" />
+                  <span className="editor-btn-text">Share</span>
+                </button>
+                <button
+                  onClick={handleDuplicateInvitation}
+                  className="editor-toolbar-btn editor-toolbar-btn-collapsible"
+                  title="Duplicate Saved Invitation (Clone As Fresh Copy)"
+                >
+                  <span className="text-[11px] leading-none">📋</span>
+                  <span className="editor-btn-text">Duplicate</span>
+                </button>
+              </>
             )}
 
             <button

@@ -172,9 +172,49 @@ export function downloadStandaloneHtmlWebsite(config = {}, invitation = {}) {
     .pulse-glow {
       animation: pulse-slow 3s infinite ease-in-out;
     }
+    /* Anti-screenshot & Privacy Protection */
+    body {
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    img {
+      -webkit-user-drag: none;
+      user-drag: none;
+    }
+    @media print {
+      html, body {
+        display: none !important;
+        visibility: hidden !important;
+      }
+    }
+    .privacy-obfuscated {
+      filter: blur(60px) grayscale(100%) !important;
+      opacity: 0.02 !important;
+      pointer-events: none !important;
+    }
   </style>
 </head>
 <body class="min-h-screen selection:bg-amber-500/30">
+
+  <!-- ================= ANTI-SCREENSHOT PRIVACY SHIELD ================= -->
+  <div id="privacy-blackout-shield" class="fixed inset-0 z-[9999999] bg-[#070b19] flex flex-col items-center justify-center p-6 text-center select-none cursor-pointer transition-opacity duration-200 hidden" onclick="dismissPrivacyShield()">
+    <div class="relative max-w-md w-full p-8 rounded-3xl border border-amber-500/40 bg-gradient-to-b from-slate-900 to-slate-950 shadow-2xl space-y-6 text-slate-100">
+      <div class="w-16 h-16 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center">
+        <span class="text-3xl">🔒</span>
+      </div>
+      <div class="space-y-2">
+        <span class="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold uppercase tracking-widest text-[10px]">
+          Privacy Shield Active
+        </span>
+        <h2 class="font-cinzel text-xl font-bold text-amber-300">Invitation Privacy Protected</h2>
+        <p class="text-xs text-slate-300 leading-relaxed">Screen capture &amp; recording are restricted to safeguard personal ceremony details and invitee privacy.</p>
+      </div>
+      <button type="button" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-bold uppercase tracking-wider text-xs shadow-lg">
+        Click Anywhere to Resume Viewing
+      </button>
+    </div>
+  </div>
 
   <!-- ================= ENVELOPE MODAL OVERLAY ================= -->
   <div id="envelope-overlay" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md transition-opacity duration-700">
@@ -703,6 +743,37 @@ export function downloadStandaloneHtmlWebsite(config = {}, invitation = {}) {
       alert("Thank you! Your blessing has been posted.");
     }
     renderWishes();
+
+    // Anti-Screenshot & Invitee Privacy Engine
+    function triggerPrivacyShield() {
+      const shield = document.getElementById("privacy-blackout-shield");
+      if (shield) shield.classList.remove("hidden");
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText("🔒 Privacy Protected: Screenshots and screen copying are restricted for this invitation.");
+      }
+    }
+    function dismissPrivacyShield() {
+      const shield = document.getElementById("privacy-blackout-shield");
+      if (shield) shield.classList.add("hidden");
+    }
+    window.addEventListener("keydown", function(e) {
+      if (e.key === "PrintScreen" || e.keyCode === 44 ||
+          (e.shiftKey && (e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) ||
+          (e.ctrlKey && (e.key === 'p' || e.key === 'P')) ||
+          (e.metaKey && (e.key === 'p' || e.key === 'P'))) {
+        e.preventDefault();
+        triggerPrivacyShield();
+        return false;
+      }
+    }, true);
+    window.addEventListener("blur", function() {
+      triggerPrivacyShield();
+    });
+    window.addEventListener("focus", function() {
+      setTimeout(dismissPrivacyShield, 300);
+    });
+    document.addEventListener("contextmenu", function(e) { e.preventDefault(); return false; }, true);
+    document.addEventListener("dragstart", function(e) { e.preventDefault(); return false; }, true);
   </script>
 </body>
 </html>`;
