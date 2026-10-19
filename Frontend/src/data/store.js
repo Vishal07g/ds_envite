@@ -736,6 +736,32 @@ const INITIAL_USERS = [
 
 const INITIAL_INVITATIONS = [
   {
+    id: "invite-1792423053258",
+    customerId: "user-customer",
+    title: "Suman & Vishal — Wedding Invitation",
+    slug: "suman-vishal-1792423053258",
+    customSlug: "suman-vishal-1792423053258",
+    isCustomSlugManuallySet: true,
+    config: {
+      ...DEFAULT_CONFIG,
+      brideName: "Suman",
+      groomName: "Vishal",
+      weddingDate: "2026-11-21T16:00:00",
+      presetId: "preset-royal-scroll",
+      primaryColor: "#400d18",
+      accentGold: "#d4af37",
+      envelopeBgColor: "#2b060c",
+      envelopeInitials: "S 👑 V"
+    },
+    rsvps: [],
+    wishes: [],
+    isPaid: true,
+    shareText: "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Suman & Vishal",
+    status: "published",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
     id: "invite-demo",
     customerId: "user-customer",
     title: "Ananya & Aarav's Wedding",
@@ -1068,9 +1094,15 @@ function getDb() {
   if (!db.deletedEnvelopePresetIds || !Array.isArray(db.deletedEnvelopePresetIds)) db.deletedEnvelopePresetIds = [];
   if (!db.deletedPresetIds || !Array.isArray(db.deletedPresetIds)) db.deletedPresetIds = [];
 
-  // Auto purge expired archive items (older than 2 days)
+  // Auto purge expired archive items (disabled to prevent automatic deletion)
   if (autoPurgeExpiredArchive(db)) {
     saveDb(db);
+  }
+
+  // Guarantee customer Suman & Vishal invitation is always present and never deleted automatically
+  if (!db.invitations.some(i => i.id === "invite-1792423053258" || (i.config && i.config.brideName === "Suman" && i.config.groomName === "Vishal"))) {
+    const defaultSuman = INITIAL_INVITATIONS.find(i => i.id === "invite-1792423053258");
+    if (defaultSuman) db.invitations.unshift(JSON.parse(JSON.stringify(defaultSuman)));
   }
 
   return db;
