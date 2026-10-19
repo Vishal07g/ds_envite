@@ -27,7 +27,7 @@ export default function ShareInviteModal({
   const groomName = currentConfig.groomName || "Aarav";
 
   const autoSlug = dbStore.getInvitationShareSlug(invObj || { id: targetId }, currentConfig);
-  const isManuallySet = Boolean(invObj?.isCustomSlugManuallySet && invObj?.customSlug && !invObj.customSlug.startsWith("ananya-aarav") && !invObj.customSlug.startsWith("suman-vishal"));
+  const isManuallySet = Boolean(invObj?.isCustomSlugManuallySet && invObj?.customSlug && !invObj.customSlug.startsWith("ananya-aarav"));
   const activeSlug = isManuallySet ? invObj.customSlug : autoSlug;
 
   useEffect(() => {

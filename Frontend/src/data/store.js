@@ -796,18 +796,10 @@ function saveToFirebase(db) {
   }
 }
 
-// Helper to auto-purge expired archive items older than 2 days (48 hours)
-const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
+// Helper to auto-purge expired archive items - disabled so invitations are never deleted automatically
 function autoPurgeExpiredArchive(db) {
-  if (!db || !db.archive || !Array.isArray(db.archive)) return false;
-  const now = Date.now();
-  const initialLen = db.archive.length;
-  db.archive = db.archive.filter(item => {
-    if (!item.expiresAt && !item.archivedAt) return true;
-    const expiryTime = item.expiresAt ? new Date(item.expiresAt).getTime() : (new Date(item.archivedAt).getTime() + TWO_DAYS_MS);
-    return now < expiryTime;
-  });
-  return db.archive.length !== initialLen;
+  // Never delete saved invitations or archive items automatically; only admin can delete manually
+  return false;
 }
 
 // Subscribe to real-time updates from Firebase
@@ -982,12 +974,7 @@ function getDb() {
     const brandSettings = localStorage.getItem("db_brand_settings");
 
     db = {
-      users: (users !== null ? parseArrayData(JSON.parse(users), []) : (isInit ? [] : INITIAL_USERS)).map(u => {
-        if (u.displayName === "Suman & Vishal") {
-          return { ...u, displayName: "Ananya & Aarav" };
-        }
-        return u;
-      }),
+      users: users !== null ? parseArrayData(JSON.parse(users), []) : (isInit ? [] : INITIAL_USERS),
       invitations: (invitations !== null ? parseArrayData(JSON.parse(invitations), []) : (isInit ? [] : INITIAL_INVITATIONS)).map(inv => {
         let cleanWishes = Array.isArray(inv.wishes) ? inv.wishes : [];
         const seenW = new Set();
@@ -1011,45 +998,26 @@ function getDb() {
           ? { ...inv.config, scratchImage: "" }
           : { ...(inv.config || {}) };
 
-        // Clean out legacy starter names Suman & Vishal to fresh placeholder names Ananya & Aarav
-        if (!updatedConfig.brideName || /suman/i.test(updatedConfig.brideName)) {
-          updatedConfig.brideName = "Ananya";
-        }
-        if (!updatedConfig.groomName || /vishal/i.test(updatedConfig.groomName)) {
-          updatedConfig.groomName = "Aarav";
-        }
-        if (updatedConfig.envelopeNamesText && (/suman/i.test(updatedConfig.envelopeNamesText) || /vishal/i.test(updatedConfig.envelopeNamesText))) {
-          updatedConfig.envelopeNamesText = updatedConfig.envelopeNamesText.replace(/suman/gi, "Ananya").replace(/vishal/gi, "Aarav");
-        }
-        let updatedTitle = inv.title;
-        if (updatedTitle && (/suman/i.test(updatedTitle) || /vishal/i.test(updatedTitle))) {
-          updatedTitle = updatedTitle.replace(/suman/gi, "Ananya").replace(/vishal/gi, "Aarav");
-        }
-        let updatedShareText = inv.shareText;
-        if (updatedShareText && (/suman/i.test(updatedShareText) || /vishal/i.test(updatedShareText))) {
-          updatedShareText = updatedShareText.replace(/suman/gi, "Ananya").replace(/vishal/gi, "Aarav");
-        }
-
         const brideName = updatedConfig.brideName || "Ananya";
         const groomName = updatedConfig.groomName || "Aarav";
-        const defaultNameSlug = ((brideName && groomName) ? `${brideName}-${groomName}` : (updatedTitle || "wedding"))
+        const defaultNameSlug = ((brideName && groomName) ? `${brideName}-${groomName}` : (inv.title || "wedding"))
           .toLowerCase()
           .replace(/&/g, "and")
           .replace(/['’]/g, "")
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/^-+|-+$/g, "");
         const rawId = (inv.id || "").replace(/^invite-/, "");
-        const isManuallySet = Boolean(inv.isCustomSlugManuallySet && inv.customSlug && !inv.customSlug.startsWith("ananya-aarav") && !inv.customSlug.startsWith("suman-vishal"));
+        const isManuallySet = Boolean(inv.isCustomSlugManuallySet && inv.customSlug && !inv.customSlug.startsWith("ananya-aarav"));
         const dynamicSlug = `${defaultNameSlug}-${rawId || "invite"}`;
-        const computedSlug = isManuallySet ? inv.customSlug : dynamicSlug;
+        const computedSlug = isManuallySet ? inv.customSlug : (inv.slug || dynamicSlug);
 
         return {
           ...inv,
           isCustomSlugManuallySet: isManuallySet,
           slug: computedSlug,
           customSlug: computedSlug,
-          title: updatedTitle,
-          shareText: updatedShareText,
+          title: inv.title || `${brideName} & ${groomName}'s Wedding`,
+          shareText: inv.shareText,
           wishes: cleanWishes,
           rsvps: cleanRsvps,
           config: updatedConfig
@@ -1336,8 +1304,7 @@ export const dbStore = {
       invitation.customSlug &&
       typeof invitation.customSlug === "string" &&
       invitation.customSlug.trim() &&
-      !invitation.customSlug.startsWith("ananya-aarav") &&
-      !invitation.customSlug.startsWith("suman-vishal")
+      !invitation.customSlug.startsWith("ananya-aarav")
     );
 
     if (isManual) {
@@ -1452,7 +1419,7 @@ export const dbStore = {
 
     const isManual = updates.isCustomSlugManuallySet !== undefined
       ? updates.isCustomSlugManuallySet
-      : Boolean(current.isCustomSlugManuallySet && current.customSlug && !current.customSlug.startsWith("ananya-aarav") && !current.customSlug.startsWith("suman-vishal"));
+      : Boolean(current.isCustomSlugManuallySet && current.customSlug && !current.customSlug.startsWith("ananya-aarav"));
 
     let newSlug = dynamicSlug;
     let newCustomSlug = dynamicSlug;
