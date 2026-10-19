@@ -7,10 +7,45 @@
  * Used automatically by WhatsApp, Facebook, iMessage, Twitter, and LinkedIn
  * link previews when an invitation link is shared.
  * 
- * WhatsApp requires a real PNG/JPEG under 300KB — this outputs a crisp ~150KB PNG.
+ * Includes bundled Georgia font buffer so text and initials ALWAYS render with
+ * 100% reliability in serverless Linux environments without relying on system fonts.
  */
 
 import { Resvg } from '@resvg/resvg-js';
+import fs from 'fs';
+import path from 'path';
+import { GEORGIA_BOLD_BASE64 } from './georgiaFont.js';
+
+let cachedFontBuffer = null;
+
+function getFontBuffer() {
+  if (cachedFontBuffer) return cachedFontBuffer;
+
+  // 1. Try reading from filesystem
+  const candidatePaths = [
+    path.resolve(process.cwd(), 'api/fonts/georgiab.ttf'),
+    path.resolve(process.cwd(), 'public/fonts/georgiab.ttf'),
+    path.resolve('api/fonts/georgiab.ttf'),
+    path.resolve('public/fonts/georgiab.ttf'),
+  ];
+
+  for (const p of candidatePaths) {
+    try {
+      if (fs.existsSync(p)) {
+        cachedFontBuffer = fs.readFileSync(p);
+        return cachedFontBuffer;
+      }
+    } catch {}
+  }
+
+  // 2. Guaranteed in-memory fallback
+  if (GEORGIA_BOLD_BASE64) {
+    cachedFontBuffer = Buffer.from(GEORGIA_BOLD_BASE64, 'base64');
+    return cachedFontBuffer;
+  }
+
+  return null;
+}
 
 export default async function handler(req, res) {
   try {
@@ -40,7 +75,7 @@ export default async function handler(req, res) {
     <radialGradient id="bg" cx="50%" cy="50%" r="75%">
       <stop offset="0%" stop-color="#4a121d"/>
       <stop offset="50%" stop-color="#2a0810"/>
-      <stop offset="100%" stop-color="#110205"/>
+      <stop offset="100%" stop-color="#120205"/>
     </radialGradient>
     <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#FBF0B9"/>
@@ -49,13 +84,6 @@ export default async function handler(req, res) {
       <stop offset="75%" stop-color="#F5DA88"/>
       <stop offset="100%" stop-color="#D4AF37"/>
     </linearGradient>
-    <filter id="softGlow">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
   </defs>
 
   <!-- Luxury Burgundy Background -->
@@ -79,41 +107,53 @@ export default async function handler(req, res) {
   </g>
 
   <!-- Central Crest Rings -->
-  <circle cx="600" cy="255" r="138" fill="none" stroke="url(#gold)" stroke-width="3" filter="url(#softGlow)"/>
+  <circle cx="600" cy="255" r="138" fill="none" stroke="url(#gold)" stroke-width="3"/>
   <circle cx="600" cy="255" r="126" fill="none" stroke="url(#gold)" stroke-width="1.5" stroke-dasharray="4 6" opacity="0.6"/>
 
-  <!-- Crown Icon -->
-  <text x="600" y="130" text-anchor="middle" font-size="28" fill="#d4af37">👑</text>
+  <!-- Crown Icon (Vector Path) -->
+  <g transform="translate(600, 130)">
+    <path d="M -16 8 L -20 -8 L -9 -2 L 0 -14 L 9 -2 L 20 -8 L 16 8 Z" fill="url(#gold)"/>
+    <circle cx="-20" cy="-10" r="2" fill="#FFF8E0"/>
+    <circle cx="0" cy="-16" r="2.5" fill="#FFF8E0"/>
+    <circle cx="20" cy="-10" r="2" fill="#FFF8E0"/>
+  </g>
 
   <!-- Couple Monogram Initials -->
   <text x="600" y="275" text-anchor="middle" dominant-baseline="central" 
-        font-family="Georgia, serif" font-weight="bold" font-size="82"
+        font-family="Georgia" font-weight="bold" font-size="82"
         fill="url(#gold)">${escapeXml(initials)}</text>
-
-  <!-- Flourish beneath initials -->
-  <text x="600" y="325" text-anchor="middle" font-size="16" fill="url(#gold)" opacity="0.85"
-        font-family="serif">❦  ❖  ❦</text>
 
   <!-- Couple Full Names -->
   <text x="600" y="445" text-anchor="middle" 
-        font-family="Georgia, serif" font-weight="bold" font-size="34"
+        font-family="Georgia" font-weight="bold" font-size="34"
         fill="#FFFFFF" letter-spacing="3">${escapeXml(coupleNames)}</text>
 
   <!-- Wedding Invitation Subtitle -->
   <text x="600" y="492" text-anchor="middle" 
-        font-family="sans-serif" font-weight="600" font-size="15"
-        fill="#D4AF37" letter-spacing="5">✦  W E D D I N G   I N V I T A T I O N  ✦</text>
+        font-family="Georgia" font-weight="bold" font-size="15"
+        fill="#D4AF37" letter-spacing="5">WEDDING INVITATION</text>
 
   <!-- Date / Cordially Invited -->
   <text x="600" y="535" text-anchor="middle" 
-        font-family="sans-serif" font-weight="500" font-size="13"
-        fill="rgba(255,255,255,0.75)" letter-spacing="3">${escapeXml(dateText)}</text>
+        font-family="Georgia" font-size="13"
+        fill="#D4AF37" opacity="0.9" letter-spacing="3">${escapeXml(dateText)}</text>
 </svg>
 `;
 
-    const resvg = new Resvg(svg.trim(), {
+    const fontBuffer = getFontBuffer();
+    const resvgOpts = {
       fitTo: { mode: 'width', value: 1200 },
-    });
+    };
+
+    if (fontBuffer) {
+      resvgOpts.font = {
+        fontBuffers: [fontBuffer],
+        loadSystemFonts: false,
+        defaultFontFamily: 'Georgia',
+      };
+    }
+
+    const resvg = new Resvg(svg.trim(), resvgOpts);
     const pngBuffer = resvg.render().asPng();
 
     res.setHeader('Content-Type', 'image/png');
@@ -122,7 +162,6 @@ export default async function handler(req, res) {
     res.status(200).send(pngBuffer);
   } catch (error) {
     console.error('Error generating OG image:', error);
-    // Fallback: Redirect to static default PNG thumbnail
     res.redirect(302, '/wedding_monogram_thumbnail.png');
   }
 }
