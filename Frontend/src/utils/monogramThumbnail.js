@@ -172,7 +172,7 @@ export function generateMonogramCanvas({
 export function getMonogramThumbnailDataUrl(options) {
   try {
     const canvas = generateMonogramCanvas(options);
-    return canvas.toDataURL("image/png");
+    return canvas.toDataURL("image/jpeg", 0.85);
   } catch (e) {
     console.warn("Could not generate monogram canvas:", e);
     return null;
@@ -216,7 +216,7 @@ export function updateSocialMetaTags({
   if (thumbnailUrl) {
     setMeta("property", "og:image", thumbnailUrl);
     setMeta("property", "og:image:secure_url", thumbnailUrl);
-    setMeta("property", "og:image:type", "image/png");
+    setMeta("property", "og:image:type", "image/jpeg");
     setMeta("property", "og:image:width", "1200");
     setMeta("property", "og:image:height", "630");
     setMeta("name", "twitter:image", thumbnailUrl);

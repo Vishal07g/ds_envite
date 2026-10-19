@@ -271,7 +271,7 @@ export default function ShareInviteModal({
             <div className="rounded-xl overflow-hidden border border-amber-500/40 bg-[#0d141e] shadow-lg max-w-md mx-auto">
               <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
                 <img
-                  src={monogramDataUrl || "/wedding_monogram_thumbnail.png"}
+                  src={monogramDataUrl || "/wedding_monogram_thumbnail.jpg"}
                   alt={`${brideName} & ${groomName} Monogram Thumbnail`}
                   className="w-full h-full object-cover"
                 />
