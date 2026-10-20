@@ -2495,6 +2495,14 @@ a.editor-toolbar-btn-primary span {
   transition: filter 0.1s ease, opacity 0.1s ease !important;
 }
 
+body.privacy-shield-body-lock {
+  filter: blur(80px) grayscale(100%) brightness(10%) !important;
+  background-color: #000000 !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-touch-callout: none !important;
+}
+
 #invitation-view-container {
   user-select: none !important;
   -webkit-user-select: none !important;
@@ -2504,6 +2512,7 @@ a.editor-toolbar-btn-primary span {
 #invitation-view-container img {
   -webkit-user-drag: none !important;
   user-drag: none !important;
+  pointer-events: none;
 }
 
 /* Hardened Print Blocking to prevent Print-to-PDF scraping */

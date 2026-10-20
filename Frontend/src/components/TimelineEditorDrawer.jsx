@@ -298,9 +298,18 @@ export default function TimelineEditorDrawer({ config = {}, onChangeField, trigg
                           />
                         )}
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-slate-100 text-xs truncate">{c.title}</p>
-                        <p className="text-[10px] text-amber-300/80 truncate">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="text"
+                            value={c.title || ""}
+                            onChange={(e) => handleUpdateCeremonyField(c.id, 'title', e.target.value)}
+                            className="font-bold text-slate-100 text-xs bg-slate-950/80 border border-slate-700/80 hover:border-amber-400 focus:border-amber-400 rounded px-2 py-0.5 focus:outline-none w-full max-w-[190px] transition"
+                            placeholder="Ceremony Name"
+                            title="Click to rename this holy ceremony"
+                          />
+                        </div>
+                        <p className="text-[10px] text-amber-300/80 truncate mt-0.5">
                           {c.date ? `${dayOfWeek || ''} ${formattedDate || ''}` : "Undated"}
                           {c.time && (c.showTime !== false ? ` • ${c.time}` : ' • (Time hidden)')}
                         </p>
@@ -440,18 +449,53 @@ export default function TimelineEditorDrawer({ config = {}, onChangeField, trigg
               </button>
             </div>
 
-            {/* Title */}
+            {/* Holy Ceremony Title & Quick Preset Suggestions */}
             <div>
-              <label className="text-[10px] uppercase font-bold text-slate-400 block mb-1">
-                Ceremony Title *
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] uppercase font-bold text-amber-300 block">
+                  ✨ Holy Ceremony Name / Title *
+                </label>
+                <span className="text-[9px] text-slate-400">Directly Editable</span>
+              </div>
               <input
                 type="text"
                 value={selectedCeremony.title || ""}
                 onChange={(e) => handleUpdateCeremonyField(selectedCeremony.id, 'title', e.target.value)}
-                className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-slate-100 text-xs focus:border-amber-400 focus:outline-none"
-                placeholder="e.g. Sangeet Night"
+                className="w-full px-3 py-2 bg-slate-900 border border-amber-500/40 rounded-xl text-slate-100 font-bold text-xs focus:border-amber-400 focus:outline-none shadow-inner"
+                placeholder="e.g. Subh Haldi, Narayan Katha, Subh Vivaah"
               />
+              {/* Quick Holy Ceremony suggestions pills */}
+              <div className="flex flex-wrap gap-1 mt-2">
+                {[
+                  "Subh Haldi",
+                  "Mehandi Ceremony",
+                  "Narayan Katha",
+                  "Subh Vivaah",
+                  "Sacred Phere",
+                  "Reception",
+                  "Devpujan",
+                  "Sangeet & Musical Night",
+                  "Tilak / Roka",
+                  "Baraat Agaman",
+                  "Vidaai",
+                  "Holy Matrimony",
+                  "Nikah Ceremony",
+                  "Anand Karaj"
+                ].map(suggested => (
+                  <button
+                    key={suggested}
+                    type="button"
+                    onClick={() => handleUpdateCeremonyField(selectedCeremony.id, 'title', suggested)}
+                    className={`px-2 py-0.5 rounded-full text-[9px] font-semibold border transition ${
+                      selectedCeremony.title === suggested
+                        ? 'bg-amber-500 text-slate-950 border-amber-400 font-bold shadow'
+                        : 'bg-slate-800 text-slate-300 border-slate-700 hover:border-amber-400/50 hover:text-amber-200'
+                    }`}
+                  >
+                    {suggested}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Date & Time */}

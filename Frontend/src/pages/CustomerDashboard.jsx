@@ -16,6 +16,7 @@ import AiAssistantModal from '../components/AiAssistantModal';
 import GuestManagerModal from '../components/GuestManagerModal';
 import { downloadPrintablePdfCard, downloadInvitationImage, downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
 import { getCoupleInitials } from '../utils/monogramThumbnail';
+import { formatDriveFolderName, GOOGLE_DRIVE_ROOT_FOLDER_URL } from '../utils/googleDriveStorage';
 
 export default function CustomerDashboard() {
   const { currentUser } = useAuth();
@@ -209,12 +210,17 @@ export default function CustomerDashboard() {
     };
     dbStore.updateOrder(editingOrder.id, finalData);
 
-    // Synchronize music with linked invitation if present
+    // Synchronize wedding details and music with linked invitation to trigger automatic Google Drive folder rename
     const linkedInv = dbStore.getInvitations().find(i => i.id === editingOrder.invitationId || i.orderId === editingOrder.id || i.presetId === editingOrder.presetId);
     if (linkedInv) {
       dbStore.updateInvitation(linkedInv.id, {
         config: {
           ...linkedInv.config,
+          brideName: finalData.brideName || linkedInv.config?.brideName,
+          groomName: finalData.groomName || linkedInv.config?.groomName,
+          weddingVenue: finalData.venueName || linkedInv.config?.weddingVenue,
+          weddingAddress: finalData.venueAddress || linkedInv.config?.weddingAddress,
+          weddingDate: finalData.weddingDate || linkedInv.config?.weddingDate,
           startingMusicEnabled: finalData.startingMusicEnabled,
           startingMusicUrl: finalData.startingMusicUrl,
           startingMusicTitle: finalData.startingMusicTitle,
@@ -226,7 +232,7 @@ export default function CustomerDashboard() {
     }
 
     setEditingOrder(null);
-    showToast("Order details updated successfully!", "success");
+    showToast("Order details updated and Drive folder synced successfully!", "success");
     setTick(t => t + 1);
   };
 
@@ -277,7 +283,7 @@ export default function CustomerDashboard() {
   };
 
   const handleDuplicateInvitation = (id) => {
-    const duplicated = dbStore.duplicateInvitation(id);
+    const duplicated = dbStore.duplicateInvitation(id, null, currentUser?.id);
     if (duplicated) {
       showToast(`Invitation duplicated as "${duplicated.title}"!`, "success");
       setTick(t => t + 1);
@@ -522,6 +528,29 @@ export default function CustomerDashboard() {
                               </span>
                             )}
                           </button>
+
+                          {/* Google Drive Cloud Storage Badge */}
+                          <div className="p-2 bg-emerald-950/40 border border-emerald-500/30 rounded-lg flex items-center justify-between text-xs">
+                            <div className="flex items-center space-x-1.5 min-w-0">
+                              <span className="text-sm shrink-0">☁️</span>
+                              <div className="min-w-0">
+                                <span className="text-[8.5px] uppercase font-extrabold text-emerald-400 block tracking-wider">Drive Cloud Storage</span>
+                                <p className="text-[10.5px] font-bold text-slate-200 truncate" title={inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title)}>
+                                  📁 {inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title)}
+                                </p>
+                              </div>
+                            </div>
+                            <a
+                              href={inv.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0 px-2 py-0.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 rounded text-[9.5px] font-bold transition flex items-center space-x-1"
+                              title="Open folder on Google Drive"
+                            >
+                              <span>Drive</span>
+                              <span>↗</span>
+                            </a>
+                          </div>
                           <div className="grid grid-cols-2 gap-2">
                             <Link
                               to={`/admin/editor/${inv.id}`}

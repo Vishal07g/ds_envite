@@ -18,8 +18,22 @@ export default function InvitationView() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { currentUser } = useAuth();
-  const [invitation, setInvitation] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [invitation, setInvitation] = useState(() => {
+    if (id && id !== "demo") {
+      const cached = dbStore.getInvitationById(id);
+      if (cached) {
+        return {
+          ...cached,
+          config: {
+            ...DEFAULT_TIMELINE_CONFIG,
+            ...(cached.config || {})
+          }
+        };
+      }
+    }
+    return null;
+  });
+  const [loading, setLoading] = useState(() => (id === "demo" ? false : !invitation));
   const [notFound, setNotFound] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(true);
   const [toast, setToast] = useState({ show: false, message: "", type: "info" });
@@ -134,18 +148,10 @@ export default function InvitationView() {
     }
 
     if (inv) {
-      let activeConfig = {
+      const activeConfig = {
         ...DEFAULT_TIMELINE_CONFIG,
         ...(inv.config || {})
       };
-      const savedTemp = sessionStorage.getItem("preview_temp_config");
-      if (isPreviewParam && savedTemp) {
-        try {
-          activeConfig = { ...activeConfig, ...JSON.parse(savedTemp) };
-        } catch (e) {
-          console.error("Failed to parse temp preview config", e);
-        }
-      }
 
       setInvitation({
         ...inv,

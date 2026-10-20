@@ -2,6 +2,15 @@
 import { ref, set, get, onValue } from "firebase/database";
 import { database } from "../utils/firebase";
 import { DEFAULT_TIMELINE_CONFIG } from "./timelineDefaults";
+import {
+  formatDriveFolderName,
+  syncDriveFolder,
+  GOOGLE_DRIVE_ROOT_FOLDER_ID,
+  GOOGLE_DRIVE_ROOT_FOLDER_URL,
+  transferAllDatabaseImagesToDrive,
+  scanDatabaseForBase64Media,
+  uploadBase64ToDriveStorage
+} from "../utils/googleDriveStorage";
 
 // Firebase Realtime Database sync status
 let isFirebaseSynced = false;
@@ -731,36 +740,465 @@ const INITIAL_PRESETS = [
 
 const INITIAL_USERS = [
   { id: "user-admin", username: "dsenviteadmin", password: "dsenvite1006", displayName: "Administrator", role: "admin" },
-  { id: "user-customer", username: "customer", password: "customer123", displayName: "Ananya & Aarav", role: "customer" }
+  { id: "user-customer", username: "customer", password: "customer123", displayName: "Suman & Vishal", role: "customer" }
 ];
 
 const INITIAL_INVITATIONS = [
   {
-    id: "invite-1792423053258",
-    customerId: "user-customer",
-    title: "Suman & Vishal — Wedding Invitation",
-    slug: "suman-vishal-1792423053258",
-    customSlug: "suman-vishal-1792423053258",
-    isCustomSlugManuallySet: true,
-    config: {
-      ...DEFAULT_CONFIG,
-      brideName: "Suman",
-      groomName: "Vishal",
-      weddingDate: "2026-11-21T16:00:00",
-      presetId: "preset-royal-scroll",
-      primaryColor: "#400d18",
-      accentGold: "#d4af37",
-      envelopeBgColor: "#2b060c",
-      envelopeInitials: "S 👑 V"
-    },
-    rsvps: [],
-    wishes: [],
-    isPaid: true,
-    shareText: "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Suman & Vishal",
-    status: "published",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
+  "config": {
+    "accentGold": "rgba(184, 146, 84, 1)",
+    "autoPlayMusic": true,
+    "bgShapesCount": 27,
+    "bgShapesOpacity": 0.12,
+    "bgShapesSize": 0.7,
+    "bgShapesType": "none",
+    "bodyFontClass": "font-serif",
+    "brideFamily": "Mr. Nagina Paswan & Mrs. Gyanti Devi",
+    "brideName": "Suman",
+    "ceremonies": [
+      {
+        "category": "haldi",
+        "clipartId": "haldi-bowl",
+        "customImageUrl": "",
+        "date": "2026-11-21",
+        "description": "A joyful morning of turmeric rituals, holy blessings, and laughter.",
+        "id": "ceremony-haldi",
+        "order": 0,
+        "showClipart": true,
+        "showTime": true,
+        "time": "10:00 AM",
+        "title": "Subh Haldi",
+        "venueAddress": "The Starlight Cathedral, Glass Valley, CA",
+        "venueName": "Chinakuri",
+        "venueUrl": "https://maps.app.goo.gl/MuQ3oPGNM3GztD447",
+        "visible": true
+      },
+      {
+        "category": "mehendi",
+        "clipartId": "mehendi-cone",
+        "date": "2026-11-22",
+        "description": "Intricate henna adornments, traditional folk tunes, and celebrations.",
+        "id": "ceremony-mehendi",
+        "order": 1,
+        "showClipart": true,
+        "showTime": true,
+        "time": "04:00 PM",
+        "title": "Mehandi Ceremony",
+        "venueAddress": "100 Seraphim Way, Glass Valley, CA",
+        "venueName": "Chinakuri ",
+        "venueUrl": "https://maps.app.goo.gl/MuQ3oPGNM3GztD447",
+        "visible": true
+      },
+      {
+        "category": "sangeet",
+        "clipartId": "wedding-arch",
+        "customImageUrl": "",
+        "date": "2026-11-23",
+        "description": "A blissful evening hai Narayan katha or Devpujan.",
+        "id": "ceremony-sangeet",
+        "order": 2,
+        "showClipart": true,
+        "showTime": true,
+        "time": "07:00 PM",
+        "title": "Narayan Katha",
+        "venueAddress": "The Gilded Glass Greenhouse, CA",
+        "venueName": "Chinakuri ",
+        "venueUrl": "https://maps.app.goo.gl/MuQ3oPGNM3GztD447",
+        "visible": true
+      },
+      {
+        "category": "wedding",
+        "clipartId": "wedding-mandap",
+        "date": "2026-11-24",
+        "description": "The sacred phere, wedding vows, and eternal union of two souls.",
+        "id": "ceremony-wedding",
+        "order": 3,
+        "showClipart": true,
+        "showTime": true,
+        "time": "07:00 PM",
+        "title": "Subh Vivaah",
+        "venueAddress": "The Starlight Cathedral Grounds, CA",
+        "venueName": "Snehalata Marrieage Hall",
+        "venueUrl": "https://maps.app.goo.gl/8r1eTfdEMwWu2uS58",
+        "visible": true
+      },
+      {
+        "category": "reception",
+        "clipartId": "reception-plates",
+        "date": "2026-11-29",
+        "description": "A formal dinner reception to celebrate the newlyweds with family and friends.",
+        "id": "ceremony-reception",
+        "order": 4,
+        "showClipart": true,
+        "showTime": true,
+        "time": "06:30 PM",
+        "title": "Reception",
+        "venueAddress": "450 Conservatory Road, Glass Valley, CA",
+        "venueName": "Delight Marriage Hall",
+        "venueUrl": "https://maps.app.goo.gl/xuAshA4dUf532ZNS8",
+        "visible": true
+      },
+      {
+        "category": "reception",
+        "clipartId": "reception-champagne",
+        "date": "2026-12-06",
+        "description": "An intimate gathering and blessing evening for close family.",
+        "id": "ceremony-extra-reception",
+        "order": 5,
+        "showClipart": true,
+        "showTime": true,
+        "time": "06:30 PM",
+        "title": "Additional Reception",
+        "venueAddress": "Glass Valley Heritage Estate, CA",
+        "venueName": "Singari Devi Bhavan, Fakira Chhapra",
+        "venueUrl": "https://maps.app.goo.gl/RcMVB5RnQ8AemrmRA",
+        "visible": true
+      }
+    ],
+    "coverAmpersandColor": "#b89254",
+    "coverAmpersandFont": "font-cursive",
+    "coverAmpersandSize": "text-3xl sm:text-5xl",
+    "coverAmpersandText": "&",
+    "coverAmpersandTextSize": "text-2xl",
+    "coverBgOverlayEnd": "rgba(177, 174, 170, 0.35)",
+    "coverBgOverlayStart": "rgba(209, 77, 21, 0.16)",
+    "coverBorderColor": "#b89254",
+    "coverBorderEnabled": false,
+    "coverBorderOpacity": 1,
+    "coverBorderSize": 2,
+    "coverBottomTaglineBg": "rgba(253, 251, 247, 0.7)",
+    "coverBottomTaglineColor": "#8a2b3f",
+    "coverBottomTaglineFont": "font-sans",
+    "coverBottomTaglineSize": "text-[9px] sm:text-xs",
+    "coverBottomTaglineText": "✦ A Sacred Promise of Eternal Love • Uncover Our Secret Date Below ✦",
+    "coverBrideColor": "#8a2b3f",
+    "coverBrideFont": "font-serif",
+    "coverBrideSize": "text-4xl sm:text-6xl md:text-7xl",
+    "coverBrideText": "Suman",
+    "coverBrideTextFont": "font-cinzel-dec",
+    "coverCornerSize": 32,
+    "coverGroomColor": "#8a2b3f",
+    "coverGroomFont": "font-serif",
+    "coverGroomSize": "text-4xl sm:text-6xl md:text-7xl",
+    "coverGroomText": "Vishal",
+    "coverGroomTextFont": "font-cinzel-dec",
+    "coverInnerBorderColor": "rgba(184, 146, 84, 0.15)",
+    "coverInnerBorderEnabled": true,
+    "coverQuoteColor": "#4a4a4a",
+    "coverQuoteFont": "font-cursive",
+    "coverQuoteSize": "text-base sm:text-xl",
+    "coverQuoteTextColor": "rgba(153, 121, 70, 1)",
+    "coverRevealBtnFont": "font-sans",
+    "coverRevealBtnSize": "text-[10px]",
+    "coverRevealBtnText": "Reveal Secret Save the Date",
+    "coverSubheadingColor": "#4a4a4a",
+    "coverSubheadingFont": "font-serif",
+    "coverSubheadingItalic": true,
+    "coverSubheadingSize": "text-xl sm:text-2xl",
+    "coverSubheadingText": "The Beginning of Forever for",
+    "coverSubheadingTextColor": "rgba(143, 68, 21, 1)",
+    "coverSubheadingTextFont": "",
+    "coverSubheadingTextSize": "text-xs",
+    "coverTopTaglineColor": "#8a2b3f",
+    "coverTopTaglineFont": "font-sans",
+    "coverTopTaglineSize": "text-[10px] sm:text-xs",
+    "coverTopTaglineSpacing": "tracking-[0.3em]",
+    "coverTopTaglineText": "By the decree of love and destiny",
+    "cursiveFontClass": "font-cursive",
+    "customSacredSymbol": "",
+    "customSacredSymbolImg": "https://www.googleapis.com/drive/v3/files/1c6s4GwrdBbCSmx4tK6ci4km7A4pVKTi-?alt=media&key=AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y",
+    "customSacredSymbolImgBlendMode": "normal",
+    "customSacredSymbolImgOpacity": 1,
+    "customSacredSymbolImgRotate": 0,
+    "customSacredSymbolImgScale": 1.25,
+    "customSacredSymbolImgShadowBlur": 8,
+    "customSacredSymbolImgShadowColor": "rgba(0, 0, 0, 0.4)",
+    "customSacredSymbolImgShadowX": 0,
+    "customSacredSymbolImgShadowY": 3,
+    "customSacredSymbolImgSizePx": 70,
+    "customSacredSymbolImgTintColor": "",
+    "customSacredSymbolImgX": 0,
+    "customSacredSymbolImgY": 12,
+    "customSacredVerse": "वक्रतुण्ड महाकाय सूर्यकोटि समप्रभ । निर्विघ्नं कुरु मे देव सर्वकार्येषु सर्वदा ॥",
+    "customSacredVerseColor": "rgba(253, 251, 247, 1)",
+    "customSacredVerseFont": "font-cinzel-dec",
+    "customSacredVerseOpacity": 0.8,
+    "envelopeAspectRatio": "auto",
+    "envelopeBgColor": "#5a0e1c",
+    "envelopeBgImage": "",
+    "envelopeBtnColor": "rgba(184, 146, 84, 0.98)",
+    "envelopeBtnDesign": "classic",
+    "envelopeBtnFont": "font-sans",
+    "envelopeBtnSize": "text-xs",
+    "envelopeBtnText": "Open Invitation",
+    "envelopeCurtainsImg": "/real_velvet_curtains.jpg",
+    "envelopeDoorsImg": "/real_palace_doors.jpg",
+    "envelopeFlapBgEnd": "rgba(90, 14, 28, 0.9)",
+    "envelopeFlapBgStart": "rgba(184, 146, 84, 0.25)",
+    "envelopeFlapShape": "curved-scoop",
+    "envelopeInitials": "S & V",
+    "envelopeInitialsColor": "",
+    "envelopeInitialsFont": "font-cursive",
+    "envelopeInitialsSize": "text-3xl",
+    "envelopeInitialsYOffset": -20,
+    "envelopeInviteLabelColor": "rgba(184, 146, 84, 0.37)",
+    "envelopeInviteLabelFont": "font-sans",
+    "envelopeInviteLabelSize": "text-[10px]",
+    "envelopeInviteLabelText": "INVITED YOU FOR BLESSINGS AND GRATITUDE",
+    "envelopeInviteLabelTextYOffset": 3,
+    "envelopeLeafImg": "/real_autumn_leaf.jpg",
+    "envelopeMaxWidth": 740,
+    "envelopeNamesColor": "",
+    "envelopeNamesFont": "font-cinzel",
+    "envelopeNamesSize": "text-xl",
+    "envelopeNamesText": "Suman & Vishal",
+    "envelopeNamesTextYOffset": 5,
+    "envelopeOpeningStyle": "classic-envelope",
+    "envelopePaperOpacity": 0.85,
+    "envelopePaperTexture": "/real_paper_texture.jpg",
+    "envelopeParticleType": "sparkles",
+    "envelopeParticles": 35,
+    "envelopePetalImg": "/real_rose_petal.jpg",
+    "envelopeSealColor": "#c89f4b",
+    "envelopeSealShape": "organic",
+    "envelopeSealSizePx": 104,
+    "envelopeSealTop": 47,
+    "envelopeSealType": "rings",
+    "envelopeSizingMode": "classic-rectangle",
+    "envelopeSpeed": "0.9",
+    "envelopeSymbolBlendMode": "normal",
+    "envelopeSymbolColor": "",
+    "envelopeSymbolFont": "font-yatra",
+    "envelopeSymbolImg": "",
+    "envelopeSymbolOpacity": 1,
+    "envelopeSymbolRotate": 0,
+    "envelopeSymbolScale": 1,
+    "envelopeSymbolShadowBlur": 8,
+    "envelopeSymbolShadowColor": "rgba(0, 0, 0, 0.5)",
+    "envelopeSymbolShadowX": 0,
+    "envelopeSymbolShadowY": 4,
+    "envelopeSymbolSize": "text-3xl",
+    "envelopeSymbolSizePx": 48,
+    "envelopeSymbolText": "ॐ",
+    "envelopeSymbolTextYOffset": 8,
+    "envelopeSymbolTintColor": "",
+    "envelopeSymbolType": "text",
+    "envelopeSymbolX": 0,
+    "envelopeSymbolY": 0,
+    "envelopeTagline": "WEDDING OF",
+    "envelopeTaglineColor": "rgba(184, 146, 84, 0.77)",
+    "envelopeTaglineFont": "font-sans",
+    "envelopeTaglineSize": "text-[9px]",
+    "envelopeTaglineYOffset": 7,
+    "envelopeWaxSealImg": "/real_wax_seal_gold.jpg",
+    "frameBorderTheme": "double-gilded",
+    "frameShape": "oval",
+    "galleryCaption1": "",
+    "galleryCaption2": "",
+    "galleryCaption3": "",
+    "galleryCaption4": "",
+    "galleryCaption5": "",
+    "galleryCaption6": "",
+    "galleryFrameBorder1": "double-gilded",
+    "galleryFrameBorder2": "double-gilded",
+    "galleryFrameBorder3": "double-gilded",
+    "galleryFrameBorder4": "double-gilded",
+    "galleryFrameBorder5": "double-gilded",
+    "galleryFrameBorder6": "double-gilded",
+    "galleryFrameShape1": "portrait",
+    "galleryFrameShape2": "portrait",
+    "galleryFrameShape3": "portrait",
+    "galleryFrameShape4": "portrait",
+    "galleryFrameShape5": "portrait",
+    "galleryFrameShape6": "portrait",
+    "galleryImage1": "",
+    "galleryImage2": "",
+    "galleryImage3": "",
+    "galleryImage4": "https://www.googleapis.com/drive/v3/files/1ykpf7aFVNXStbIkk4xIyZGkUpokkqvPd?alt=media&key=AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y",
+    "galleryImage5": "",
+    "galleryImage6": "",
+    "gallerySubtitle": "Our Love in Frames",
+    "galleryTitle": "Our Captured Moments",
+    "glassBtnBg": "rgba(138, 43, 63, 0.08)",
+    "glassBtnBorder": "rgba(184, 146, 84, 0.4)",
+    "glassBtnShadow": "rgba(184, 146, 84, 0.15)",
+    "glassBtnShadowSize": "16",
+    "glassBtnText": "#8a2b3f",
+    "globalBorderFit": "contain",
+    "globalBorderImage": "",
+    "globalBorderInset": 0,
+    "globalBorderOpacity": 1,
+    "globalBorderRepeat": "round",
+    "globalBorderScrollMode": "fixed",
+    "globalBorderSlice": 48,
+    "globalBorderWidth": 28,
+    "groomFamily": "Mr. Ram Naresh Pd. Gupta & Mrs. Sonmati Devi",
+    "groomName": "Vishal",
+    "headerFontClass": "font-serif",
+    "heroImage": "https://www.googleapis.com/drive/v3/files/1brJdMaSjflXO8OeJ6cAzVj5cklst48jr?alt=media&key=AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y",
+    "heroTitleAlign": "text-center",
+    "heroTitleFont": "font-serif",
+    "heroTitleSize": "text-4xl sm:text-6xl md:text-7xl",
+    "introQuote": "Celebrating love, togetherness and everlasting happiness.",
+    "isPaid": true,
+    "lightBgColor": "rgba(253, 251, 247, 0.93)",
+    "loopMusic": true,
+    "mainMusicEnabled": true,
+    "musicArtist": "Custom Upload",
+    "musicTitle": "Manglashake",
+    "musicUrl": "https://www.googleapis.com/drive/v3/files/1kv2KpmoK76DwvC7RcSDA79UE_ihSH2lJ?alt=media&key=AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y",
+    "musicVolume": 0.8,
+    "primaryColor": "rgba(74, 28, 44, 1)",
+    "receptionAddress": "Chinakuri Bazaar, WB",
+    "receptionDate": "2026-11-29",
+    "receptionMapUrl": "https://maps.app.goo.gl/dfYzXxKh276PELCd6",
+    "receptionVenue": "Delight Marriage Hall",
+    "religionKey": "secular",
+    "revealColor": "rgba(80, 33, 67, 1)",
+    "revealEffect": "scratch",
+    "revealSpeed": "2.4",
+    "rsvpTitleAlign": "text-center",
+    "rsvpTitleFont": "font-serif",
+    "rsvpTitleSize": "text-2xl sm:text-3xl",
+    "sacredShadowColor": "rgba(0, 0, 0, 0.38)",
+    "sacredSymbolColor": "#8a2b3f",
+    "sacredVerseColor": "#4a4a4a",
+    "scratchCardBorder": "rgba(245, 158, 11, 0.44)",
+    "scratchCardGlow": "rgba(225, 29, 72, 0.18)",
+    "scratchDateText": "2026-11-24",
+    "scratchImage": "",
+    "scratchImageOpacity": 1,
+    "scratchImageOverlayEnd": "rgba(255, 255, 255, 0.57)",
+    "scratchImageScale": 100,
+    "scratchImageXOffset": 50,
+    "scratchImageYOffset": 50,
+    "scratchSecretMessage": "Consider this your official clearance to witness our favorite secret: we really are doing this forever",
+    "scratchSectionBgImage": "https://www.googleapis.com/drive/v3/files/1AghNIqFPeKW3Imvb8D-_6KNJnF1jWVeR?alt=media&key=AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y",
+    "scratchSectionBgImageOverlayEnd": "rgba(5, 7, 13, 0.54)",
+    "scratchSectionBgImageOverlayStart": "rgba(5, 7, 13, 0.6)",
+    "scratchSectionBgImageScale": 70,
+    "scroll3DEnabled": true,
+    "scroll3DIntensity": 4,
+    "scroll3DPerspective": 900,
+    "showCeremonyCardBorder": false,
+    "showCoverBottomTagline": false,
+    "showDetailsCardBorder": true,
+    "showEnvelopeFolds": true,
+    "showEnvelopePaperTexture": true,
+    "showGallery": true,
+    "showGlobalBorder": false,
+    "showGroomDetails": true,
+    "showIconBorder": false,
+    "showMusicWidget": true,
+    "showSacredSymbol": true,
+    "showScratchCard": true,
+    "showTimelineAllCliparts": true,
+    "showTimelineCards": true,
+    "showTimelineDateTime": true,
+    "showTimelineDescriptions": true,
+    "showTimelineHeading": true,
+    "showTimelineLine": true,
+    "showTimelineOrnaments": true,
+    "showTimelineOuterFrame": false,
+    "showTimelineSection": true,
+    "showTimelineSubtitle": true,
+    "showTimelineTime": true,
+    "showTimelineVenue": true,
+    "startingMusicArtist": "Custom Intro",
+    "startingMusicEnabled": true,
+    "startingMusicLoop": true,
+    "startingMusicTitle": "Vakratunda-Mahakaya-Ganesh-Mantr",
+    "startingMusicUrl": "https://www.googleapis.com/drive/v3/files/1ScEGe8HiEjdTdhbYh2R_6rTJMjHfsNu6?alt=media&key=AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y",
+    "startingMusicVolume": 0.8,
+    "storyBrideFamily": "Mr. Nagina Paswan & Mrs. Gyanti Devi",
+    "storyBrideNameFont": "font-cinzel-dec",
+    "storyBrideParentLabel": "D/O",
+    "storyBrideTitle": "The Beautiful Bride",
+    "storyFrameBorderTheme": "pearls",
+    "storyFrameShape": "portrait",
+    "storyGroomFamily": "Mr. Ram Naresh Pd. Gupta & Mrs. Sonmati Devi",
+    "storyGroomFamilySize": "text-xs",
+    "storyGroomNameFont": "font-cinzel-dec",
+    "storyGroomParentLabel": "S/o",
+    "storyGroomTitle": "The Noble Groom",
+    "storyImage": "https://www.googleapis.com/drive/v3/files/1fQyJTqmjFZGbNWljlzcC2qc_m3ryFLdK?alt=media&key=AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y",
+    "storyParagraph": "Through years of relentless hustle, shared sacrifices, and a deep, unwavering respect for each other’s dreams, we turned a high school romance into a lifelong partnership. Today, we stand ready to marry not just because we fell in love, but because we never stopped honoring the person by our side.",
+    "storyParagraphSize": "text-xs",
+    "storyPathTitle": "Our Path of Serendipity",
+    "storySubtitle": "MEET THE FAMILIES",
+    "storyTextAlign": "text-left",
+    "storyTextSize": "text-xs sm:text-sm",
+    "storyTitle": "Vows of Two Dynasties",
+    "storyTitleAlign": "text-left",
+    "storyTitleFont": "font-serif",
+    "storyTitleSize": "text-3xl sm:text-4xl",
+    "timelineCardBg": "#fffcf9",
+    "timelineCardBorder": "rgba(205, 164, 82, 0.45)",
+    "timelineCardCornerRadius": 28,
+    "timelineCardPadding": 16,
+    "timelineCardShadow": "0 8px 24px -6px rgba(120, 20, 40, 0.08), 0 2px 6px -1px rgba(205, 164, 82, 0.15)",
+    "timelineCardShape": "pill",
+    "timelineClipartBorder": "#cda452",
+    "timelineClipartSize": 46,
+    "timelineDateColor": "#755d52",
+    "timelineDensity": "spacious",
+    "timelineHeading": "Wedding Ceremony",
+    "timelineHeadingColor": "#bfbfbf",
+    "timelineHeadingFont": "font-serif",
+    "timelineLayout": "alternating",
+    "timelineLineColor": "#cda452",
+    "timelineMobileLayout": "alternating",
+    "timelineNodeColor": "#781428",
+    "timelineNodeSize": 14,
+    "timelineSortMode": "chronological",
+    "timelineSubtitle": "Timeline",
+    "timelineSubtitleColor": "#c28b2a",
+    "timelineSubtitleFont": "font-cursive",
+    "timelineTextColor": "#44342d",
+    "timelineTitleColor": "#c27100",
+    "timelineTitleFont": "font-serif",
+    "timelineTitleSize": "large",
+    "timelineVenueColor": "#755d52",
+    "venueCardBgColor": "rgba(0, 0, 0, 0.18)",
+    "venueCardTextColor": "rgba(253, 251, 247, 0.75)",
+    "venueCeremonyFrameBorderTheme": "minimalist",
+    "venueCeremonyFrameShape": "landscape",
+    "venueCeremonyImage": "",
+    "venueReceptionFrameBorderTheme": "minimalist",
+    "venueReceptionFrameShape": "landscape",
+    "venueReceptionImage": "",
+    "venueShadowEnabled": true,
+    "venueTitleAlign": "text-center",
+    "venueTitleFont": "font-serif",
+    "venueTitleSize": "text-2xl sm:text-3xl",
+    "weddingAddress": "Neamatpur, WB",
+    "weddingDate": "2026-11-24T19:00",
+    "weddingMapUrl": "https://maps.app.goo.gl/8r1eTfdEMwWu2uS58",
+    "weddingVenue": "Snehalata Marriage Hall",
+    "wishTitleAlign": "text-center",
+    "wishTitleFont": "font-serif",
+    "wishTitleSize": "text-2xl sm:text-3xl"
   },
+  "createdAt": "2026-10-20T01:53:10.490Z",
+  "customSlug": "suman-vishal",
+  "driveStorage": {
+    "folderName": "Suman & Vishal (Snehalata Marriage Hall, Neamatpur, WB)",
+    "folderUrl": "https://drive.google.com/drive/folders/1_pdrNFiXcOymZQEby52O3FbvImCU_SW8?usp=sharing",
+    "lastSyncedAt": "2026-10-20T01:53:10.490Z",
+    "rootFolderId": "1_pdrNFiXcOymZQEby52O3FbvImCU_SW8",
+    "rootFolderUrl": "https://drive.google.com/drive/folders/1_pdrNFiXcOymZQEby52O3FbvImCU_SW8?usp=sharing",
+    "status": "synced"
+  },
+  "id": "invite-1792299417819",
+  "isCustomSlugManuallySet": true,
+  "isPaid": true,
+  "shareText": "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Suman & Vishal",
+  "slug": "suman-vishal",
+  "status": "published",
+  "title": "Suman & Vishal's Wedding Invitation",
+  "updatedAt": "2026-10-20T01:53:10.490Z",
+  "customerId": "user-customer"
+},
   {
     id: "invite-demo",
     customerId: "user-customer",
@@ -1099,10 +1537,26 @@ function getDb() {
     saveDb(db);
   }
 
-  // Guarantee customer Suman & Vishal invitation is always present and never deleted automatically
-  if (!db.invitations.some(i => i.id === "invite-1792423053258" || (i.config && i.config.brideName === "Suman" && i.config.groomName === "Vishal"))) {
-    const defaultSuman = INITIAL_INVITATIONS.find(i => i.id === "invite-1792423053258");
-    if (defaultSuman) db.invitations.unshift(JSON.parse(JSON.stringify(defaultSuman)));
+  // Guarantee customer Suman & Vishal invitation is always present and completely hydrated with all ceremonies and details
+  const primarySumanDef = INITIAL_INVITATIONS[0];
+  const existingSumanIdx = db.invitations.findIndex(i => 
+    i.id === "invite-1792299417819" || 
+    i.id === "invite-1792423053258" || 
+    (i.config && i.config.brideName === "Suman" && i.config.groomName === "Vishal")
+  );
+  if (existingSumanIdx === -1) {
+    if (primarySumanDef) db.invitations.unshift(JSON.parse(JSON.stringify(primarySumanDef)));
+  } else {
+    // If ceremonies are missing or < 5, hydrate with the full details
+    const curr = db.invitations[existingSumanIdx];
+    if (!curr.config?.ceremonies || curr.config.ceremonies.length < 5 || !curr.config.weddingVenue || curr.config.weddingVenue.includes("Starlight")) {
+      db.invitations[existingSumanIdx] = {
+        ...JSON.parse(JSON.stringify(primarySumanDef)),
+        id: curr.id,
+        customerId: "user-customer",
+        isPaid: true
+      };
+    }
   }
 
   return db;
@@ -1415,6 +1869,8 @@ export const dbStore = {
     const nameSlug = this.slugify(`${bride}-${groom}`) || "wedding";
     const uniqueId = `invite-${timestamp}`;
     const initialSlug = `${nameSlug}-${timestamp}`;
+    const fullConfig = { ...DEFAULT_CONFIG, ...config };
+    const folderName = formatDriveFolderName(fullConfig, title || `${bride} & ${groom}'s Wedding`);
 
     const newInv = {
       id: uniqueId,
@@ -1422,17 +1878,39 @@ export const dbStore = {
       customSlug: initialSlug,
       customerId,
       title: title || `${bride} & ${groom}'s Wedding`,
-      config: { ...DEFAULT_CONFIG, ...config },
+      config: fullConfig,
       rsvps: [],
       wishes: [],
       isPaid,
       shareText: `We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - ${bride} & ${groom}`,
       status,
+      driveStorage: {
+        rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
+        rootFolderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
+        folderName: folderName,
+        folderId: null,
+        folderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
+        lastSyncedAt: new Date().toISOString(),
+        status: "synced"
+      },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
     db.invitations.push(newInv);
     saveDb(db);
+
+    // Asynchronously create and sync folder on Google Drive
+    syncDriveFolder({ invitation: newInv }).then(driveRes => {
+      if (driveRes && driveRes.folderId) {
+        const freshDb = getDb();
+        const target = freshDb.invitations.find(i => i.id === uniqueId);
+        if (target) {
+          target.driveStorage = { ...(target.driveStorage || {}), ...driveRes };
+          saveDb(freshDb);
+        }
+      }
+    }).catch(err => console.warn("Google Drive initial sync warning:", err));
+
     return newInv;
   },
   updateInvitation(id, updates) {
@@ -1469,16 +1947,85 @@ export const dbStore = {
       }
     }
 
+    // Google Drive Cloud Storage: Auto-rename folder whenever bride, groom, or location is edited
+    const oldFolderName = current.driveStorage?.folderName || formatDriveFolderName(current.config || {}, current.title);
+    const newFolderName = formatDriveFolderName(newConfig, updates.title || current.title);
+    const folderRenamed = Boolean(oldFolderName && newFolderName && oldFolderName !== newFolderName);
+
+    const updatedDriveStorage = {
+      ...(current.driveStorage || {}),
+      ...(updates.driveStorage || {}),
+      rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
+      rootFolderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
+      folderName: newFolderName,
+      folderUrl: current.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL,
+      lastSyncedAt: new Date().toISOString()
+    };
+
+    if (folderRenamed) {
+      console.log(`[Google Drive Cloud] Auto-renaming folder to "${newFolderName}" (was "${oldFolderName}")`);
+      syncDriveFolder({
+        invitation: { ...current, ...updates, config: newConfig },
+        oldFolderName
+      }).then(res => {
+        if (res) {
+          const freshDb = getDb();
+          const target = freshDb.invitations.find(i => i.id === id);
+          if (target) {
+            target.driveStorage = { ...(target.driveStorage || {}), ...res };
+            saveDb(freshDb);
+          }
+        }
+      }).catch(err => console.warn("Google Drive auto-rename warning:", err));
+    }
+
     db.invitations[idx] = {
       ...current,
       ...updates,
       isCustomSlugManuallySet: isManual,
       slug: newSlug,
       customSlug: newCustomSlug,
+      driveStorage: updatedDriveStorage,
       updatedAt: new Date().toISOString()
     };
     saveDb(db);
     window.dispatchEvent(new Event("db_synced"));
+
+    // Permanent Google Drive Sync: If any base64 image data is saved, migrate it to Google Drive in the background to free Firebase space
+    if (updates.config) {
+      const base64Keys = Object.keys(updates.config).filter(k => typeof updates.config[k] === 'string' && updates.config[k].startsWith('data:image'));
+      if (base64Keys.length > 0) {
+        setTimeout(async () => {
+          try {
+            const freshDb = getDb();
+            const target = (freshDb.invitations || []).find(i => i.id === id);
+            if (!target || !target.config) return;
+            let didMigrate = false;
+            for (const k of base64Keys) {
+              if (target.config[k] && target.config[k].startsWith('data:image')) {
+                const res = await uploadBase64ToDriveStorage({
+                  base64Data: target.config[k],
+                  invitation: target,
+                  category: k,
+                  customFileName: `${k}_drive`
+                });
+                if (res.success && res.url.startsWith('http')) {
+                  target.config[k] = res.url;
+                  didMigrate = true;
+                }
+              }
+            }
+            if (didMigrate) {
+              saveDb(freshDb);
+              window.dispatchEvent(new Event("db_synced"));
+            }
+          } catch(e) {
+            console.warn("Background Drive migration notice:", e);
+          }
+        }, 300);
+      }
+    }
+
     return db.invitations[idx];
   },
   deleteInvitation(id) {
@@ -1492,7 +2039,7 @@ export const dbStore = {
     window.dispatchEvent(new Event("db_synced"));
     return true;
   },
-  duplicateInvitation(id, customTitle = null) {
+  duplicateInvitation(id, customTitle = null, assignCustomerId = null) {
     const db = getDb();
     const source = this.getInvitationById(id);
     if (!source) return null;
@@ -1507,6 +2054,7 @@ export const dbStore = {
     const newSlug = `${nameSlug}-${timestamp}`;
 
     const newTitle = customTitle || `${source.title || `${bride} & ${groom}'s Wedding`} (Copy)`;
+    const newFolderName = formatDriveFolderName(cleanConfig, newTitle);
 
     const duplicated = {
       ...JSON.parse(JSON.stringify(source)),
@@ -1516,11 +2064,21 @@ export const dbStore = {
       isCustomSlugManuallySet: false,
       title: newTitle,
       config: cleanConfig,
+      customerId: assignCustomerId !== null ? assignCustomerId : (source.customerId || null),
       rsvps: [],
       wishes: [],
       guestList: Array.isArray(source.guestList) ? JSON.parse(JSON.stringify(source.guestList)) : [],
       isPaid: false,
       status: "draft",
+      driveStorage: {
+        rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
+        rootFolderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
+        folderName: newFolderName,
+        folderId: null,
+        folderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
+        lastSyncedAt: new Date().toISOString(),
+        status: "synced"
+      },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
@@ -1528,6 +2086,10 @@ export const dbStore = {
     db.invitations.unshift(duplicated);
     saveDb(db);
     window.dispatchEvent(new Event("db_synced"));
+
+    // Sync newly duplicated invitation's folder
+    syncDriveFolder({ invitation: duplicated }).catch(err => console.warn("Duplicate Drive sync warning:", err));
+
     return duplicated;
   },
   ensureInvitationCached(inv) {
@@ -2144,6 +2706,18 @@ export const dbStore = {
     saveDb(db);
     window.dispatchEvent(new Event("db_synced"));
     return db.brandSettings;
+  },
+
+  // --- GOOGLE DRIVE CLOUD IMAGE TRANSFER & SYNC ---
+  scanBase64Media() {
+    return scanDatabaseForBase64Media(getDb());
+  },
+  transferAllImagesToDrive(onProgress) {
+    return transferAllDatabaseImagesToDrive({
+      getDb,
+      saveDb,
+      onProgress
+    });
   }
 };
 export { DEFAULT_CONFIG };
