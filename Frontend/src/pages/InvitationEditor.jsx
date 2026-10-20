@@ -12,6 +12,7 @@ import AiAssistantModal from '../components/AiAssistantModal';
 import GuestManagerModal from '../components/GuestManagerModal';
 import ShareInviteModal from '../components/ShareInviteModal';
 import { downloadPrintablePdfCard, downloadInvitationImage, downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
+import { formatDriveFolderName, GOOGLE_DRIVE_ROOT_FOLDER_URL } from '../utils/googleDriveStorage';
 
 export default function InvitationEditor() {
   const { id } = useParams();
@@ -21,13 +22,23 @@ export default function InvitationEditor() {
   const isAdmin = currentUser?.role === 'admin';
   const [toast, setToast] = useState({ show: false, message: "", type: "info" });
   
-  // Customization state
-  const [invitation, setInvitation] = useState(null);
-  const [config, setConfig] = useState(DEFAULT_CONFIG);
-  const [title, setTitle] = useState("New Wedding Invitation");
-  const [customerId, setCustomerId] = useState("");
-  const [isPaid, setIsPaid] = useState(false);
-  const [status, setStatus] = useState("draft");
+  // Customization state - initialized synchronously to avoid flash of default names
+  const cachedInv = id ? dbStore.getInvitationById(id) : null;
+  const [invitation, setInvitation] = useState(() => cachedInv);
+  const [config, setConfig] = useState(() => {
+    if (cachedInv?.config) {
+      const cleaned = { ...DEFAULT_CONFIG, ...cachedInv.config };
+      if (cleaned.scratchImage && typeof cleaned.scratchImage === 'string' && cleaned.scratchImage.includes('photo-1519225495810-7512c696505a')) {
+        cleaned.scratchImage = "";
+      }
+      return cleaned;
+    }
+    return DEFAULT_CONFIG;
+  });
+  const [title, setTitle] = useState(() => cachedInv?.title || "New Wedding Invitation");
+  const [customerId, setCustomerId] = useState(() => cachedInv?.customerId || "");
+  const [isPaid, setIsPaid] = useState(() => cachedInv?.isPaid || false);
+  const [status, setStatus] = useState(() => cachedInv?.status || "draft");
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
 
   // AI & Guest Manager Modals
@@ -137,7 +148,7 @@ export default function InvitationEditor() {
       showToast("Please save the invitation first before duplicating.", "info");
       return;
     }
-    const dup = dbStore.duplicateInvitation(id);
+    const dup = dbStore.duplicateInvitation(id, null, currentUser?.role === 'customer' ? currentUser?.id : null);
     if (dup) {
       showToast(`Duplicated as "${dup.title}"! Loading new copy...`, "success");
       navigate(`/admin/editor/${dup.id}`);
@@ -238,6 +249,7 @@ export default function InvitationEditor() {
         }`}
       >
         <AdminSidebar
+          invitation={invitation || { id, title, config }}
           config={config}
           onChangeField={handleFieldChange}
           onAiImageGen={handleAIImageGen}
@@ -373,6 +385,20 @@ export default function InvitationEditor() {
                 </button>
               </>
             )}
+
+            <a
+              href={invitation?.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="editor-toolbar-btn editor-toolbar-btn-collapsible text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-300/60"
+              title={`Google Drive Cloud Folder: ${invitation?.driveStorage?.folderName || formatDriveFolderName(config, title)} (Click to open)`}
+            >
+              <span className="text-[10px]">☁️</span>
+              <span className="editor-btn-text text-emerald-800 font-bold truncate max-w-[120px]">
+                {invitation?.driveStorage?.folderName || formatDriveFolderName(config, title)}
+              </span>
+              <span className="text-[8px] text-emerald-600">↗</span>
+            </a>
 
             <button
               onClick={handleSave}

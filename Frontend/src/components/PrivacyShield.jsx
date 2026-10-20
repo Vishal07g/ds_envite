@@ -17,7 +17,8 @@ import { SvgHeart, SvgCheck } from './icons';
 export default function PrivacyShield({ 
   targetContainerId = "invitation-view-container",
   coupleNames = "Celebration",
-  enableWatermarkPattern = true
+  enableWatermarkPattern = true,
+  showBadge = false
 }) {
   const [isShieldActive, setIsShieldActive] = useState(false);
   const [shieldReason, setShieldReason] = useState("");
@@ -52,11 +53,12 @@ export default function PrivacyShield({
     setIsShieldActive(true);
     scrubClipboard();
 
-    // Obfuscate the target DOM container
+    // Obfuscate the target DOM container and document body
     const container = document.getElementById(targetContainerId);
     if (container) {
       container.classList.add("privacy-shield-obfuscated");
     }
+    document.body.classList.add("privacy-shield-body-lock");
   }, [targetContainerId, scrubClipboard]);
 
   // Dismiss the privacy shield smoothly
@@ -66,11 +68,26 @@ export default function PrivacyShield({
     if (container) {
       container.classList.remove("privacy-shield-obfuscated");
     }
+    document.body.classList.remove("privacy-shield-body-lock");
   }, [targetContainerId]);
 
-  // Handle keyboard shortcuts (PrintScreen, Snipping Tool, Print, Inspect)
+  // Handle keyboard shortcuts (PrintScreen, Snipping Tool, Print, Inspect, Hardware Volume/Power combo)
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // 0. Mobile Hardware Volume Down / Power key combination detection
+      if (
+        e.key === "AudioVolumeDown" || 
+        e.code === "AudioVolumeDown" || 
+        e.keyCode === 174 || 
+        e.keyCode === 25 || 
+        e.key === "VolumeDown"
+      ) {
+        scrubClipboard();
+        triggerShield("Mobile Hardware Capture Attempt (Power + Volume Down)");
+        notify("🚫 Mobile Screenshot Blocked: Hardware button capture is disabled.");
+        return;
+      }
+
       // 1. PrintScreen key (standard code 44 or key 'PrintScreen')
       if (e.key === "PrintScreen" || e.keyCode === 44) {
         e.preventDefault();
@@ -125,27 +142,30 @@ export default function PrivacyShield({
     };
 
     // 6. Window Blur & Visibility Change (Snipping Tool & external screenshot tool detector)
-    // When snipping tool or screen capture is triggered, browser loses focus immediately
+    // When snipping tool, Power+Volume screenshot, or OS screen grab is triggered, browser loses focus immediately
     const handleBlur = () => {
       // Trigger instant opaque blackout so any snip captures only the shield
-      triggerShield("Window focus lost / Screen Capture active");
+      triggerShield("Window focus lost / OS Screen Capture active");
     };
 
     const handleFocus = () => {
-      // Once user clicks back into the window, smoothly lift the shield after a brief verification
       setTimeout(() => {
         dismissShield();
-      }, 300);
+      }, 350);
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === "hidden") {
-        triggerShield("Screen visibility changed");
+        triggerShield("Screen visibility changed / OS Screenshot buffer");
       } else {
         setTimeout(() => {
           dismissShield();
-        }, 300);
+        }, 350);
       }
+    };
+
+    const handlePageHide = () => {
+      triggerShield("Page suspended / OS Capture buffer");
     };
 
     // 7. Context Menu prevention (Right-click to Inspect / Save Image As)
@@ -161,22 +181,48 @@ export default function PrivacyShield({
       return false;
     };
 
+    // 9. Mobile 3-Finger Touch & Palm Swipe Screenshot Interception
+    const handleMultiTouch = (e) => {
+      const touches = e.touches || [];
+      const hasThreeFingers = touches.length >= 3;
+      const hasPalmContact = Array.from(touches).some(t => 
+        (t.radiusX && t.radiusX > 30) || 
+        (t.radiusY && t.radiusY > 30)
+      );
+
+      if (hasThreeFingers || hasPalmContact) {
+        if (e.cancelable) {
+          e.preventDefault();
+        }
+        e.stopPropagation();
+        scrubClipboard();
+        triggerShield(hasThreeFingers ? "3-Finger Screenshot Gesture Blocked" : "Palm Swipe Capture Blocked");
+        notify("🚫 Mobile Screenshot Blocked: Multi-finger touch capture is restricted.");
+      }
+    };
+
     window.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("keyup", handleKeyUp, true);
     window.addEventListener("blur", handleBlur);
     window.addEventListener("focus", handleFocus);
+    window.addEventListener("pagehide", handlePageHide);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener("contextmenu", handleContextMenu, true);
     document.addEventListener("dragstart", handleDragStart, true);
+    window.addEventListener("touchstart", handleMultiTouch, { capture: true, passive: false });
+    window.addEventListener("touchmove", handleMultiTouch, { capture: true, passive: false });
 
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("keyup", handleKeyUp, true);
       window.removeEventListener("blur", handleBlur);
       window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("pagehide", handlePageHide);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       document.removeEventListener("contextmenu", handleContextMenu, true);
       document.removeEventListener("dragstart", handleDragStart, true);
+      window.removeEventListener("touchstart", handleMultiTouch, { capture: true });
+      window.removeEventListener("touchmove", handleMultiTouch, { capture: true });
     };
   }, [triggerShield, dismissShield, scrubClipboard, notify]);
 
@@ -266,68 +312,74 @@ export default function PrivacyShield({
         </div>
       )}
 
-      {/* 4. DISCREET PRIVACY VERIFICATION & TESTING BADGE */}
-      <div className="fixed bottom-3 right-3 z-50">
-        {!showTestBadge ? (
-          <button
-            type="button"
-            onClick={() => setShowTestBadge(true)}
-            className="px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-amber-500/30 hover:border-amber-400 text-amber-300 text-[10px] font-bold tracking-wider uppercase transition shadow-md flex items-center space-x-1 cursor-pointer"
-            title="Invitee Privacy Shield is Active. Click to inspect or test."
-          >
-            <span>🛡️</span>
-            <span className="hidden sm:inline">Privacy Shield ON</span>
-          </button>
-        ) : (
-          <div className="p-3 rounded-2xl bg-slate-950/95 backdrop-blur-md border border-amber-500/40 shadow-2xl text-slate-100 text-xs space-y-2.5 max-w-xs animate-fade-in">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
-              <div className="flex items-center space-x-1.5 font-bold text-amber-300 text-[11px] uppercase tracking-wider">
-                <span>🛡️</span>
-                <span>Privacy Shield Status</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowTestBadge(false)}
-                className="text-slate-400 hover:text-white text-xs px-1"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-1 text-[11px] text-slate-300">
-              <div className="flex items-center justify-between">
-                <span>• PrintScreen Interceptor:</span>
-                <span className="text-emerald-400 font-bold">Active</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>• Snipping Tool Shield:</span>
-                <span className="text-emerald-400 font-bold">Active</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>• Clipboard Scrubber:</span>
-                <span className="text-emerald-400 font-bold">Active</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>• Print / PDF Blocker:</span>
-                <span className="text-emerald-400 font-bold">Active</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>• Right-Click &amp; Drag Lock:</span>
-                <span className="text-emerald-400 font-bold">Active</span>
-              </div>
-            </div>
-
+      {/* 4. DISCREET PRIVACY VERIFICATION BADGE (Hidden by default, protection runs strictly in background) */}
+      {showBadge && (
+        <div className="fixed bottom-3 right-3 z-50">
+          {!showTestBadge ? (
             <button
               type="button"
-              onClick={handleTestShield}
-              className="w-full py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold text-[10px] uppercase tracking-wider transition flex items-center justify-center space-x-1 cursor-pointer"
+              onClick={() => setShowTestBadge(true)}
+              className="px-2.5 py-1 rounded-full bg-slate-950/80 backdrop-blur-md border border-amber-500/30 hover:border-amber-400 text-amber-300 text-[10px] font-bold tracking-wider uppercase transition shadow-md flex items-center space-x-1 cursor-pointer"
+              title="Invitee Privacy Shield is Active. Click to inspect or test."
             >
-              <span>⚡</span>
-              <span>Test Screenshot Shield ({testModeCount} tested)</span>
+              <span>🛡️</span>
+              <span className="hidden sm:inline">Privacy Shield ON</span>
             </button>
-          </div>
-        )}
-      </div>
+          ) : (
+            <div className="p-3 rounded-2xl bg-slate-950/95 backdrop-blur-md border border-amber-500/40 shadow-2xl text-slate-100 text-xs space-y-2.5 max-w-xs animate-fade-in">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-1.5">
+                <div className="flex items-center space-x-1.5 font-bold text-amber-300 text-[11px] uppercase tracking-wider">
+                  <span>🛡️</span>
+                  <span>Privacy Shield Status</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowTestBadge(false)}
+                  className="text-slate-400 hover:text-white text-xs px-1"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-1 text-[11px] text-slate-300">
+                <div className="flex items-center justify-between">
+                  <span>• Mobile 3-Finger Touch Shield:</span>
+                  <span className="text-emerald-400 font-bold">Active</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>• Hardware Power+Vol Capture:</span>
+                  <span className="text-emerald-400 font-bold">Active</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>• Palm Swipe Screen Defense:</span>
+                  <span className="text-emerald-400 font-bold">Active</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>• PrintScreen &amp; Snipping Shield:</span>
+                  <span className="text-emerald-400 font-bold">Active</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>• Clipboard Auto-Scrubber:</span>
+                  <span className="text-emerald-400 font-bold">Active</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span>• Right-Click &amp; Long-Press Lock:</span>
+                  <span className="text-emerald-400 font-bold">Active</span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleTestShield}
+                className="w-full py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold text-[10px] uppercase tracking-wider transition flex items-center justify-center space-x-1 cursor-pointer"
+              >
+                <span>⚡</span>
+                <span>Test Screenshot Shield ({testModeCount} tested)</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </>
   );
 }

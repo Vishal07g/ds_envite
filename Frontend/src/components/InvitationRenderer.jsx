@@ -465,7 +465,7 @@ const ScratchCardShield = React.memo(
 
 export default function InvitationRenderer({ 
   invitationId = 'default',
-  config: propConfig, 
+  config: propConfig = {}, 
   rsvps = [], 
   wishes = [], 
   onSubmitRsvp, 
@@ -482,11 +482,12 @@ export default function InvitationRenderer({
   isPaid = false
 }) {
   const config = useMemo(() => {
-    if (!propConfig.syncColorThemeWithEnvelope) return propConfig;
+    const base = propConfig || {};
+    if (!base.syncColorThemeWithEnvelope) return base;
     return {
-      ...propConfig,
-      primaryColor: propConfig.envelopeBgColor || propConfig.primaryColor || "#0b1329",
-      accentGold: propConfig.envelopeSealColor || propConfig.accentGold || "#f59e0b"
+      ...base,
+      primaryColor: base.envelopeBgColor || base.primaryColor || "#0b1329",
+      accentGold: base.envelopeSealColor || base.accentGold || "#f59e0b"
     };
   }, [propConfig]);
 
@@ -537,18 +538,18 @@ export default function InvitationRenderer({
 
   // Automatically start playing Song 1 (Starting Song) as soon as invitation link is opened
   useEffect(() => {
-    if (!isEnvelopeOpened && hasStartingSong && config.showMusic !== false) {
+    if (hasStartingSong && config.showMusic !== false) {
       setCurrentTrack("starting");
 
       const playStartingSong = () => {
         const startEl = startingAudioRef.current;
-        if (!startEl || isEnvelopeOpened) return;
+        if (!startEl) return;
 
         if (startEl.paused) {
           startEl.play().then(() => {
             if (onMusicToggle) onMusicToggle(true);
           }).catch(err => {
-            console.log("Audio autoplay waiting for user activity:", err);
+            console.log("Audio autoplay waiting for user activity:", err.name);
           });
         }
       };
@@ -556,15 +557,15 @@ export default function InvitationRenderer({
       // 1. Try immediate autoplay right on page load
       playStartingSong();
 
-      // 2. Fallback on any initial activity/gesture (pointer, mouse, touch, scroll, focus)
-      const gestureEvents = ['pointerdown', 'touchstart', 'click', 'mousemove', 'pointermove', 'scroll', 'wheel', 'keydown', 'focus'];
+      // 2. Fallback on any initial activity/gesture (pointer, mouse, touch, scroll, focus, envelopeUserTapped)
+      const gestureEvents = ['pointerdown', 'touchstart', 'click', 'mousemove', 'scroll', 'keydown', 'envelopeUserTapped'];
       const onFirstGesture = () => {
         playStartingSong();
-        gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture));
+        gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture, { capture: true }));
       };
 
       gestureEvents.forEach(evt => {
-        window.addEventListener(evt, onFirstGesture, { once: true, passive: true });
+        window.addEventListener(evt, onFirstGesture, { capture: true, once: true });
       });
 
       // Also retry once audio element finishes buffering
@@ -575,14 +576,14 @@ export default function InvitationRenderer({
       }
 
       return () => {
-        gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture));
+        gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture, { capture: true }));
         if (startEl) {
           startEl.removeEventListener('canplay', playStartingSong);
           startEl.removeEventListener('loadeddata', playStartingSong);
         }
       };
     }
-  }, [isEnvelopeOpened, hasStartingSong, startingSongUrl, config.showMusic]);
+  }, [hasStartingSong, startingSongUrl, config.showMusic]);
 
   // Music Volume, Drag & Widget Toggle state
   const [audioVolume, setAudioVolume] = useState(config.musicVolume !== undefined ? Number(config.musicVolume) : 0.8);
@@ -990,15 +991,19 @@ export default function InvitationRenderer({
   const handleEnvelopeOpen = () => {
     setEnvelopeOpeningAnim(true);
 
-    // Immediately transition to Song 2 on the user's envelope click gesture!
-    if (hasMainSong) {
-      if (startingAudioRef.current) {
-        startingAudioRef.current.pause();
+    // If starting song is enabled, play Song 1 immediately on this envelope open gesture!
+    if (hasStartingSong) {
+      setCurrentTrack("starting");
+      const startEl = startingAudioRef.current;
+      if (startEl && startEl.paused) {
+        startEl.play().then(() => {
+          if (onMusicToggle) onMusicToggle(true);
+        }).catch(e => console.log("Starting audio play on envelope click:", e));
       }
+    } else if (hasMainSong) {
       setCurrentTrack("main");
       const mainEl = mainAudioRef.current || audioRef.current;
-      if (mainEl) {
-        mainEl.currentTime = 0;
+      if (mainEl && mainEl.paused) {
         mainEl.play().then(() => {
           if (onMusicToggle) onMusicToggle(true);
         }).catch(e => console.log("Main audio play on envelope click:", e));
@@ -1037,29 +1042,7 @@ export default function InvitationRenderer({
     if ((!hasStartingSong && !hasMainSong) || config.showMusic === false) return null;
 
     if (config.showMusicWidget === false || isWidgetHidden) {
-      return (
-        <>
-          {hasStartingSong && (
-            <audio
-              ref={startingAudioRef}
-              src={startingSongUrl}
-              loop={config.startingMusicLoop !== false}
-              preload="auto"
-            />
-          )}
-          {hasMainSong && (
-            <audio
-              ref={(el) => {
-                mainAudioRef.current = el;
-                audioRef.current = el;
-              }}
-              src={config.musicUrl}
-              loop={config.loopMusic !== false}
-              preload="auto"
-            />
-          )}
-        </>
-      );
+      return null;
     }
 
     const isCustomPos = widgetPos.x !== null && widgetPos.y !== null;
@@ -1113,25 +1096,6 @@ export default function InvitationRenderer({
               )}
             </button>
           </div>
-          {hasStartingSong && (
-            <audio
-              ref={startingAudioRef}
-              src={startingSongUrl}
-              loop={config.startingMusicLoop !== false}
-              preload="auto"
-            />
-          )}
-          {hasMainSong && (
-            <audio
-              ref={(el) => {
-                mainAudioRef.current = el;
-                audioRef.current = el;
-              }}
-              src={config.musicUrl}
-              loop={config.loopMusic !== false}
-              preload="auto"
-            />
-          )}
         </div>
       );
     }
@@ -1276,26 +1240,6 @@ export default function InvitationRenderer({
             </div>
           )}
         </div>
-
-        {hasStartingSong && (
-          <audio
-            ref={startingAudioRef}
-            src={startingSongUrl}
-            loop={config.startingMusicLoop !== false}
-            preload="auto"
-          />
-        )}
-        {hasMainSong && (
-          <audio
-            ref={(el) => {
-              mainAudioRef.current = el;
-              audioRef.current = el;
-            }}
-            src={config.musicUrl}
-            loop={config.loopMusic !== false}
-            preload="auto"
-          />
-        )}
       </div>
     );
   };
@@ -1653,6 +1597,44 @@ export default function InvitationRenderer({
             setActiveColorId={setActiveColorId}
           />
         </div>
+      )}
+
+      {/* Permanent, Uninterrupted Dual-Track Audio Players */}
+      {!isPrintMode && (
+        <>
+          {hasStartingSong && (
+            <audio
+              ref={startingAudioRef}
+              src={startingSongUrl}
+              autoPlay
+              playsInline
+              loop={config.startingMusicLoop !== false && !hasMainSong}
+              preload="auto"
+              onEnded={() => {
+                if (hasMainSong) {
+                  setCurrentTrack("main");
+                  const mainEl = mainAudioRef.current || audioRef.current;
+                  if (mainEl) {
+                    mainEl.currentTime = 0;
+                    mainEl.play().catch(e => console.log("Transition to main song:", e));
+                  }
+                }
+              }}
+            />
+          )}
+          {hasMainSong && (
+            <audio
+              ref={(el) => {
+                mainAudioRef.current = el;
+                audioRef.current = el;
+              }}
+              src={config.musicUrl}
+              playsInline
+              loop={config.loopMusic !== false}
+              preload="auto"
+            />
+          )}
+        </>
       )}
 
       {!isPrintMode && renderAudioPlayerWidget()}

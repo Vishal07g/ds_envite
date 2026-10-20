@@ -13,6 +13,18 @@ import PaymentModal from '../components/PaymentModal';
 import InvoiceModal from '../components/InvoiceModal';
 import ShareInviteModal from '../components/ShareInviteModal';
 import { downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
+import {
+  formatDriveFolderName,
+  GOOGLE_DRIVE_ROOT_FOLDER_URL,
+  GOOGLE_DRIVE_ROOT_FOLDER_ID,
+  getDriveWebhookUrl,
+  setDriveWebhookUrl,
+  syncDriveFolder,
+  syncInvitationMediaFromDrive,
+  requestGoogleDriveAuth,
+  transferInvitationToGoogleDriveOAuth,
+  GOOGLE_APPS_SCRIPT_TEMPLATE
+} from '../utils/googleDriveStorage';
 
 function LogoBrandingManager({ showToast }) {
   const initialSettings = dbStore.getBrandSettings();
@@ -1047,6 +1059,97 @@ export default function AdminDashboard() {
 
   const [paymentModalOrder, setPaymentModalOrder] = useState(null);
   const [invoiceModalTarget, setInvoiceModalTarget] = useState(null);
+  const [driveWebhookInput, setDriveWebhookInput] = useState(() => getDriveWebhookUrl());
+  const [isSyncingAllDrive, setIsSyncingAllDrive] = useState(false);
+  const [copiedScript, setCopiedScript] = useState(false);
+  const [isMigratingImages, setIsMigratingImages] = useState(false);
+  const [migrationProgress, setMigrationProgress] = useState(null);
+  const [scanStats, setScanStats] = useState(() => dbStore.scanBase64Media());
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      setScanStats(dbStore.scanBase64Media());
+    };
+    window.addEventListener("db_synced", handleUpdate);
+    window.addEventListener("drive_images_migrated", handleUpdate);
+    return () => {
+      window.removeEventListener("db_synced", handleUpdate);
+      window.removeEventListener("drive_images_migrated", handleUpdate);
+    };
+  }, []);
+
+  const handleTransferAllImages = async () => {
+    setIsMigratingImages(true);
+    setMigrationProgress({ percent: 5, message: "Scanning database and preparing Google Drive folders..." });
+    try {
+      const res = await dbStore.transferAllImagesToDrive((progress) => {
+        setMigrationProgress(progress);
+      });
+      if (res.success) {
+        showToast(
+          res.migratedCount > 0 
+            ? `Successfully transferred ${res.migratedCount} image(s) to Google Drive! Cleaned ${(res.bytesFreed / (1024 * 1024)).toFixed(2)} MB in Firebase!`
+            : "All images are already cleanly synced to Google Drive!",
+          "success"
+        );
+      }
+      setScanStats(dbStore.scanBase64Media());
+      setTick(t => t + 1);
+    } catch (err) {
+      console.error("Migration error:", err);
+      showToast(`Error transferring images: ${err.message}`, "error");
+    } finally {
+      setIsMigratingImages(false);
+      setTimeout(() => setMigrationProgress(null), 8000);
+    }
+  };
+
+  const handleTransferViaOAuth = async () => {
+    setIsMigratingImages(true);
+    setMigrationProgress({ percent: 5, message: "Connecting to your Google Drive via OAuth Client ID..." });
+    try {
+      const token = await requestGoogleDriveAuth();
+      let totalTransferred = 0;
+      for (let i = 0; i < invitations.length; i++) {
+        const inv = invitations[i];
+        const res = await transferInvitationToGoogleDriveOAuth({
+          invitation: inv,
+          token,
+          onProgress: (p) => setMigrationProgress(p)
+        });
+
+        if (res.success && res.uploadedCount > 0) {
+          totalTransferred += res.uploadedCount;
+          dbStore.updateInvitation(inv.id, {
+            config: res.updatedConfig,
+            driveStorage: {
+              ...(inv.driveStorage || {}),
+              folderId: res.folderId,
+              folderUrl: res.folderUrl,
+              status: "live_synced",
+              filesCount: res.uploadedCount,
+              lastSyncedAt: new Date().toISOString()
+            }
+          });
+        }
+      }
+
+      showToast(
+        totalTransferred > 0 
+          ? `Transferred ${totalTransferred} files directly into Google Drive with OAuth!` 
+          : "All invitation files are already synced with Google Drive!",
+        "success"
+      );
+      setScanStats(dbStore.scanBase64Media());
+      setTick(t => t + 1);
+    } catch(err) {
+      console.error("OAuth transfer error:", err);
+      showToast(`Google Drive transfer error: ${err.message}`, "error");
+    } finally {
+      setIsMigratingImages(false);
+      setTimeout(() => setMigrationProgress(null), 8000);
+    }
+  };
 
   // Actions
   const handleTogglePayment = (id, currentVal) => {
@@ -1276,6 +1379,7 @@ export default function AdminDashboard() {
             { id: "orders", label: "Incoming Orders", count: orders.filter(o => o.status === 'pending').length },
             { id: "customers", label: "Customer Accounts", count: users.length },
             { id: "themes", label: "Themes & Presets", count: dbStore.getPresets().length },
+            { id: "drive", label: "Google Drive Cloud" },
             { id: "branding", label: "Logo & Branding" },
             { id: "archive", label: "Archive (Trash)", count: dbStore.getArchive().length }
           ].map(tab => (
@@ -1403,6 +1507,15 @@ export default function AdminDashboard() {
                             >
                               <span>🌐 HTML</span>
                             </button>
+                            <a
+                              href={inv.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-2 rounded bg-slate-900 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 hover:border-emerald-400 transition inline-flex items-center"
+                              title={`Open Google Drive Folder: ${inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title)}`}
+                            >
+                              <span className="text-xs">📁</span>
+                            </a>
                             <Link
                               to={`/invite/${dbStore.getInvitationShareSlug(inv)}`}
                               target="_blank"
@@ -2274,6 +2387,348 @@ export default function AdminDashboard() {
               </div>
             );
           })()}
+
+          {/* 7. GOOGLE DRIVE CLOUD STORAGE TAB */}
+          {activeSubTab === "drive" && (
+            <div className="space-y-6">
+              {/* Cloud Storage Header Banner */}
+              <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-950/70 via-slate-900 to-emerald-950/70 border border-emerald-500/40 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1.5">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-2xl">☁️</span>
+                    <h3 className="text-lg font-bold text-emerald-300">Google Drive Cloud Storage</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                      Real-time Sync Active
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 max-w-2xl">
+                    Every wedding invitation and theme automatically gets its own dedicated folder inside your root Google Drive folder, formatted strictly as <strong className="text-amber-300">“Bride &amp; Groom (Wedding Location)”</strong> and renames automatically whenever the invitation is edited.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 self-start md:self-center">
+                  <a
+                    href={GOOGLE_DRIVE_ROOT_FOLDER_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 hover:from-emerald-500 hover:to-teal-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-lg flex items-center space-x-2 transition"
+                  >
+                    <span>📁 Open Root Drive Folder</span>
+                    <span>↗</span>
+                  </a>
+                </div>
+              </div>
+
+              {/* Transfer All Images & Free Firebase Space Action Box */}
+              <div className="p-6 rounded-2xl bg-slate-950/90 border border-amber-500/30 shadow-2xl space-y-4">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xl">🚀</span>
+                      <h4 className="font-extrabold text-amber-200 text-base">
+                        Transfer Images to Google Drive &amp; Clear Firebase Database
+                      </h4>
+                      {scanStats.totalItems > 0 ? (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-rose-500/20 text-rose-300 border border-rose-500/40 animate-pulse">
+                          {scanStats.totalItems} Base64 Image(s) Lingering in Database
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                          ✓ 100% Clean (Zero Base64 in Database)
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-slate-300 max-w-2xl">
+                      Extracts all raw embedded image strings from Firebase Realtime Database and transfers each image into its respective invitation's folder on Google Drive. Replaces heavy database strings with fast streaming Google Drive CDN URLs.
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 self-start lg:self-center shrink-0">
+                    <button
+                      onClick={handleTransferViaOAuth}
+                      disabled={isMigratingImages}
+                      className="px-5 py-3 rounded-xl font-extrabold text-xs uppercase tracking-wider shadow-lg bg-gradient-to-r from-emerald-400 via-teal-400 to-emerald-500 hover:from-emerald-500 hover:to-teal-500 text-slate-950 flex items-center space-x-2 transition cursor-pointer active:scale-98 disabled:opacity-50"
+                      title="Use your authenticated Google Client ID to authorize and upload files directly to Google Drive"
+                    >
+                      <span>{isMigratingImages ? "⏳ Processing..." : "🔑 Connect Google & Push to Drive"}</span>
+                    </button>
+                    <button
+                      onClick={handleTransferAllImages}
+                      disabled={isMigratingImages}
+                      className="px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider border border-slate-700 bg-slate-900/80 hover:bg-slate-800 text-slate-300 transition cursor-pointer"
+                      title="Optimize database and re-scan"
+                    >
+                      <span>🔄 Optimize Database</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Live Progress Bar during Migration */}
+                {migrationProgress && (
+                  <div className="pt-3 border-t border-slate-850 space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-amber-300 font-semibold">{migrationProgress.message}</span>
+                      <span className="font-mono text-emerald-400 font-extrabold">{migrationProgress.percent}%</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-900 rounded-full overflow-hidden border border-slate-800">
+                      <div 
+                        className="h-full bg-gradient-to-r from-amber-400 to-emerald-400 transition-all duration-300 rounded-full shadow-sm"
+                        style={{ width: `${migrationProgress.percent}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Storage Statistics Summary */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Base64 Images in Database</span>
+                    <span className="text-lg font-mono font-bold text-amber-300">{scanStats.totalItems}</span>
+                  </div>
+                  <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Space To Free in Firebase</span>
+                    <span className="text-lg font-mono font-bold text-emerald-400">
+                      {(scanStats.totalBytes / (1024 * 1024)).toFixed(2)} MB
+                    </span>
+                  </div>
+                  <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800/80">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Permanent Sync Mode</span>
+                    <span className="text-xs font-semibold text-sky-400 flex items-center space-x-1 mt-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-sky-400 animate-ping"></span>
+                      <span>Google Drive Cloud Active</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Folder Naming & Storage Rules Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                  <div className="flex items-center space-x-2 text-amber-300 font-bold text-xs uppercase tracking-wider">
+                    <span>🏷️</span>
+                    <span>Auto-Folder Naming</span>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Folders are named strictly using couple names and wedding location:
+                  </p>
+                  <div className="p-2 bg-slate-900 rounded font-mono text-[11px] text-emerald-400 border border-slate-800">
+                    Bride &amp; Groom (Location)
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                  <div className="flex items-center space-x-2 text-amber-300 font-bold text-xs uppercase tracking-wider">
+                    <span>🔄</span>
+                    <span>Automatic Renaming</span>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    Whenever an admin or customer updates names, venues, or locations, the folder renames automatically to match.
+                  </p>
+                  <div className="p-2 bg-slate-900 rounded font-mono text-[11px] text-amber-300 border border-slate-800">
+                    Real-time Auto Rename
+                  </div>
+                </div>
+
+                <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2">
+                  <div className="flex items-center space-x-2 text-amber-300 font-bold text-xs uppercase tracking-wider">
+                    <span>⚡</span>
+                    <span>Instant Guest Loading</span>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    All images, audio, and design files uploaded are stored in the folder and cached so invitations shared to guests load instantly.
+                  </p>
+                  <div className="p-2 bg-slate-900 rounded font-mono text-[11px] text-sky-400 border border-slate-800">
+                    Zero Latency Streaming
+                  </div>
+                </div>
+              </div>
+
+              {/* Invitations Folder Registry Table */}
+              <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-850 pb-3">
+                  <div>
+                    <h4 className="font-bold text-slate-100 text-sm">Invitation Folders on Drive</h4>
+                    <p className="text-xs text-slate-400">Folders created and linked in the root Google Drive storage</p>
+                  </div>
+                  <button
+                    onClick={async () => {
+                      setIsSyncingAllDrive(true);
+                      let totalSyncedMedia = 0;
+                      for (const inv of invitations) {
+                        try {
+                          await syncDriveFolder({ invitation: inv });
+                          const mediaRes = await syncInvitationMediaFromDrive(inv);
+                          if (mediaRes.success && mediaRes.syncedFiles > 0) {
+                            totalSyncedMedia += mediaRes.syncedFiles;
+                            dbStore.updateInvitation(inv.id, {
+                              config: mediaRes.updatedConfig,
+                              driveStorage: {
+                                ...(inv.driveStorage || {}),
+                                folderId: mediaRes.folderId,
+                                folderUrl: mediaRes.folderUrl,
+                                status: "live_synced",
+                                filesCount: mediaRes.syncedFiles,
+                                lastSyncedAt: new Date().toISOString()
+                              }
+                            });
+                          }
+                        } catch(e) {}
+                      }
+                      setIsSyncingAllDrive(false);
+                      showToast(
+                        totalSyncedMedia > 0 
+                          ? `Synced ${totalSyncedMedia} media file(s) from Google Drive into invitations!` 
+                          : "All invitation folders checked and synced with Google Drive!", 
+                        "success"
+                      );
+                      setTick(t => t + 1);
+                    }}
+                    disabled={isSyncingAllDrive}
+                    className="px-3.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition flex items-center space-x-1.5 self-start sm:self-center"
+                  >
+                    <span>{isSyncingAllDrive ? "⏳ Checking Drive..." : "🔄 Re-sync All Folders & Media"}</span>
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-[10px] text-amber-300 font-bold uppercase tracking-wider">
+                        <th className="py-2.5 px-3">Drive Folder Name</th>
+                        <th className="py-2.5 px-3">Associated Invitation</th>
+                        <th className="py-2.5 px-3">Wedding Location</th>
+                        <th className="py-2.5 px-3">Sync Status</th>
+                        <th className="py-2.5 px-3 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/60">
+                      {invitations.map(inv => {
+                        const folderName = inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title);
+                        const folderUrl = inv.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL;
+                        const location = inv.config?.weddingVenue || inv.config?.weddingAddress || "Not specified";
+                        
+                        return (
+                          <tr key={inv.id} className="hover:bg-slate-900/50 transition">
+                            <td className="py-3 px-3 font-semibold text-slate-100 flex items-center space-x-2">
+                              <span className="text-emerald-400">📁</span>
+                              <span className="font-mono text-emerald-300">{folderName}</span>
+                            </td>
+                            <td className="py-3 px-3 text-slate-300">
+                              {inv.title || "Wedding Invitation"}
+                            </td>
+                            <td className="py-3 px-3 text-slate-400">
+                              {location}
+                            </td>
+                            <td className="py-3 px-3">
+                              <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                {inv.driveStorage?.status || "Synced"}
+                              </span>
+                            </td>
+                            <td className="py-3 px-3 text-right flex items-center justify-end space-x-2">
+                              <button
+                                onClick={async () => {
+                                  showToast(`Checking Google Drive for "${folderName}"...`, "info");
+                                  const res = await syncInvitationMediaFromDrive(inv);
+                                  if (res.success && res.syncedFiles > 0) {
+                                    dbStore.updateInvitation(inv.id, {
+                                      config: res.updatedConfig,
+                                      driveStorage: {
+                                        ...(inv.driveStorage || {}),
+                                        folderId: res.folderId,
+                                        folderUrl: res.folderUrl,
+                                        status: "live_synced",
+                                        filesCount: res.syncedFiles,
+                                        lastSyncedAt: new Date().toISOString()
+                                      }
+                                    });
+                                    showToast(`Successfully linked ${res.syncedFiles} files from Google Drive!`, "success");
+                                    setTick(t => t + 1);
+                                  } else {
+                                    showToast(res.message || "No new files found in Drive folder.", "info");
+                                  }
+                                }}
+                                className="px-2.5 py-1 rounded bg-amber-500/10 border border-amber-500/30 hover:border-amber-400 text-amber-300 text-xs font-bold transition inline-flex items-center space-x-1"
+                                title="Sync files inside this Drive folder with the invitation"
+                              >
+                                <span>⚡ Sync Media</span>
+                              </button>
+                              <a
+                                href={folderUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="px-2.5 py-1 rounded bg-slate-900 border border-emerald-500/30 hover:border-emerald-400 text-emerald-300 text-xs font-bold transition inline-flex items-center space-x-1"
+                              >
+                                <span>Open in Drive</span>
+                                <span>↗</span>
+                              </a>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Optional Google Apps Script Direct Webhook Integration */}
+              <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-850 pb-3">
+                  <div>
+                    <h4 className="font-bold text-slate-100 text-sm">Automated Google Apps Script Webhook (Optional)</h4>
+                    <p className="text-xs text-slate-400">
+                      Connect your 1-minute Google Apps Script Web App for 100% direct native Drive folder creation &amp; uploads
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(GOOGLE_APPS_SCRIPT_TEMPLATE);
+                      setCopiedScript(true);
+                      showToast("Google Apps Script code copied to clipboard!", "success");
+                      setTimeout(() => setCopiedScript(false), 3000);
+                    }}
+                    className="px-3.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition flex items-center space-x-1.5 self-start sm:self-center"
+                  >
+                    <span>{copiedScript ? "✓ Copied!" : "📋 Copy Google Apps Script Code"}</span>
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-amber-300 block mb-1">
+                      Web App Exec URL (Ends with /exec)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="url"
+                        value={driveWebhookInput}
+                        onChange={(e) => setDriveWebhookInput(e.target.value)}
+                        placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+                        className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-amber-400 font-mono"
+                      />
+                      <button
+                        onClick={() => {
+                          setDriveWebhookUrl(driveWebhookInput);
+                          showToast("Google Drive Webhook URL saved successfully!", "success");
+                        }}
+                        className="px-4 py-2 bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 font-extrabold text-xs rounded-xl shadow-md cursor-pointer hover:from-amber-500 hover:to-yellow-600 transition"
+                      >
+                        Save URL
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-xs space-y-1.5 text-slate-300">
+                    <p className="font-bold text-amber-300">⚡ 1-Minute Setup Guide:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-400 pl-1">
+                      <li>Open <a href="https://script.google.com" target="_blank" rel="noopener noreferrer" className="text-amber-400 underline">script.google.com</a> and click <strong>New project</strong>.</li>
+                      <li>Click the <strong>Copy Google Apps Script Code</strong> button above and paste it into <code className="text-emerald-400">Code.gs</code>.</li>
+                      <li>Click <strong>Deploy &gt; New deployment &gt; Web app</strong>. Set <em>Execute as: Me</em> and <em>Who has access: Anyone</em>.</li>
+                      <li>Click Deploy, copy the Web App URL, paste it in the box above, and click <strong>Save URL</strong>.</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
         </div>
       </div>

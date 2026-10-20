@@ -92,7 +92,28 @@ export default function EnvelopeOpener({
   const envelopeBg = config.envelopeBgColor || "#5a0e1c"; // Deep rich burgundy/wine matching reference
   const envelopeBgImage = config.showEnvelopeTexture !== false ? config.envelopeBgImage : undefined;
   const sealColor = config.envelopeSealColor || "#c89f4b"; // Antique gold
-  const initials = config.envelopeInitials || `${(config.brideName || "A").charAt(0)} & ${(config.groomName || "A").charAt(0)}`;
+  const resolvedBride = (config.brideName || "").trim();
+  const resolvedGroom = (config.groomName || "").trim();
+  const autoCoupleNames = (resolvedBride && resolvedGroom)
+    ? `${resolvedBride} & ${resolvedGroom}`
+    : (resolvedBride || resolvedGroom || "");
+
+  const isCustomEnvelopeName = config.envelopeNamesText &&
+    config.envelopeNamesText.trim() &&
+    !config.envelopeNamesText.toLowerCase().includes("ananya") &&
+    !config.envelopeNamesText.toLowerCase().includes("aarav");
+
+  const namesText = isCustomEnvelopeName ? config.envelopeNamesText : (autoCoupleNames || config.envelopeNamesText || "");
+
+  const autoInitials = (resolvedBride && resolvedGroom)
+    ? `${resolvedBride.charAt(0)} & ${resolvedGroom.charAt(0)}`
+    : "";
+
+  const isCustomInitials = config.envelopeInitials &&
+    !config.envelopeInitials.toUpperCase().includes("A & A") &&
+    !config.envelopeInitials.toUpperCase().includes("A 👑 A");
+
+  const initials = isCustomInitials ? config.envelopeInitials : (autoInitials || config.envelopeInitials || "");
   const tagline = config.envelopeTagline || "Cordially Invited";
   const animDuration = Math.max(1.0, parseFloat(config.envelopeSpeed || "1.2"));
   const particleCount = parseInt(config.envelopeParticles || "24");
@@ -100,7 +121,6 @@ export default function EnvelopeOpener({
 
   // Dynamic text values
   const symbolText = config.envelopeSymbolText || config.customSacredSymbol || "❤";
-  const namesText = config.envelopeNamesText || `${config.brideName || 'Ananya'} & ${config.groomName || 'Aarav'}`;
   const inviteLabel = config.envelopeInviteLabelText || "Together with their families, request the pleasure of your company";
   const btnText = config.envelopeBtnText || "Open Invitation";
 
@@ -361,6 +381,7 @@ export default function EnvelopeOpener({
         overscrollBehavior: 'none',
       }}
       onClick={handleUserClickOpen}
+      onPointerDown={() => window.dispatchEvent(new Event('envelopeUserTapped'))}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300;1,600&family=Great+Vibes&family=Inter:wght@300;400;600&family=Italiana&family=Marcellus&family=Montserrat:wght@300;600&family=Pinyon+Script&family=Playball&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Rozha+One&family=Yatra+One&display=swap');

@@ -9,6 +9,12 @@ import {
   SvgBookOpen, SvgAward, SvgLayers, SvgCheck, SvgEye,
   SvgVolume2, SvgVolumeX
 } from './icons';
+import {
+  uploadInvitationFileToDrive,
+  formatDriveFolderName,
+  GOOGLE_DRIVE_ROOT_FOLDER_URL,
+  GOOGLE_DRIVE_ROOT_FOLDER_ID
+} from '../utils/googleDriveStorage';
 
 const RELIGIONS = {
   secular: {
@@ -256,6 +262,7 @@ const CustomSelect = ({ value, onChange, options, className = "" }) => {
 };
 
 export default function AdminSidebar({ 
+  invitation,
   config, 
   onChangeField, 
   onAiImageGen, 
@@ -273,6 +280,8 @@ export default function AdminSidebar({
 }) {
   const [activeTab, setActiveTab] = useState("cover");
   const [isScrollLocked, setIsScrollLocked] = useState(false);
+  const [driveUploading, setDriveUploading] = useState(false);
+  const [uploadStatusText, setUploadStatusText] = useState("");
   const [isTabDropdownOpen, setIsTabDropdownOpen] = useState(false);
   const [activeElementField, setActiveElementField] = useState(null);
   const dropdownRef = React.useRef(null);
@@ -597,15 +606,31 @@ export default function AdminSidebar({
     const file = e.target.files[0];
     if (!file) return;
     try {
-      const rawDataUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
+      setDriveUploading(true);
+      setUploadStatusText("Uploading to Google Drive Cloud...");
+      const uploadRes = await uploadInvitationFileToDrive({
+        file,
+        invitation: invitation || { config },
+        category: field
       });
-      onChangeField(field, rawDataUrl);
+      onChangeField(field, uploadRes.url);
+      setUploadStatusText("Saved to Google Drive!");
+      setTimeout(() => setUploadStatusText(""), 3000);
     } catch (err) {
-      console.error("Error reading file:", err);
+      console.error("Error uploading to Drive, fallback to local:", err);
+      try {
+        const rawDataUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        onChangeField(field, rawDataUrl);
+      } catch (readErr) {
+        console.error("Fallback file reading error:", readErr);
+      }
+    } finally {
+      setDriveUploading(false);
     }
   };
 
@@ -614,18 +639,19 @@ export default function AdminSidebar({
     if (!files || files.length === 0) return;
 
     let filesUploadedCount = 0;
+    setDriveUploading(true);
+    setUploadStatusText(`Uploading ${files.length} photo(s) to Google Drive...`);
     for (let idx = 1; idx <= 10; idx++) {
       if (filesUploadedCount >= files.length) break;
       if (!config[`galleryImage${idx}`]) {
         const file = files[filesUploadedCount];
         try {
-          const dataUrl = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
+          const uploadRes = await uploadInvitationFileToDrive({
+            file,
+            invitation: invitation || { config },
+            category: `gallery_${idx}`
           });
-          onChangeField(`galleryImage${idx}`, dataUrl);
+          onChangeField(`galleryImage${idx}`, uploadRes.url);
           if (!config[`galleryCaption${idx}`]) {
             onChangeField(`galleryCaption${idx}`, file.name.replace(/\.[^/.]+$/, ""));
           }
@@ -636,11 +662,25 @@ export default function AdminSidebar({
             onChangeField(`galleryFrameBorder${idx}`, "double-gilded");
           }
         } catch (err) {
-          console.error("Error reading file:", err);
+          console.error("Error uploading file:", err);
+          try {
+            const dataUrl = await new Promise((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(reader.result);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+            onChangeField(`galleryImage${idx}`, dataUrl);
+          } catch (rErr) {
+            console.error("Gallery fallback error:", rErr);
+          }
         }
         filesUploadedCount++;
       }
     }
+    setDriveUploading(false);
+    setUploadStatusText("Gallery synced to Google Drive!");
+    setTimeout(() => setUploadStatusText(""), 3000);
     e.target.value = "";
   };
 
@@ -1036,10 +1076,24 @@ export default function AdminSidebar({
               const file = e.target.files[0];
               if (file) {
                 try {
-                  const hdCompressed = await compressImage(file, 2048, 2048, 0.95);
-                  onChangeField(imageKey, hdCompressed);
+                  setDriveUploading(true);
+                  setUploadStatusText("Uploading HD Image to Google Drive...");
+                  const uploadRes = await uploadInvitationFileToDrive({
+                    file,
+                    invitation: invitation || { config },
+                    category: imageKey
+                  });
+                  onChangeField(imageKey, uploadRes.url);
+                  setUploadStatusText("HD Image saved in Google Drive!");
+                  setTimeout(() => setUploadStatusText(""), 3000);
                 } catch (err) {
-                  console.error("Error reading HD image:", err);
+                  console.error("Error uploading HD image to Drive:", err);
+                  try {
+                    const hdCompressed = await compressImage(file, 2048, 2048, 0.95);
+                    onChangeField(imageKey, hdCompressed);
+                  } catch (e) {}
+                } finally {
+                  setDriveUploading(false);
                 }
               }
             }}
@@ -1701,6 +1755,41 @@ export default function AdminSidebar({
           )}
         </div>
       </div>
+
+      {/* Google Drive Cloud Storage Header Badge */}
+      <div className="px-3 py-2 bg-[#FFF9F2] border-b border-[#E9DCCB] flex items-center justify-between text-xs">
+        <div className="flex items-center space-x-2 min-w-0">
+          <span className="text-base shrink-0">☁️</span>
+          <div className="min-w-0">
+            <div className="flex items-center space-x-1">
+              <span className="text-[9.5px] uppercase font-extrabold tracking-wider text-emerald-800">Drive Cloud Storage</span>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            </div>
+            <p 
+              className="text-[10.5px] font-bold text-[#513321] truncate max-w-[210px]" 
+              title={invitation?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation")}
+            >
+              📁 {invitation?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation")}
+            </p>
+          </div>
+        </div>
+        <a
+          href={invitation?.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="shrink-0 px-2 py-0.5 bg-emerald-100/70 hover:bg-emerald-200/80 border border-emerald-400/50 text-emerald-900 rounded-md text-[9.5px] font-extrabold flex items-center space-x-1 transition shadow-xs"
+          title="Open this invitation's folder in Google Drive"
+        >
+          <span>Open</span>
+          <span>↗</span>
+        </a>
+      </div>
+      {uploadStatusText && (
+        <div className="px-3 py-1 bg-amber-50 border-b border-amber-300/60 text-[10px] text-amber-900 font-bold flex items-center space-x-1.5 animate-pulse">
+          <span>⏳</span>
+          <span>{uploadStatusText}</span>
+        </div>
+      )}
 
       {/* Tab Dropdown Selector */}
       <div 
