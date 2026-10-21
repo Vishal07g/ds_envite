@@ -17,6 +17,7 @@ import GuestManagerModal from '../components/GuestManagerModal';
 import { downloadPrintablePdfCard, downloadInvitationImage, downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
 import { getCoupleInitials } from '../utils/monogramThumbnail';
 import { formatDriveFolderName, GOOGLE_DRIVE_ROOT_FOLDER_URL } from '../utils/googleDriveStorage';
+import { formatDriveDirectUrl } from '../utils/helpers';
 
 export default function CustomerDashboard() {
   const { currentUser } = useAuth();
@@ -1221,7 +1222,7 @@ export default function CustomerDashboard() {
                           <input 
                             type="text"
                             value={editOrderForm.startingMusicUrl || ""}
-                            onChange={(e) => setEditOrderForm(prev => ({ ...prev, startingMusicUrl: e.target.value }))}
+                            onChange={(e) => setEditOrderForm(prev => ({ ...prev, startingMusicUrl: formatDriveDirectUrl(e.target.value, "audio") }))}
                             placeholder="Direct MP3 URL or Upload Audio File"
                             className="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-100"
                           />
@@ -1282,7 +1283,7 @@ export default function CustomerDashboard() {
                           <input 
                             type="text"
                             value={editOrderForm.musicUrl || ""}
-                            onChange={(e) => setEditOrderForm(prev => ({ ...prev, musicUrl: e.target.value }))}
+                            onChange={(e) => setEditOrderForm(prev => ({ ...prev, musicUrl: formatDriveDirectUrl(e.target.value, "audio") }))}
                             placeholder="Direct MP3 URL or Upload Audio File"
                             className="flex-1 px-3 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-100"
                           />
@@ -1597,7 +1598,8 @@ export default function CustomerDashboard() {
                       type="text" 
                       value={customerMusicForm.startingMusicUrl || ""}
                       onChange={(e) => {
-                        setCustomerMusicForm(prev => ({ ...prev, startingMusicUrl: e.target.value }));
+                        const directUrl = formatDriveDirectUrl(e.target.value, "audio");
+                        setCustomerMusicForm(prev => ({ ...prev, startingMusicUrl: directUrl }));
                         if (custStartingPlaying && custStartingAudioRef.current) {
                           custStartingAudioRef.current.pause();
                           setCustStartingPlaying(false);
@@ -1633,7 +1635,7 @@ export default function CustomerDashboard() {
                       </button>
                       <audio 
                         ref={custStartingAudioRef} 
-                        src={customerMusicForm.startingMusicUrl} 
+                        src={formatDriveDirectUrl(customerMusicForm.startingMusicUrl, "audio")} 
                         onEnded={() => setCustStartingPlaying(false)}
                         onError={() => setCustStartingPlaying(false)}
                       />
@@ -1798,7 +1800,8 @@ export default function CustomerDashboard() {
                       type="text" 
                       value={customerMusicForm.musicUrl || ""}
                       onChange={(e) => {
-                        setCustomerMusicForm(prev => ({ ...prev, musicUrl: e.target.value }));
+                        const directUrl = formatDriveDirectUrl(e.target.value, "audio");
+                        setCustomerMusicForm(prev => ({ ...prev, musicUrl: directUrl }));
                         if (custMainPlaying && custMainAudioRef.current) {
                           custMainAudioRef.current.pause();
                           setCustMainPlaying(false);
@@ -1834,7 +1837,7 @@ export default function CustomerDashboard() {
                       </button>
                       <audio 
                         ref={custMainAudioRef} 
-                        src={customerMusicForm.musicUrl} 
+                        src={formatDriveDirectUrl(customerMusicForm.musicUrl, "audio")} 
                         onEnded={() => setCustMainPlaying(false)}
                         onError={() => setCustMainPlaying(false)}
                       />

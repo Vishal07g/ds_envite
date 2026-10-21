@@ -2300,24 +2300,47 @@ svg.active-icon,
   display: flex !important;
   align-items: center !important;
   box-sizing: border-box !important;
-  height: 32px !important;
-  min-height: 32px !important;
-  max-height: 32px !important;
+  height: 33px !important;
+  min-height: 33px !important;
+  max-height: 33px !important;
   white-space: nowrap !important;
   width: 100% !important;
-  background: #F7EFE5 !important;
-  border-bottom: 1px solid #E9DCCB !important;
+  background: transparent !important;
+  border: none !important;
   padding: 0 6px !important;
   overflow-x: auto !important;
   overflow-y: hidden !important;
-  scrollbar-width: none !important;
-  -ms-overflow-style: none !important;
+  scroll-behavior: smooth !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(196, 154, 74, 0.45) transparent !important;
+  cursor: grab !important;
+}
+
+.editor-top-toolbar:active,
+.editor-top-toolbar.toolbar-dragging {
+  cursor: grabbing !important;
+  user-select: none !important;
 }
 
 .editor-top-toolbar::-webkit-scrollbar {
-  display: none !important;
-  width: 0 !important;
-  height: 0 !important;
+  display: block !important;
+  height: 2.5px !important;
+  background: transparent !important;
+}
+
+.editor-top-toolbar::-webkit-scrollbar-track {
+  background: rgba(233, 220, 203, 0.25) !important;
+  border-radius: 9999px !important;
+}
+
+.editor-top-toolbar::-webkit-scrollbar-thumb {
+  background: rgba(196, 154, 74, 0.45) !important;
+  border-radius: 9999px !important;
+  transition: background 0.2s ease !important;
+}
+
+.editor-top-toolbar::-webkit-scrollbar-thumb:hover {
+  background: #C49A4A !important;
 }
 
 .editor-toolbar-inner {

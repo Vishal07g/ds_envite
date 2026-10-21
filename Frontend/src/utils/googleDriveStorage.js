@@ -1,19 +1,21 @@
 // Google Drive Cloud Storage Integration Service for Wedding Invitations
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
-import { storage } from "./firebase";
+import { storage } from "./firebase.js";
+
+const env = (typeof import.meta !== "undefined" && import.meta.env) ? import.meta.env : (typeof process !== "undefined" && process.env ? process.env : {});
 
 export const GOOGLE_DRIVE_ROOT_FOLDER_ID = 
-  import.meta.env.VITE_GOOGLE_DRIVE_ROOT_FOLDER_ID || "1_pdrNFiXcOymZQEby52O3FbvImCU_SW8";
+  env.VITE_GOOGLE_DRIVE_ROOT_FOLDER_ID || "1_pdrNFiXcOymZQEby52O3FbvImCU_SW8";
 
 export const GOOGLE_DRIVE_ROOT_FOLDER_URL = 
-  import.meta.env.VITE_GOOGLE_DRIVE_FOLDER_URL || 
+  env.VITE_GOOGLE_DRIVE_FOLDER_URL || 
   `https://drive.google.com/drive/folders/${GOOGLE_DRIVE_ROOT_FOLDER_ID}?usp=sharing`;
 
 export const GOOGLE_DRIVE_API_KEY = 
-  import.meta.env.VITE_GOOGLE_DRIVE_API_KEY || "AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y";
+  env.VITE_GOOGLE_DRIVE_API_KEY || "AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y";
 
 export const GOOGLE_DRIVE_CLIENT_ID = 
-  import.meta.env.VITE_GOOGLE_DRIVE_CLIENT_ID || "481414834690-smumepc6si7n9qcrqs559e5rqv405d9v.apps.googleusercontent.com";
+  env.VITE_GOOGLE_DRIVE_CLIENT_ID || "481414834690-smumepc6si7n9qcrqs559e5rqv405d9v.apps.googleusercontent.com";
 
 /**
  * Get active stored OAuth access token
@@ -328,18 +330,78 @@ export async function findDriveFolderByName(folderName) {
   }
 }
 /**
+ * Extract Google Drive file ID from any Google Drive URL format:
+ * - https://drive.google.com/file/d/{id}/view...
+ * - https://drive.google.com/open?id={id}
+ * - https://drive.google.com/uc?id={id}
+ * - https://drive.google.com/uc?export=download&id={id}
+ * - https://www.googleapis.com/drive/v3/files/{id}...
+ * - https://lh3.googleusercontent.com/d/{id}
+ * - https://docs.google.com/file/d/{id}
+ */
+export function extractDriveFileId(url) {
+  if (!url || typeof url !== "string") return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  // 1. Check googleapis.com/drive/v3/files/{id}
+  const apiMatch = trimmed.match(/\/drive\/v3\/files\/([a-zA-Z0-9_-]{15,})/);
+  if (apiMatch) return apiMatch[1];
+
+  // 2. Check /file/d/{id}
+  const fileDMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]{15,})/);
+  if (fileDMatch) return fileDMatch[1];
+
+  // 3. Check /d/{id} (e.g. googleusercontent.com/d/{id})
+  const dMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]{15,})/);
+  if (dMatch) return dMatch[1];
+
+  // 4. Check query param id= or ?id=
+  const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{15,})/);
+  if (idMatch) return idMatch[1];
+
+  return null;
+}
+
+/**
+ * Format any Google Drive URL into an ultra-fast, permanently embeddable/playable direct streaming URL.
+ * - type: 'image' -> 'https://lh3.googleusercontent.com/d/{fileId}' (Google global CDN, CORS enabled, no rate limits)
+ * - type: 'audio' / 'media' -> 'https://drive.google.com/uc?export=download&id={fileId}' (Direct binary stream)
+ */
+export function formatDriveDirectUrl(url, type = "image") {
+  if (!url || typeof url !== "string") return url;
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+
+  const fileId = extractDriveFileId(trimmed);
+  if (!fileId) return trimmed;
+
+  if (type === "audio" || type === "music" || type === "sound") {
+    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+  }
+
+  // Default is image (high-speed Google CDN)
+  return `https://lh3.googleusercontent.com/d/${fileId}`;
+}
+
+/**
  * Generate high-speed CDN streaming URL for Google Drive file
  */
 export function getDriveDirectFileUrl(fileId, mimeType = "") {
   if (!fileId) return "";
-  if (mimeType && mimeType.startsWith("image/")) {
-    return `https://lh3.googleusercontent.com/d/${fileId}`;
+  const isAudio = Boolean(
+    mimeType && (
+      mimeType.startsWith("audio/") || 
+      mimeType.includes("mpeg") || 
+      mimeType.includes("mp3") || 
+      mimeType.includes("wav") || 
+      mimeType.includes("ogg")
+    )
+  );
+  if (isAudio) {
+    return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
-  // Audio or generic files
-  if (GOOGLE_DRIVE_API_KEY) {
-    return `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${GOOGLE_DRIVE_API_KEY}`;
-  }
-  return `https://drive.google.com/uc?export=download&id=${fileId}`;
+  return `https://lh3.googleusercontent.com/d/${fileId}`;
 }
 
 /**
@@ -448,7 +510,7 @@ export function formatDriveFolderName(config = {}, fallbackTitle = "") {
  * Get active Webhook URL (from .env or localStorage configuration)
  */
 export function getDriveWebhookUrl() {
-  return import.meta.env.VITE_GOOGLE_DRIVE_WEBHOOK_URL || localStorage.getItem("google_drive_webhook_url") || "";
+  return env.VITE_GOOGLE_DRIVE_WEBHOOK_URL || (typeof localStorage !== "undefined" ? localStorage.getItem("google_drive_webhook_url") : "") || "";
 }
 
 /**
@@ -552,7 +614,39 @@ export async function uploadInvitationFileToDrive({
   let driveDirectUrl = null;
   const webhookUrl = getDriveWebhookUrl();
 
-  // 1. If Google Apps Script Webhook is active, upload directly into the specific Drive folder!
+  // 1. If Google Drive OAuth token is available, upload directly to Google Drive!
+  const oauthToken = getStoredOAuthToken();
+  if (oauthToken) {
+    try {
+      let targetFolderId = invitation?.driveStorage?.folderId;
+      if (!targetFolderId) {
+        const f = await getOrCreateDriveFolderOAuth(folderName, GOOGLE_DRIVE_ROOT_FOLDER_ID, oauthToken);
+        targetFolderId = f.id;
+      }
+      const uploaded = await uploadFileToDriveOAuth({
+        blob: file,
+        fileName: fileName,
+        mimeType: file.type || "image/jpeg",
+        folderId: targetFolderId,
+        token: oauthToken
+      });
+      if (uploaded && uploaded.directUrl) {
+        return {
+          success: true,
+          url: uploaded.directUrl,
+          driveDirectUrl: uploaded.directUrl,
+          driveFileId: uploaded.fileId,
+          fileName: uploaded.fileName,
+          folderName,
+          folderUrl: invitation?.driveStorage?.folderUrl || `https://drive.google.com/drive/folders/${targetFolderId}`
+        };
+      }
+    } catch (oauthErr) {
+      console.warn("Direct Google Drive OAuth upload failed, falling back:", oauthErr);
+    }
+  }
+
+  // 2. If Google Apps Script Webhook is active, upload directly into the specific Drive folder!
   if (webhookUrl) {
     try {
       const base64Data = await new Promise((resolve, reject) => {
@@ -580,7 +674,10 @@ export async function uploadInvitationFileToDrive({
         const result = await response.json();
         if (result.status === "success") {
           driveFileId = result.fileId;
-          driveDirectUrl = result.fileUrl || `https://lh3.googleusercontent.com/d/${result.fileId}`;
+          const isAudio = Boolean(file.type && (file.type.startsWith("audio/") || file.type.includes("mpeg") || file.type.includes("mp3")));
+          driveDirectUrl = isAudio 
+            ? `https://drive.google.com/uc?export=download&id=${result.fileId}`
+            : (result.fileUrl || `https://lh3.googleusercontent.com/d/${result.fileId}`);
           cloudUrl = driveDirectUrl;
         }
       }
@@ -589,13 +686,15 @@ export async function uploadInvitationFileToDrive({
     }
   }
 
-  // 2. High-speed Realtime Storage (Firebase Storage synchronized under the exact Drive folder structure)
-  // Ensures invitation links shared to guests ALWAYS load in real-time with zero latency or rate-limiting
+  // 3. High-speed Realtime Storage (Firebase Storage synchronized with timeout protection)
   if (!cloudUrl && storage) {
     try {
       const storagePath = `drive_storage/${folderName}/${fileName}`;
       const fileStorageRef = storageRef(storage, storagePath);
-      await uploadBytes(fileStorageRef, file, {
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error("Storage timeout")), 3500)
+      );
+      const uploadPromise = uploadBytes(fileStorageRef, file, {
         contentType: file.type || "image/jpeg",
         customMetadata: {
           invitationId: invitation?.id || "",
@@ -604,9 +703,10 @@ export async function uploadInvitationFileToDrive({
           category: category
         }
       });
+      await Promise.race([uploadPromise, timeoutPromise]);
       cloudUrl = await getDownloadURL(fileStorageRef);
     } catch (firebaseErr) {
-      console.warn("Firebase storage upload error, falling back to local data URL:", firebaseErr);
+      console.warn("Firebase storage upload bypass, utilizing local data URL:", firebaseErr?.message || firebaseErr);
     }
   }
 

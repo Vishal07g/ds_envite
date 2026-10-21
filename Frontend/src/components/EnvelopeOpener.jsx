@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { SvgHeart, SvgSparkles } from './icons';
 import { EditableText } from './EditableText';
+import { formatDriveDirectUrl } from '../utils/helpers';
 
 // Hook to load image and make dark background genuinely transparent via canvas
-function useTransparentAsset(imageSrc, threshold = 24) {
+function useTransparentAsset(rawImageSrc, threshold = 24) {
+  const imageSrc = formatDriveDirectUrl(rawImageSrc, 'image');
   const [cleanSrc, setCleanSrc] = useState(imageSrc);
 
   useEffect(() => {

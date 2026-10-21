@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import dbStore from '../data/store';
-import { formatWeddingDate, formatWeddingTime, formatWeddingDateDmy, getFrameClasses, hexToRgb, parseColor, rgbaToCss } from '../utils/helpers';
+import { formatWeddingDate, formatWeddingTime, formatWeddingDateDmy, getFrameClasses, hexToRgb, parseColor, rgbaToCss, formatDriveDirectUrl } from '../utils/helpers';
 import { 
   SvgHeart, SvgSparkles, SvgCalendar, SvgMapPin, 
   SvgVolume2, SvgVolumeX, SvgUsers, SvgMessageSquare, 
@@ -310,7 +310,7 @@ const ScratchCardShield = React.memo(
         img.onerror = () => {
           drawDefaultMetallicShield(ctx, width, height);
         };
-        img.src = scratchImage;
+        img.src = formatDriveDirectUrl(scratchImage, "image");
       }
     }, [
       scratchImage,
@@ -1605,7 +1605,7 @@ export default function InvitationRenderer({
           {hasStartingSong && (
             <audio
               ref={startingAudioRef}
-              src={startingSongUrl}
+              src={formatDriveDirectUrl(startingSongUrl, "audio")}
               autoPlay
               playsInline
               loop={config.startingMusicLoop !== false && !hasMainSong}
@@ -1628,7 +1628,7 @@ export default function InvitationRenderer({
                 mainAudioRef.current = el;
                 audioRef.current = el;
               }}
-              src={config.musicUrl}
+              src={formatDriveDirectUrl(config.musicUrl, "audio")}
               playsInline
               loop={config.loopMusic !== false}
               preload="auto"
@@ -1969,7 +1969,7 @@ export default function InvitationRenderer({
                   onClick={(e) => { e.stopPropagation(); onSelectElement && onSelectElement({ tabId: 'cover', field: 'customSacredSymbolImg' }); }}
                 >
                   <img 
-                    src={config.customSacredSymbolImg} 
+                    src={formatDriveDirectUrl(config.customSacredSymbolImg, "image")} 
                     alt="Holy Symbol" 
                     style={{
                       width: `${config.customSacredSymbolImgSizePx || 56}px`,
@@ -1986,11 +1986,11 @@ export default function InvitationRenderer({
                       style={{
                         backgroundColor: config.customSacredSymbolImgTintColor,
                         mixBlendMode: config.customSacredSymbolImgBlendMode || 'color',
-                        WebkitMaskImage: `url("${config.customSacredSymbolImg}")`,
+                        WebkitMaskImage: `url("${formatDriveDirectUrl(config.customSacredSymbolImg, "image")}")`,
                         WebkitMaskSize: 'contain',
                         WebkitMaskRepeat: 'no-repeat',
                         WebkitMaskPosition: 'center',
-                        maskImage: `url("${config.customSacredSymbolImg}")`,
+                        maskImage: `url("${formatDriveDirectUrl(config.customSacredSymbolImg, "image")}")`,
                         maskSize: 'contain',
                         maskRepeat: 'no-repeat',
                         maskPosition: 'center'
@@ -2067,7 +2067,7 @@ export default function InvitationRenderer({
               id="cover-section"
               className="relative min-h-[75vh] flex flex-col justify-center items-center text-center p-6 bg-cover bg-center overflow-hidden w-full mx-auto rounded-3xl" 
               style={{ 
-                backgroundImage: `linear-gradient(${config.coverBgOverlayStart || 'rgba(0, 0, 0, 0.45)'}, ${config.coverBgOverlayEnd || 'rgba(0, 0, 0, 0.70)'}), url("${config.heroImage}")`,
+                backgroundImage: `linear-gradient(${config.coverBgOverlayStart || 'rgba(0, 0, 0, 0.45)'}, ${config.coverBgOverlayEnd || 'rgba(0, 0, 0, 0.70)'}), url("${formatDriveDirectUrl(config.heroImage, "image")}")`,
                 backgroundSize: config.coverHeroScale ? `${config.coverHeroScale}%` : 'cover',
                 backgroundPosition: `${config.coverHeroXOffset ?? 50}% ${config.coverHeroYOffset ?? 50}%`,
                 boxShadow: config.coverShadowEnabled !== false
@@ -2317,7 +2317,7 @@ export default function InvitationRenderer({
             className="py-12 px-4 sm:px-5 text-center w-full mx-auto rounded-3xl relative overflow-hidden"
             style={{
               backgroundImage: config.scratchSectionBgImage 
-                ? `linear-gradient(${config.scratchSectionBgImageOverlayStart || 'rgba(5,7,13,0.7)'}, ${config.scratchSectionBgImageOverlayEnd || 'rgba(4,6,10,0.9)'}), url("${config.scratchSectionBgImage}")` 
+                ? `linear-gradient(${config.scratchSectionBgImageOverlayStart || 'rgba(5,7,13,0.7)'}, ${config.scratchSectionBgImageOverlayEnd || 'rgba(4,6,10,0.9)'}), url("${formatDriveDirectUrl(config.scratchSectionBgImage, "image")}")` 
                 : (config.scratchSectionBg || 'linear-gradient(180deg, #05070D 0%, #09111D 45%, #04060A 100%)'),
               backgroundSize: config.scratchSectionBgImageScale ? `${config.scratchSectionBgImageScale}%` : 'cover',
               backgroundPosition: `${config.scratchSectionBgImageXOffset ?? 50}% ${config.scratchSectionBgImageYOffset ?? 50}%`,
@@ -2756,7 +2756,7 @@ export default function InvitationRenderer({
                     className={`w-[320px] relative overflow-hidden transition-all duration-700 ${getFrameClasses(config.storyFrameShape || 'oval', config.storyFrameBorderTheme || 'double-gilded')}`}
                   >
                     <img
-                      src={config.storyImage}
+                      src={formatDriveDirectUrl(config.storyImage, "image")}
                       alt="Lovely Couple Frame"
                       className="w-full h-full object-cover"
                     />
@@ -3566,7 +3566,7 @@ export default function InvitationRenderer({
                       onTouchEnd={handleTouchEnd}
                     >
                       {galleryIndexes.map((idx, i) => {
-                        const imgUrl = config[`galleryImage${idx}`];
+                        const imgUrl = formatDriveDirectUrl(config[`galleryImage${idx}`], "image");
                         const caption = config[`galleryCaption${idx}`];
                         const shape = config[`galleryFrameShape${idx}`] || 'portrait';
                         const border = config[`galleryFrameBorder${idx}`] || 'minimalist';
