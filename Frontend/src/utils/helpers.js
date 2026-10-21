@@ -253,3 +253,47 @@ export function rgbaToCss(r, g, b, a) {
   return `rgba(${clampRgb(r)}, ${clampRgb(g)}, ${clampRgb(b)}, ${clampAlpha(a)})`;
 }
 
+/**
+ * Extract Google Drive file ID from any Google Drive URL format
+ */
+export function extractDriveFileId(url) {
+  if (!url || typeof url !== "string") return null;
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  const apiMatch = trimmed.match(/\/drive\/v3\/files\/([a-zA-Z0-9_-]{15,})/);
+  if (apiMatch) return apiMatch[1];
+
+  const fileDMatch = trimmed.match(/\/file\/d\/([a-zA-Z0-9_-]{15,})/);
+  if (fileDMatch) return fileDMatch[1];
+
+  const dMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]{15,})/);
+  if (dMatch) return dMatch[1];
+
+  const idMatch = trimmed.match(/[?&]id=([a-zA-Z0-9_-]{15,})/);
+  if (idMatch) return idMatch[1];
+
+  return null;
+}
+
+/**
+ * Automatically format Google Drive URLs into fast, permanent embeddable CDN URLs
+ * - type: 'image' -> 'https://lh3.googleusercontent.com/d/{fileId}'
+ * - type: 'audio' / 'media' -> 'https://drive.google.com/uc?export=download&id={fileId}'
+ */
+export function formatDriveDirectUrl(url, type = "image") {
+  if (!url || typeof url !== "string") return url;
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+
+  const fileId = extractDriveFileId(trimmed);
+  if (!fileId) return trimmed;
+
+  if (type === "audio" || type === "music" || type === "sound") {
+    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+  }
+
+  return `https://lh3.googleusercontent.com/d/${fileId}`;
+}
+
+

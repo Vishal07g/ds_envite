@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import dbStore, { DEFAULT_CONFIG } from '../data/store';
 import { useAuth } from '../context/AuthContext';
@@ -51,6 +51,85 @@ export default function InvitationEditor() {
   const [previewEnvelope, setPreviewEnvelope] = useState(false);
   const [isGeneratingImg, setIsGeneratingImg] = useState({ hero: false, story: false, scratch: false });
   const [musicPlaying, setMusicPlaying] = useState(false);
+
+  // Upper Toolbar Scroll State & Middle Mouse Wheel Controls
+  const toolbarRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkToolbarScroll = useCallback(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollLeft(scrollLeft > 4);
+    setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = toolbarRef.current;
+    if (!el) return;
+
+    // 1. Mouse wheel horizontal scroll (middle mouse wheel)
+    const onWheel = (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY * 1.25;
+        checkToolbarScroll();
+      } else if (e.deltaX !== 0) {
+        checkToolbarScroll();
+      }
+    };
+
+    // 2. Click-and-drag / Middle-click panning support
+    let isDown = false;
+    let startX = 0;
+    let scrollStart = 0;
+
+    const onMouseDown = (e) => {
+      // Middle click (button 1) anywhere, or left click (button 0) directly on toolbar background
+      if (e.button === 1 || (e.button === 0 && (e.target === el || e.target.classList?.contains('editor-toolbar-inner')))) {
+        isDown = true;
+        startX = e.pageX - el.offsetLeft;
+        scrollStart = el.scrollLeft;
+        el.classList.add('toolbar-dragging');
+        if (e.button === 1) e.preventDefault();
+      }
+    };
+
+    const onMouseMove = (e) => {
+      if (!isDown) return;
+      e.preventDefault();
+      const x = e.pageX - el.offsetLeft;
+      const walk = (x - startX) * 1.5;
+      el.scrollLeft = scrollStart - walk;
+      checkToolbarScroll();
+    };
+
+    const onMouseUp = () => {
+      isDown = false;
+      el.classList.remove('toolbar-dragging');
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    el.addEventListener('mousedown', onMouseDown);
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    el.addEventListener('scroll', checkToolbarScroll);
+    window.addEventListener('resize', checkToolbarScroll);
+
+    // Initial check
+    const timer = setTimeout(checkToolbarScroll, 200);
+
+    return () => {
+      clearTimeout(timer);
+      el.removeEventListener('wheel', onWheel);
+      el.removeEventListener('mousedown', onMouseDown);
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      el.removeEventListener('scroll', checkToolbarScroll);
+      window.removeEventListener('resize', checkToolbarScroll);
+    };
+  }, [checkToolbarScroll, sidebarOpen]);
 
   const showToast = useCallback((message, type = "info") => {
     setToast({ show: true, message, type });
@@ -272,152 +351,185 @@ export default function InvitationEditor() {
         sidebarOpen ? 'h-[45vh] md:h-full sidebar-open' : 'h-full sidebar-closed'
       }`}>
         
-        {/* Editor floating toolbar with smooth responsive fit */}
-        <div className="editor-top-toolbar w-full border-b border-[#E9DCCB] bg-[#F7EFE5] px-1 sm:px-2 shrink-0 z-20 shadow-xs">
-          <div className="editor-toolbar-inner flex items-center gap-1 py-0.5 w-full min-w-0">
-            {!sidebarOpen && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="editor-toolbar-btn editor-toolbar-btn-collapsible"
-                title="Open Customization Controls"
-              >
-                <SvgSliders className="w-3 h-3 shrink-0 text-[#513321]" />
-                <span className="editor-btn-text">Customize</span>
-              </button>
-            )}
-
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="editor-toolbar-input w-[70px] sm:w-[80px] 2xl:w-[95px] focus:outline-none focus:border-[#C49A4A]"
-              placeholder="Title"
-              title="Invitation Title"
-            />
-
+        {/* Editor floating toolbar with smooth responsive fit, middle mouse wheel scrolling & navigation chevrons */}
+        <div className="relative w-full border-b border-[#E9DCCB] bg-[#F7EFE5] shrink-0 z-20 shadow-xs group/toolbar select-none">
+          {/* Left scroll chevron button */}
+          {canScrollLeft && (
             <button
-              onClick={() => setShowAiModal(true)}
-              className="editor-toolbar-btn editor-toolbar-btn-collapsible"
-              title="Generate AI Wedding Wording with Gemini AI"
+              type="button"
+              onClick={() => toolbarRef.current?.scrollBy({ left: -180, behavior: 'smooth' })}
+              className="absolute left-0 top-0 bottom-0 z-30 flex items-center justify-center px-1.5 bg-gradient-to-r from-[#F7EFE5] via-[#F7EFE5]/95 to-transparent text-[#513321] transition cursor-pointer shadow-xs"
+              title="Scroll toolbar left (or roll middle mouse wheel)"
             >
-              <SvgSparkles className="w-3 h-3 shrink-0 text-[#513321]" />
-              <span className="editor-btn-text">AI Wording</span>
-            </button>
-
-            <button
-              onClick={() => setShowGuestModal(true)}
-              className="editor-toolbar-btn editor-toolbar-btn-collapsible"
-              title="Manage Guests & RSVP List"
-            >
-              <SvgUsers className="w-3 h-3 shrink-0 text-[#513321]" />
-              <span className="editor-btn-text">Guests</span>
-            </button>
-
-            <button
-              onClick={() => downloadPrintablePdfCard(config, id)}
-              className="editor-toolbar-btn editor-toolbar-btn-collapsible"
-              title="Download Printable PDF Invitation Card"
-            >
-              <SvgDownload className="w-3 h-3 shrink-0 text-[#513321]" />
-              <span className="editor-btn-text">PDF</span>
-            </button>
-
-            <button
-              onClick={() => downloadInvitationImage(config)}
-              className="editor-toolbar-btn editor-toolbar-btn-collapsible"
-              title="Export High-Res PNG Image"
-            >
-              <SvgImage className="w-3 h-3 shrink-0 text-[#513321]" />
-              <span className="editor-btn-text">PNG</span>
-            </button>
-
-            <button
-              onClick={() => {
-                downloadStandaloneHtmlWebsite(config, { id });
-                showToast("Standalone HTML website downloaded! Opens in any browser with zero login.", "success");
-              }}
-              className="editor-toolbar-btn editor-toolbar-btn-collapsible"
-              title="Download 100% Independent Standalone Interactive HTML Website (Runs offline & online without any login)"
-            >
-              <span className="text-[10px] leading-none">🌐</span>
-              <span className="editor-btn-text">HTML</span>
-            </button>
-
-            <button
-              onClick={() => setPreviewEnvelope(!previewEnvelope)}
-              className={`editor-toolbar-btn editor-toolbar-btn-collapsible ${
-                previewEnvelope ? 'editor-toolbar-btn-active' : ''
-              }`}
-              title="Toggle Full-Screen Envelope Live Preview"
-            >
-              <SvgMail className="w-3 h-3 shrink-0 text-[#513321]" />
-              <span className="editor-btn-text">{previewEnvelope ? "Card" : "Envelope"}</span>
-            </button>
-
-            <button
-              onClick={() => handleFieldChange("showGlobalBorder", config.showGlobalBorder === false ? true : false)}
-              className={`editor-toolbar-btn editor-toolbar-btn-collapsible ${
-                config.showGlobalBorder !== false ? 'editor-toolbar-btn-active' : ''
-              }`}
-              title="Toggle Luxury Border Frame ON/OFF"
-            >
-              <span className="text-[10px] leading-none">🖼️</span>
-              <span className="editor-btn-text">Frame: {config.showGlobalBorder !== false ? "ON" : "OFF"}</span>
-            </button>
-
-            {id && (
-              <>
-                <button
-                  onClick={() => setShowShareModal(true)}
-                  className="editor-toolbar-btn editor-toolbar-btn-collapsible"
-                  title="Share Invitation Website (Copy Link, WhatsApp, Standalone HTML)"
-                >
-                  <SvgCopy className="w-3 h-3 shrink-0 text-[#513321]" />
-                  <span className="editor-btn-text">Share</span>
-                </button>
-                <button
-                  onClick={handleDuplicateInvitation}
-                  className="editor-toolbar-btn editor-toolbar-btn-collapsible"
-                  title="Duplicate Saved Invitation (Clone As Fresh Copy)"
-                >
-                  <span className="text-[11px] leading-none">📋</span>
-                  <span className="editor-btn-text">Duplicate</span>
-                </button>
-              </>
-            )}
-
-            <a
-              href={invitation?.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="editor-toolbar-btn editor-toolbar-btn-collapsible text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-300/60"
-              title={`Google Drive Cloud Folder: ${invitation?.driveStorage?.folderName || formatDriveFolderName(config, title)} (Click to open)`}
-            >
-              <span className="text-[10px]">☁️</span>
-              <span className="editor-btn-text text-emerald-800 font-bold truncate max-w-[120px]">
-                {invitation?.driveStorage?.folderName || formatDriveFolderName(config, title)}
+              <span className="w-5 h-5 rounded-full bg-white border border-[#E9DCCB] flex items-center justify-center text-[9px] font-black text-[#513321] hover:bg-[#FAF7F2] hover:border-[#C49A4A] shadow-xs transition">
+                ◀
               </span>
-              <span className="text-[8px] text-emerald-600">↗</span>
-            </a>
-
-            <button
-              onClick={handleSave}
-              className="editor-toolbar-btn editor-toolbar-btn-primary"
-              title="Save All Customization Changes"
-            >
-              <SvgCheck className="w-3 h-3 shrink-0 text-[#513321]" />
-              <span>Save</span>
             </button>
+          )}
 
-            <button
-              onClick={() => navigate(currentUser?.role === 'customer' ? '/customer' : '/admin')}
-              className="editor-toolbar-btn"
-              title="Return to Dashboard"
-            >
-              <SvgLogOut className="w-3 h-3 shrink-0 text-[#513321]" />
-              <span>Dashboard</span>
-            </button>
+          <div 
+            ref={toolbarRef}
+            className="editor-top-toolbar w-full px-2 sm:px-3 overflow-x-auto overflow-y-hidden"
+          >
+            <div className="editor-toolbar-inner flex items-center gap-1.5 py-0.5 w-auto min-w-0">
+              {!sidebarOpen && (
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="editor-toolbar-btn editor-toolbar-btn-collapsible"
+                  title="Open Customization Controls"
+                >
+                  <SvgSliders className="w-3 h-3 shrink-0 text-[#513321]" />
+                  <span className="editor-btn-text">Customize</span>
+                </button>
+              )}
+
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="editor-toolbar-input w-[70px] sm:w-[80px] 2xl:w-[95px] focus:outline-none focus:border-[#C49A4A]"
+                placeholder="Title"
+                title="Invitation Title"
+              />
+
+              <button
+                onClick={() => setShowAiModal(true)}
+                className="editor-toolbar-btn editor-toolbar-btn-collapsible"
+                title="Generate AI Wedding Wording with Gemini AI"
+              >
+                <SvgSparkles className="w-3 h-3 shrink-0 text-[#513321]" />
+                <span className="editor-btn-text">AI Wording</span>
+              </button>
+
+              <button
+                onClick={() => setShowGuestModal(true)}
+                className="editor-toolbar-btn editor-toolbar-btn-collapsible"
+                title="Manage Guests & RSVP List"
+              >
+                <SvgUsers className="w-3 h-3 shrink-0 text-[#513321]" />
+                <span className="editor-btn-text">Guests</span>
+              </button>
+
+              <button
+                onClick={() => downloadPrintablePdfCard(config, id)}
+                className="editor-toolbar-btn editor-toolbar-btn-collapsible"
+                title="Download Printable PDF Invitation Card"
+              >
+                <SvgDownload className="w-3 h-3 shrink-0 text-[#513321]" />
+                <span className="editor-btn-text">PDF</span>
+              </button>
+
+              <button
+                onClick={() => downloadInvitationImage(config)}
+                className="editor-toolbar-btn editor-toolbar-btn-collapsible"
+                title="Export High-Res PNG Image"
+              >
+                <SvgImage className="w-3 h-3 shrink-0 text-[#513321]" />
+                <span className="editor-btn-text">PNG</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  downloadStandaloneHtmlWebsite(config, { id });
+                  showToast("Standalone HTML website downloaded! Opens in any browser with zero login.", "success");
+                }}
+                className="editor-toolbar-btn editor-toolbar-btn-collapsible"
+                title="Download 100% Independent Standalone Interactive HTML Website (Runs offline & online without any login)"
+              >
+                <span className="text-[10px] leading-none">🌐</span>
+                <span className="editor-btn-text">HTML</span>
+              </button>
+
+              <button
+                onClick={() => setPreviewEnvelope(!previewEnvelope)}
+                className={`editor-toolbar-btn editor-toolbar-btn-collapsible ${
+                  previewEnvelope ? 'editor-toolbar-btn-active' : ''
+                }`}
+                title="Toggle Full-Screen Envelope Live Preview"
+              >
+                <SvgMail className="w-3 h-3 shrink-0 text-[#513321]" />
+                <span className="editor-btn-text">{previewEnvelope ? "Card" : "Envelope"}</span>
+              </button>
+
+              <button
+                onClick={() => handleFieldChange("showGlobalBorder", config.showGlobalBorder === false ? true : false)}
+                className={`editor-toolbar-btn editor-toolbar-btn-collapsible ${
+                  config.showGlobalBorder !== false ? 'editor-toolbar-btn-active' : ''
+                }`}
+                title="Toggle Luxury Border Frame ON/OFF"
+              >
+                <span className="text-[10px] leading-none">🖼️</span>
+                <span className="editor-btn-text">Frame: {config.showGlobalBorder !== false ? "ON" : "OFF"}</span>
+              </button>
+
+              {id && (
+                <>
+                  <button
+                    onClick={() => setShowShareModal(true)}
+                    className="editor-toolbar-btn editor-toolbar-btn-collapsible"
+                    title="Share Invitation Website (Copy Link, WhatsApp, Standalone HTML)"
+                  >
+                    <SvgCopy className="w-3 h-3 shrink-0 text-[#513321]" />
+                    <span className="editor-btn-text">Share</span>
+                  </button>
+                  <button
+                    onClick={handleDuplicateInvitation}
+                    className="editor-toolbar-btn editor-toolbar-btn-collapsible"
+                    title="Duplicate Saved Invitation (Clone As Fresh Copy)"
+                  >
+                    <span className="text-[11px] leading-none">📋</span>
+                    <span className="editor-btn-text">Duplicate</span>
+                  </button>
+                </>
+              )}
+
+              <a
+                href={invitation?.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="editor-toolbar-btn editor-toolbar-btn-collapsible text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-300/60"
+                title={`Google Drive Cloud Folder: ${invitation?.driveStorage?.folderName || formatDriveFolderName(config, title)} (Click to open)`}
+              >
+                <span className="text-[10px]">☁️</span>
+                <span className="editor-btn-text text-emerald-800 font-bold truncate max-w-[120px]">
+                  {invitation?.driveStorage?.folderName || formatDriveFolderName(config, title)}
+                </span>
+                <span className="text-[8px] text-emerald-600">↗</span>
+              </a>
+
+              <button
+                onClick={handleSave}
+                className="editor-toolbar-btn editor-toolbar-btn-primary"
+                title="Save All Customization Changes"
+              >
+                <SvgCheck className="w-3 h-3 shrink-0 text-[#513321]" />
+                <span>Save</span>
+              </button>
+
+              <button
+                onClick={() => navigate(currentUser?.role === 'customer' ? '/customer' : '/admin')}
+                className="editor-toolbar-btn"
+                title="Return to Dashboard"
+              >
+                <SvgLogOut className="w-3 h-3 shrink-0 text-[#513321]" />
+                <span>Dashboard</span>
+              </button>
+            </div>
           </div>
+
+          {/* Right scroll chevron button */}
+          {canScrollRight && (
+            <button
+              type="button"
+              onClick={() => toolbarRef.current?.scrollBy({ left: 180, behavior: 'smooth' })}
+              className="absolute right-0 top-0 bottom-0 z-30 flex items-center justify-center px-1.5 bg-gradient-to-l from-[#F7EFE5] via-[#F7EFE5]/95 to-transparent text-[#513321] transition cursor-pointer shadow-xs"
+              title="Scroll toolbar right (or roll middle mouse wheel)"
+            >
+              <span className="w-5 h-5 rounded-full bg-white border border-[#E9DCCB] flex items-center justify-center text-[9px] font-black text-[#513321] hover:bg-[#FAF7F2] hover:border-[#C49A4A] shadow-xs transition">
+                ▶
+              </span>
+            </button>
+          )}
         </div>
 
         {/* Sticky Watermark & Payment Notice Bar for Unpaid Invitations */}

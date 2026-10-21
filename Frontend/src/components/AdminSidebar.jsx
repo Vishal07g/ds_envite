@@ -12,6 +12,8 @@ import {
 import {
   uploadInvitationFileToDrive,
   formatDriveFolderName,
+  formatDriveDirectUrl,
+  extractDriveFileId,
   GOOGLE_DRIVE_ROOT_FOLDER_URL,
   GOOGLE_DRIVE_ROOT_FOLDER_ID
 } from '../utils/googleDriveStorage';
@@ -608,12 +610,14 @@ export default function AdminSidebar({
     try {
       setDriveUploading(true);
       setUploadStatusText("Uploading to Google Drive Cloud...");
+      const isAudio = Boolean(file.type && (file.type.startsWith("audio/") || file.type.includes("mpeg") || file.type.includes("mp3")));
       const uploadRes = await uploadInvitationFileToDrive({
         file,
         invitation: invitation || { config },
         category: field
       });
-      onChangeField(field, uploadRes.url);
+      const resolvedUrl = formatDriveDirectUrl(uploadRes.url, isAudio ? "audio" : "image");
+      onChangeField(field, resolvedUrl);
       setUploadStatusText("Saved to Google Drive!");
       setTimeout(() => setUploadStatusText(""), 3000);
     } catch (err) {
@@ -2244,7 +2248,8 @@ export default function AdminSidebar({
                         type="text" 
                         value={config.startingMusicUrl || ""}
                         onChange={(e) => {
-                          onChangeField("startingMusicUrl", e.target.value);
+                          const directUrl = formatDriveDirectUrl(e.target.value, "audio");
+                          onChangeField("startingMusicUrl", directUrl);
                           if (testStartingAudioPlaying && testStartingAudioRef.current) {
                             testStartingAudioRef.current.pause();
                             setTestStartingAudioPlaying(false);
@@ -2285,7 +2290,7 @@ export default function AdminSidebar({
                         </button>
                         <audio 
                           ref={testStartingAudioRef} 
-                          src={config.startingMusicUrl} 
+                          src={formatDriveDirectUrl(config.startingMusicUrl, "audio")} 
                           onEnded={() => setTestStartingAudioPlaying(false)}
                           onError={() => setTestStartingAudioPlaying(false)}
                         />
@@ -2385,7 +2390,8 @@ export default function AdminSidebar({
                         type="text" 
                         value={config.musicUrl || ""}
                         onChange={(e) => {
-                          onChangeField("musicUrl", e.target.value);
+                          const directUrl = formatDriveDirectUrl(e.target.value, "audio");
+                          onChangeField("musicUrl", directUrl);
                           if (testAudioPlaying && testAudioRef.current) {
                             testAudioRef.current.pause();
                             setTestAudioPlaying(false);
@@ -2426,7 +2432,7 @@ export default function AdminSidebar({
                         </button>
                         <audio 
                           ref={testAudioRef} 
-                          src={config.musicUrl} 
+                          src={formatDriveDirectUrl(config.musicUrl, "audio")} 
                           onEnded={() => setTestAudioPlaying(false)}
                           onError={() => setTestAudioPlaying(false)}
                         />
@@ -4430,13 +4436,21 @@ export default function AdminSidebar({
                 
                 {config.heroImage ? (
                   <div className="p-2 bg-slate-950/80 rounded-xl border border-amber-500/30 flex items-center space-x-3 shadow-md relative overflow-hidden group">
-                    <div className="relative w-12 h-16 rounded-lg overflow-hidden border border-slate-800 shrink-0">
-                      <img src={config.heroImage} alt="Cover BG Preview" className="w-full h-full object-cover" />
+                    <div className="relative w-12 h-16 rounded-lg overflow-hidden border border-slate-800 shrink-0 bg-slate-900 flex items-center justify-center">
+                      <img 
+                        src={formatDriveDirectUrl(config.heroImage, "image")} 
+                        alt="Cover BG Preview" 
+                        className="w-full h-full object-cover" 
+                      />
                     </div>
                     <div className="flex-1 min-w-0 space-y-1">
                       <span className="text-[8px] uppercase tracking-wider text-slate-400 font-bold block">Active Background</span>
                       <span className="text-[10px] text-slate-100 font-bold truncate block">
-                        {config.heroImage.startsWith('data:') ? 'Custom Uploaded UHD Image' : config.heroImage.split('/').pop()}
+                        {config.heroImage.startsWith('data:') 
+                          ? 'Custom Uploaded UHD Image' 
+                          : config.heroImage.includes('drive.google.com') || config.heroImage.includes('googleusercontent.com')
+                          ? `Google Drive Asset (${extractDriveFileId(config.heroImage) ? extractDriveFileId(config.heroImage).slice(0, 8) + '...' : 'Linked'})`
+                          : config.heroImage.split('/').pop()}
                       </span>
                       <div className="flex items-center space-x-1.5">
                         <button 
@@ -4494,7 +4508,7 @@ export default function AdminSidebar({
                   <input 
                     type="text" 
                     value={config.heroImage || ""} 
-                    onChange={(e) => onChangeField("heroImage", e.target.value)}
+                    onChange={(e) => onChangeField("heroImage", formatDriveDirectUrl(e.target.value, "image"))}
                     className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded text-xs focus:outline-none focus:border-amber-500"
                     placeholder="https://example.com/background.jpg"
                   />
