@@ -50,7 +50,7 @@ export default async function handler(req, res) {
   const ogImageUrl = `${proto}://${host}/api/og-image?bride=${encodeURIComponent(bride)}&groom=${encodeURIComponent(groom)}&date=${encodeURIComponent(weddingDate)}`;
   const shareUrl = `${proto}://${host}/invite/${slug || 'suman-vishal'}`;
 
-  // Read index.html template from dist or root
+  // Read index.html template from dist or root, or fetch from host
   let html = '';
   const distPath = path.join(process.cwd(), 'dist', 'index.html');
   const rootPath = path.join(process.cwd(), 'index.html');
@@ -60,19 +60,50 @@ export default async function handler(req, res) {
   } else if (fs.existsSync(rootPath)) {
     html = fs.readFileSync(rootPath, 'utf8');
   } else {
-    html = `<!doctype html><html><head><title>${title}</title></head><body><div id="root"></div></body></html>`;
+    try {
+      const resp = await fetch(`${proto}://${host}/index.html`);
+      if (resp.ok) {
+        html = await resp.text();
+      }
+    } catch {}
   }
 
-  // Inject dynamic social meta tags
-  html = html
-    .replace(/<title>.*?<\/title>/gi, `<title>${title}</title>`)
-    .replace(/<meta property="og:title" content=".*?" \/>/gi, `<meta property="og:title" content="${ogTitle}" />`)
-    .replace(/<meta property="og:description" content=".*?" \/>/gi, `<meta property="og:description" content="${ogDesc}" />`)
-    .replace(/<meta property="og:image" content=".*?" \/>/gi, `<meta property="og:image" content="${ogImageUrl}" />`)
-    .replace(/<meta property="og:image:secure_url" content=".*?" \/>/gi, `<meta property="og:image:secure_url" content="${ogImageUrl}" />`)
-    .replace(/<meta name="twitter:title" content=".*?" \/>/gi, `<meta name="twitter:title" content="${ogTitle}" />`)
-    .replace(/<meta name="twitter:description" content=".*?" \/>/gi, `<meta name="twitter:description" content="${ogDesc}" />`)
-    .replace(/<meta name="twitter:image" content=".*?" \/>/gi, `<meta name="twitter:image" content="${ogImageUrl}" />`);
+  const metaTags = `
+    <title>${title}</title>
+    <meta property="og:title" content="${ogTitle}" />
+    <meta property="og:description" content="${ogDesc}" />
+    <meta property="og:image" content="${ogImageUrl}" />
+    <meta property="og:image:secure_url" content="${ogImageUrl}" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="${shareUrl}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${ogTitle}" />
+    <meta name="twitter:description" content="${ogDesc}" />
+    <meta name="twitter:image" content="${ogImageUrl}" />
+  `;
+
+  if (html && html.includes('<head>')) {
+    html = html.replace(/<title>.*?<\/title>/gi, '');
+    html = html.replace(/<meta property="og:.*?\/>/gi, '');
+    html = html.replace(/<meta name="twitter:.*?\/>/gi, '');
+    html = html.replace('<head>', `<head>${metaTags}`);
+  } else {
+    html = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  ${metaTags}
+  <meta http-equiv="refresh" content="0;url=${shareUrl}" />
+  <script>window.location.replace(${JSON.stringify(shareUrl)});</script>
+</head>
+<body style="background:#070b19;color:#fde047;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;font-family:sans-serif;">
+  <p>Loading Wedding Invitation... <a href="${shareUrl}" style="color:#fde047;">Click here if not redirected</a></p>
+</body>
+</html>`;
+  }
 
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');

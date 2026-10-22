@@ -2510,17 +2510,13 @@ a.editor-toolbar-btn-primary span {
    PRIVACY SHIELD & ANTI-SCREENSHOT PROTECTION
    ------------------------------------------------ */
 .privacy-shield-obfuscated {
-  filter: blur(60px) grayscale(100%) !important;
-  opacity: 0.02 !important;
-  pointer-events: none !important;
+  filter: blur(6px) !important;
+  opacity: 0.95 !important;
   user-select: none !important;
   -webkit-user-select: none !important;
-  transition: filter 0.1s ease, opacity 0.1s ease !important;
 }
 
 body.privacy-shield-body-lock {
-  filter: blur(80px) grayscale(100%) brightness(10%) !important;
-  background-color: #000000 !important;
   user-select: none !important;
   -webkit-user-select: none !important;
   -webkit-touch-callout: none !important;
@@ -2536,6 +2532,16 @@ body.privacy-shield-body-lock {
   -webkit-user-drag: none !important;
   user-drag: none !important;
   pointer-events: none;
+}
+
+/* Ensure zero login or auth buttons are visible on invitation pages */
+#invitation-view-container button[class*="login"],
+#invitation-view-container a[href*="/login"],
+.invitation-render-root a[href*="/login"],
+.invitation-render-root button[class*="login"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* Hardened Print Blocking to prevent Print-to-PDF scraping */

@@ -1444,14 +1444,8 @@ function getDb() {
     db = {
       users: users !== null ? parseArrayData(JSON.parse(users), []) : (isInit ? [] : INITIAL_USERS),
       invitations: (invitations !== null ? parseArrayData(JSON.parse(invitations), []) : (isInit ? [] : INITIAL_INVITATIONS)).map(inv => {
-        let cleanWishes = Array.isArray(inv.wishes) ? inv.wishes : [];
-        const seenW = new Set();
-        cleanWishes = cleanWishes.filter(w => {
-          const k = (w.sender || "").trim().toLowerCase();
-          if (!k || seenW.has(k)) return false;
-          seenW.add(k);
-          return true;
-        });
+        // Guarantee all blessings posted by guests are preserved permanently and never auto-deleted
+        const cleanWishes = Array.isArray(inv.wishes) ? [...inv.wishes] : [];
 
         let cleanRsvps = Array.isArray(inv.rsvps) ? inv.rsvps : [];
         const seenR = new Set();
@@ -1558,7 +1552,9 @@ function getDb() {
         ...JSON.parse(JSON.stringify(primarySumanDef)),
         id: curr.id,
         customerId: "user-customer",
-        isPaid: true
+        isPaid: true,
+        wishes: (curr.wishes && curr.wishes.length > 0) ? curr.wishes : (primarySumanDef.wishes || []),
+        rsvps: (curr.rsvps && curr.rsvps.length > 0) ? curr.rsvps : (primarySumanDef.rsvps || [])
       };
     }
   }
@@ -1863,6 +1859,32 @@ export const dbStore = {
     found = invs.find(inv => this.getInvitationShareSlug(inv) === idOrSlug);
     if (found) return found;
 
+    // 6. Match by prefix or contains (e.g. "suman-vishal" matching "suman-vishal-1792461190488")
+    const cleanSearch = String(idOrSlug).toLowerCase().trim();
+    found = invs.find(inv => {
+      const s = (inv.slug || "").toLowerCase();
+      const cs = (inv.customSlug || "").toLowerCase();
+      return (s && (s.startsWith(cleanSearch) || cleanSearch.startsWith(s))) || 
+             (cs && (cs.startsWith(cleanSearch) || cleanSearch.startsWith(cs)));
+    });
+    if (found) return found;
+
+    // 7. Match by couple names in config or title
+    found = invs.find(inv => {
+      const bride = (inv.config?.brideName || inv.config?.coverBrideText || "").toLowerCase();
+      const groom = (inv.config?.groomName || inv.config?.coverGroomText || "").toLowerCase();
+      if (bride && groom) {
+        if (cleanSearch.includes(bride) || cleanSearch.includes(groom)) return true;
+      }
+      return false;
+    });
+    if (found) return found;
+
+    // 8. If only 1 invitation exists and idOrSlug is not a preset, fallback to it
+    if (invs.length === 1 && !idOrSlug.startsWith("preset-") && idOrSlug !== "demo") {
+      return invs[0];
+    }
+
     return null;
   },
   createInvitation(customerId, title, config = DEFAULT_CONFIG, isPaid = false, status = "draft") {
@@ -2144,32 +2166,36 @@ export const dbStore = {
   },
   submitRsvp(invitationId, rsvp) {
     const db = getDb();
-    let idx = db.invitations.findIndex(inv => inv.id === invitationId);
+    const targetInv = this.getInvitationById(invitationId);
+    let idx = -1;
+    if (targetInv) {
+      idx = db.invitations.findIndex(inv => inv.id === targetInv.id);
+    }
     if (idx === -1) {
-      db.invitations.push({
-        id: invitationId,
-        title: "Wedding Invitation",
-        config: DEFAULT_CONFIG,
-        rsvps: [],
-        wishes: []
-      });
-      idx = db.invitations.length - 1;
+      idx = db.invitations.findIndex(inv => 
+        inv.id === invitationId || 
+        inv.slug === invitationId || 
+        inv.customSlug === invitationId
+      );
+    }
+    if (idx === -1) {
+      if (db.invitations.length === 1) {
+        idx = 0;
+      } else {
+        db.invitations.push({
+          id: invitationId,
+          title: "Wedding Invitation",
+          config: DEFAULT_CONFIG,
+          rsvps: [],
+          wishes: []
+        });
+        idx = db.invitations.length - 1;
+      }
     }
 
     if (!Array.isArray(db.invitations[idx].rsvps)) {
       db.invitations[idx].rsvps = [];
     }
-
-    // Clean any existing duplicates first
-    const seenGuests = new Set();
-    const sanitizedRsvps = [];
-    for (const r of db.invitations[idx].rsvps) {
-      const k = (r.name || "").trim().toLowerCase();
-      if (!k || seenGuests.has(k)) continue;
-      seenGuests.add(k);
-      sanitizedRsvps.push(r);
-    }
-    db.invitations[idx].rsvps = sanitizedRsvps;
 
     const trimmedName = (rsvp.name || "").trim().toLowerCase();
     const existingIndex = db.invitations[idx].rsvps.findIndex(
@@ -2206,45 +2232,47 @@ export const dbStore = {
   },
   submitWish(invitationId, wish) {
     const db = getDb();
-    let idx = db.invitations.findIndex(inv => inv.id === invitationId);
+    const targetInv = this.getInvitationById(invitationId);
+    let idx = -1;
+    if (targetInv) {
+      idx = db.invitations.findIndex(inv => inv.id === targetInv.id);
+    }
     if (idx === -1) {
-      db.invitations.push({
-        id: invitationId,
-        title: "Wedding Invitation",
-        config: DEFAULT_CONFIG,
-        rsvps: [],
-        wishes: []
-      });
-      idx = db.invitations.length - 1;
+      idx = db.invitations.findIndex(inv => 
+        inv.id === invitationId || 
+        inv.slug === invitationId || 
+        inv.customSlug === invitationId
+      );
+    }
+    if (idx === -1) {
+      if (db.invitations.length === 1) {
+        idx = 0;
+      } else {
+        db.invitations.push({
+          id: invitationId,
+          title: "Wedding Invitation",
+          config: DEFAULT_CONFIG,
+          rsvps: [],
+          wishes: []
+        });
+        idx = db.invitations.length - 1;
+      }
     }
 
     if (!Array.isArray(db.invitations[idx].wishes)) {
       db.invitations[idx].wishes = [];
     }
 
-    // Deduplicate existing wishes first to purge any past duplicates
-    const seenSenders = new Set();
-    const sanitizedWishes = [];
-    for (const w of db.invitations[idx].wishes) {
-      const k = (w.sender || "").trim().toLowerCase();
-      if (!k || seenSenders.has(k)) continue;
-      seenSenders.add(k);
-      sanitizedWishes.push(w);
-    }
-    db.invitations[idx].wishes = sanitizedWishes;
-
-    const trimmedSender = (wish.sender || "").trim().toLowerCase();
-    if (seenSenders.has(trimmedSender)) {
-      throw new Error(`A blessing has already been posted by "${wish.sender.trim()}". Only one blessing is permitted per guest name.`);
-    }
-
     const newWish = {
-      ...wish,
-      sender: wish.sender.trim(),
+      id: wish.id || `wish-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      sender: (wish.sender || "Guest").trim(),
+      message: (wish.message || "").trim(),
+      date: wish.date || new Date().toLocaleDateString('en-GB') + " " + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
       createdAt: wish.createdAt || new Date().toISOString()
     };
 
-    db.invitations[idx].wishes = [newWish, ...sanitizedWishes];
+    // Prepend new blessing so the latest blessing is displayed first; NEVER delete or purge past blessings
+    db.invitations[idx].wishes = [newWish, ...db.invitations[idx].wishes];
 
     saveDb(db);
     window.dispatchEvent(new Event("db_synced"));
