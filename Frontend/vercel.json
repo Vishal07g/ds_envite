@@ -5,6 +5,10 @@
       "destination": "/api/og-image"
     },
     {
+      "source": "/invite/:slug",
+      "destination": "/api/invite?slug=:slug"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

@@ -23,8 +23,9 @@ export default function ShareInviteModal({
   const currentConfig = { ...(invObj?.config || {}), ...(config || {}) };
   const effectivePaid = invObj ? (invObj.isPaid || false) : isPaid;
 
-  const brideName = currentConfig.brideName || "Ananya";
-  const groomName = currentConfig.groomName || "Aarav";
+  const brideName = currentConfig.coverBrideText || currentConfig.brideName || "Suman";
+  const groomName = currentConfig.coverGroomText || currentConfig.groomName || "Vishal";
+  const coupleInitials = `${brideName.charAt(0)} & ${groomName.charAt(0)}`;
 
   const autoSlug = dbStore.getInvitationShareSlug(invObj || { id: targetId }, currentConfig);
   const isManuallySet = Boolean(invObj?.isCustomSlugManuallySet && invObj?.customSlug && !invObj.customSlug.startsWith("ananya-aarav"));
@@ -54,7 +55,7 @@ export default function ShareInviteModal({
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const shareUrl = `${origin}/invite/${activeSlug}`;
 
-  const defaultWhatsappMsg = `💌 *Wedding Invitation* 💌\n*${brideName} & ${groomName}*\n\nWe warmly invite you to celebrate our wedding union! 💍\n\n✨ *View our interactive invitation & RSVP:*\n${shareUrl}`;
+  const defaultWhatsappMsg = `💍 *WEDDING INVITATION* 💍\n✨ *${coupleInitials}* ✨\n\n*${brideName} & ${groomName}*\n\nWe warmly invite you to celebrate our sacred wedding union! Tap to view our interactive invitation, music, and RSVP:\n${shareUrl}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl);

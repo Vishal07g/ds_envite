@@ -123,10 +123,14 @@ export const CURATED_CLIPARTS = [
 
 const DEFAULT_CONFIG = {
   ...DEFAULT_TIMELINE_CONFIG,
-  brideName: "Ananya",
-  brideFamily: "Mr. & Mrs. Rajesh Sharma",
-  groomName: "Aarav",
-  groomFamily: "Mr. & Mrs. Vijay Patel",
+  brideName: "Suman",
+  brideFamily: "",
+  groomName: "Vishal",
+  groomFamily: "",
+  coverBrideText: "Suman",
+  coverGroomText: "Vishal",
+  envelopeNamesText: "Suman & Vishal",
+  envelopeInitials: "S & V",
   weddingDate: "2026-11-20T16:00:00",
   introQuote: "Celebrating love, togetherness and everlasting happiness.",
   weddingVenue: "The Starlight Cathedral",
@@ -1462,8 +1466,8 @@ function getDb() {
           ? { ...inv.config, scratchImage: "" }
           : { ...(inv.config || {}) };
 
-        const brideName = updatedConfig.brideName || "Ananya";
-        const groomName = updatedConfig.groomName || "Aarav";
+        const brideName = updatedConfig.coverBrideText || updatedConfig.brideName || "Suman";
+        const groomName = updatedConfig.coverGroomText || updatedConfig.groomName || "Vishal";
         const defaultNameSlug = ((brideName && groomName) ? `${brideName}-${groomName}` : (inv.title || "wedding"))
           .toLowerCase()
           .replace(/&/g, "and")
@@ -1864,8 +1868,8 @@ export const dbStore = {
   createInvitation(customerId, title, config = DEFAULT_CONFIG, isPaid = false, status = "draft") {
     const db = getDb();
     const timestamp = Date.now();
-    const bride = config.brideName || "Ananya";
-    const groom = config.groomName || "Aarav";
+    const bride = config.coverBrideText || config.brideName || "Suman";
+    const groom = config.coverGroomText || config.groomName || "Vishal";
     const nameSlug = this.slugify(`${bride}-${groom}`) || "wedding";
     const uniqueId = `invite-${timestamp}`;
     const initialSlug = `${nameSlug}-${timestamp}`;
@@ -2048,8 +2052,8 @@ export const dbStore = {
     const newId = `invite-${timestamp}`;
     const cleanConfig = JSON.parse(JSON.stringify(source.config || DEFAULT_CONFIG));
 
-    const bride = cleanConfig.brideName || "Ananya";
-    const groom = cleanConfig.groomName || "Aarav";
+    const bride = cleanConfig.coverBrideText || cleanConfig.brideName || "Suman";
+    const groom = cleanConfig.coverGroomText || cleanConfig.groomName || "Vishal";
     const nameSlug = this.slugify(`${bride}-${groom}`) || "wedding";
     const newSlug = `${nameSlug}-${timestamp}`;
 

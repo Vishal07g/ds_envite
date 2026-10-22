@@ -493,6 +493,12 @@ export default function InvitationRenderer({
 
   const [isEnvelopeOpened, setIsEnvelopeOpened] = useState(isPrintMode ? true : !showEnvelopeFirst);
   const [envelopeOpeningAnim, setEnvelopeOpeningAnim] = useState(false);
+  const isEnvelopeOpenedRef = useRef(
+    isPrintMode || config.showEnvelope === false ? true : !showEnvelopeFirst
+  );
+  useEffect(() => {
+    isEnvelopeOpenedRef.current = isPrintMode || config.showEnvelope === false ? true : isEnvelopeOpened;
+  }, [isEnvelopeOpened, isPrintMode, config.showEnvelope]);
   const [isScratchFinished, setIsScratchFinished] = useState(isPrintMode ? true : false);
   const [scratchedPercentage, setScratchedPercentage] = useState(isPrintMode ? 100 : 0);
   const [showGraffiti, setShowGraffiti] = useState(false);
@@ -532,58 +538,73 @@ export default function InvitationRenderer({
   const hasStartingSong = Boolean(config.startingMusicEnabled !== false && startingSongUrl);
   const hasMainSong = Boolean(config.mainMusicEnabled !== false && config.musicUrl);
   const [currentTrack, setCurrentTrack] = useState(() => {
-    if (!isEnvelopeOpened && hasStartingSong) return "starting";
+    const envelopeOpen = isPrintMode || config.showEnvelope === false ? true : !showEnvelopeFirst;
+    if (!envelopeOpen && hasStartingSong) return "starting";
     return hasMainSong ? "main" : (hasStartingSong ? "starting" : "main");
   });
 
   // Automatically start playing Song 1 (Starting Song) as soon as invitation link is opened
   useEffect(() => {
-    if (hasStartingSong && config.showMusic !== false) {
-      setCurrentTrack("starting");
+    if (config.showMusic === false) return;
 
-      const playStartingSong = () => {
-        const startEl = startingAudioRef.current;
-        if (!startEl) return;
-
-        if (startEl.paused) {
-          startEl.play().then(() => {
-            if (onMusicToggle) onMusicToggle(true);
-          }).catch(err => {
-            console.log("Audio autoplay waiting for user activity:", err.name);
-          });
+    const playStartingSong = () => {
+      // If envelope is already opened and main song exists, do NOT play starting song!
+      if (isEnvelopeOpenedRef.current && hasMainSong) {
+        const mainEl = mainAudioRef.current || audioRef.current;
+        if (mainEl && mainEl.paused) {
+          mainEl.play().catch(() => {});
         }
-      };
-
-      // 1. Try immediate autoplay right on page load
-      playStartingSong();
-
-      // 2. Fallback on any initial activity/gesture (pointer, mouse, touch, scroll, focus, envelopeUserTapped)
-      const gestureEvents = ['pointerdown', 'touchstart', 'click', 'mousemove', 'scroll', 'keydown', 'envelopeUserTapped'];
-      const onFirstGesture = () => {
-        playStartingSong();
-        gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture, { capture: true }));
-      };
-
-      gestureEvents.forEach(evt => {
-        window.addEventListener(evt, onFirstGesture, { capture: true, once: true });
-      });
-
-      // Also retry once audio element finishes buffering
-      const startEl = startingAudioRef.current;
-      if (startEl) {
-        startEl.addEventListener('canplay', playStartingSong, { once: true });
-        startEl.addEventListener('loadeddata', playStartingSong, { once: true });
+        return;
       }
 
-      return () => {
-        gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture, { capture: true }));
-        if (startEl) {
-          startEl.removeEventListener('canplay', playStartingSong);
-          startEl.removeEventListener('loadeddata', playStartingSong);
-        }
-      };
+      // At the beginning, envelope is closed: strictly play Song 1
+      const startEl = startingAudioRef.current;
+      const mainEl = mainAudioRef.current || audioRef.current;
+
+      // Ensure main song is explicitly stopped & reset
+      if (mainEl && !mainEl.paused) {
+        mainEl.pause();
+        mainEl.currentTime = 0;
+      }
+
+      if (hasStartingSong && startEl && startEl.paused) {
+        startEl.play().then(() => {
+          if (onMusicToggle) onMusicToggle(true);
+        }).catch(err => {
+          console.log("Audio autoplay waiting for user activity:", err.name);
+        });
+      }
+    };
+
+    // 1. Try immediate autoplay right on page load
+    playStartingSong();
+
+    // 2. Fallback on any initial activity/gesture (pointer, mouse, touch, scroll, focus, envelopeUserTapped)
+    const gestureEvents = ['pointerdown', 'touchstart', 'click', 'mousemove', 'scroll', 'keydown', 'envelopeUserTapped'];
+    const onFirstGesture = () => {
+      playStartingSong();
+      gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture, { capture: true }));
+    };
+
+    gestureEvents.forEach(evt => {
+      window.addEventListener(evt, onFirstGesture, { capture: true, once: true });
+    });
+
+    // Also retry once audio element finishes buffering
+    const startEl = startingAudioRef.current;
+    if (startEl) {
+      startEl.addEventListener('canplay', playStartingSong, { once: true });
+      startEl.addEventListener('loadeddata', playStartingSong, { once: true });
     }
-  }, [hasStartingSong, startingSongUrl, config.showMusic]);
+
+    return () => {
+      gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture, { capture: true }));
+      if (startEl) {
+        startEl.removeEventListener('canplay', playStartingSong);
+        startEl.removeEventListener('loadeddata', playStartingSong);
+      }
+    };
+  }, [hasStartingSong, startingSongUrl, hasMainSong, config.showMusic, onMusicToggle]);
 
   // Music Volume, Drag & Widget Toggle state
   const [audioVolume, setAudioVolume] = useState(config.musicVolume !== undefined ? Number(config.musicVolume) : 0.8);
@@ -717,8 +738,32 @@ export default function InvitationRenderer({
       if (tabId === 'envelope') {
         setIsEnvelopeOpened(false);
         setEnvelopeOpeningAnim(false);
+        isEnvelopeOpenedRef.current = false;
+        if (hasStartingSong) {
+          setCurrentTrack("starting");
+          const mainEl = mainAudioRef.current || audioRef.current;
+          if (mainEl) {
+            mainEl.pause();
+            mainEl.currentTime = 0;
+          }
+          if (startingAudioRef.current && isPlayingMusic) {
+            startingAudioRef.current.play().catch(() => {});
+          }
+        }
       } else {
         setIsEnvelopeOpened(true);
+        isEnvelopeOpenedRef.current = true;
+        if (hasMainSong) {
+          if (startingAudioRef.current) {
+            startingAudioRef.current.pause();
+            startingAudioRef.current.currentTime = 0;
+          }
+          setCurrentTrack("main");
+          const mainEl = mainAudioRef.current || audioRef.current;
+          if (mainEl && isPlayingMusic) {
+            mainEl.play().catch(() => {});
+          }
+        }
       }
 
       let targetId = '';
@@ -914,23 +959,41 @@ export default function InvitationRenderer({
     return () => clearInterval(interval);
   }, [config.weddingDate]);
 
-  // Dual-Song Audio Handling Engine
+  // Dual-Song Audio Handling Engine: Strict Single-Track Mutual Exclusion
   useEffect(() => {
-    const activeEl = currentTrack === "starting" ? startingAudioRef.current : (mainAudioRef.current || audioRef.current);
-    if (!activeEl) return;
-    if (isPlayingMusic) {
-      activeEl.play().catch(() => {});
-    } else {
-      if (startingAudioRef.current) startingAudioRef.current.pause();
-      if (mainAudioRef.current) mainAudioRef.current.pause();
-      if (audioRef.current) audioRef.current.pause();
+    const isStarting = currentTrack === "starting";
+    const activeEl = isStarting ? startingAudioRef.current : (mainAudioRef.current || audioRef.current);
+    const inactiveEl = isStarting ? (mainAudioRef.current || audioRef.current) : startingAudioRef.current;
+
+    // 1. Strictly pause and reset the other track so both songs NEVER play simultaneously
+    if (inactiveEl && !inactiveEl.paused) {
+      inactiveEl.pause();
+      inactiveEl.currentTime = 0;
+    }
+
+    // 2. Play or pause the currently active track
+    if (activeEl) {
+      if (isPlayingMusic) {
+        activeEl.play().catch(() => {});
+      } else {
+        activeEl.pause();
+      }
     }
   }, [isPlayingMusic, currentTrack]);
 
   // Synchronous Direct User Gesture Audio Toggle (Mute / Unmute / Play / Pause)
   const toggleMusicPlayback = useCallback((e) => {
     if (e && e.stopPropagation) e.stopPropagation();
-    const activeEl = currentTrack === "starting" ? startingAudioRef.current : (mainAudioRef.current || audioRef.current);
+    const isStarting = currentTrack === "starting";
+    const activeEl = isStarting ? startingAudioRef.current : (mainAudioRef.current || audioRef.current);
+    const inactiveEl = isStarting ? (mainAudioRef.current || audioRef.current) : startingAudioRef.current;
+
+    // Guarantee the other track is paused and reset immediately
+    if (inactiveEl && !inactiveEl.paused) {
+      inactiveEl.pause();
+      inactiveEl.currentTime = 0;
+    }
+
     if (!activeEl) return;
 
     if (isPlayingMusic && !activeEl.paused) {
@@ -945,7 +1008,7 @@ export default function InvitationRenderer({
           if (onMusicToggle) onMusicToggle(true);
         }).catch(err => {
           console.warn("Direct toggle play error:", err);
-          const fallbackSrc = currentTrack === "starting" ? "/music_intro.mp3" : "/music_wedding.mp3";
+          const fallbackSrc = isStarting ? "/music_intro.mp3" : "/music_wedding.mp3";
           if (activeEl.src && !activeEl.src.includes(fallbackSrc)) {
             activeEl.src = fallbackSrc;
             activeEl.load();
@@ -964,9 +1027,20 @@ export default function InvitationRenderer({
     if (!hasStartingSong && !hasMainSong) return;
     
     const handleFirstInteraction = () => {
-      const targetTrack = (!isEnvelopeOpened && hasStartingSong) ? "starting" : (hasMainSong ? "main" : "starting");
+      const envelopeOpen = isEnvelopeOpenedRef.current;
+      // At the beginning when envelope is closed, strictly choose Song 1 (Starting Song)
+      const targetTrack = (!envelopeOpen && hasStartingSong) ? "starting" : (hasMainSong ? "main" : "starting");
       setCurrentTrack(targetTrack);
+      
       const targetEl = targetTrack === "starting" ? startingAudioRef.current : (mainAudioRef.current || audioRef.current);
+      const otherEl = targetTrack === "starting" ? (mainAudioRef.current || audioRef.current) : startingAudioRef.current;
+      
+      // Ensure other element is stopped & reset
+      if (otherEl && !otherEl.paused) {
+        otherEl.pause();
+        otherEl.currentTime = 0;
+      }
+
       if (targetEl && targetEl.paused) {
         targetEl.play().then(() => {
           if (onMusicToggle) onMusicToggle(true);
@@ -982,7 +1056,7 @@ export default function InvitationRenderer({
       window.removeEventListener('click', handleFirstInteraction);
       window.removeEventListener('touchstart', handleFirstInteraction);
     };
-  }, [hasStartingSong, hasMainSong, config.autoPlayMusic, isEnvelopeOpened]);
+  }, [hasStartingSong, hasMainSong, config.autoPlayMusic]);
 
   // Ensure the page is completely non-scrollable while the envelope is unopened
   useEffect(() => {
@@ -1020,29 +1094,39 @@ export default function InvitationRenderer({
   }, [isEnvelopeOpened, config.showEnvelope]);
 
   const handleEnvelopeOpen = () => {
+    isEnvelopeOpenedRef.current = true;
     setEnvelopeOpeningAnim(true);
 
-    // If starting song is enabled, play Song 1 immediately on this envelope open gesture!
-    if (hasStartingSong) {
+    // WHEN ENVELOPE IS OPENED: Stop Song 1 immediately, and only play Song 2 (Main Song)!
+    if (hasMainSong) {
+      // 1. Immediately pause and reset Song 1
+      if (startingAudioRef.current) {
+        startingAudioRef.current.pause();
+        startingAudioRef.current.currentTime = 0;
+      }
+      // 2. Switch to Song 2 and play
+      setCurrentTrack("main");
+      const mainEl = mainAudioRef.current || audioRef.current;
+      if (mainEl) {
+        mainEl.currentTime = 0;
+        mainEl.play().then(() => {
+          if (onMusicToggle) onMusicToggle(true);
+        }).catch(e => console.log("Main audio play on envelope open:", e));
+      }
+    } else if (hasStartingSong) {
+      // If only starting song exists, continue playing it
       setCurrentTrack("starting");
       const startEl = startingAudioRef.current;
       if (startEl && startEl.paused) {
         startEl.play().then(() => {
           if (onMusicToggle) onMusicToggle(true);
-        }).catch(e => console.log("Starting audio play on envelope click:", e));
-      }
-    } else if (hasMainSong) {
-      setCurrentTrack("main");
-      const mainEl = mainAudioRef.current || audioRef.current;
-      if (mainEl && mainEl.paused) {
-        mainEl.play().then(() => {
-          if (onMusicToggle) onMusicToggle(true);
-        }).catch(e => console.log("Main audio play on envelope click:", e));
+        }).catch(e => console.log("Starting audio play on envelope open:", e));
       }
     }
   };
 
   const handleEnvelopeComplete = () => {
+    isEnvelopeOpenedRef.current = true;
     setIsEnvelopeOpened(true);
     setEnvelopeOpeningAnim(false);
 
@@ -1053,14 +1137,18 @@ export default function InvitationRenderer({
     }
     window.scrollTo({ top: 0, behavior: 'instant' });
 
+    // Strict guarantee: Song 1 is completely stopped, only Song 2 plays after envelope is opened
     if (hasMainSong) {
-      if (startingAudioRef.current) startingAudioRef.current.pause();
+      if (startingAudioRef.current && !startingAudioRef.current.paused) {
+        startingAudioRef.current.pause();
+        startingAudioRef.current.currentTime = 0;
+      }
       setCurrentTrack("main");
       const mainEl = mainAudioRef.current || audioRef.current;
-      if (mainEl && mainEl.paused) {
+      if (mainEl && mainEl.paused && isPlayingMusic) {
         mainEl.play().then(() => {
           if (onMusicToggle) onMusicToggle(true);
-        }).catch(e => console.log("Main audio play on envelope complete:", e));
+        }).catch(() => {});
       }
     } else if (hasStartingSong && isPlayingMusic) {
       if (startingAudioRef.current && startingAudioRef.current.paused) {
@@ -1642,18 +1730,38 @@ export default function InvitationRenderer({
             <audio
               ref={startingAudioRef}
               src={formatDriveDirectUrl(startingSongUrl, "audio")}
-              autoPlay={config.autoPlayMusic !== false}
+              autoPlay={config.autoPlayMusic !== false && !isEnvelopeOpened}
               playsInline
-              loop={config.startingMusicLoop !== false && !hasMainSong}
+              loop={!isEnvelopeOpened}
               preload="auto"
+              onPlay={() => {
+                // HARD BROWSER-LEVEL EXCLUSION: If Song 1 starts, Song 2 MUST be stopped immediately!
+                const mainEl = mainAudioRef.current || audioRef.current;
+                if (mainEl && !mainEl.paused) {
+                  mainEl.pause();
+                  mainEl.currentTime = 0;
+                }
+              }}
               onError={(e) => {
                 if (e.target.src && !e.target.src.endsWith('/music_intro.mp3')) {
                   e.target.src = '/music_intro.mp3';
                   e.target.load();
-                  if (isPlayingMusic) e.target.play().catch(() => {});
+                  if (isPlayingMusic && !isEnvelopeOpenedRef.current) {
+                    e.target.play().catch(() => {});
+                  }
                 }
               }}
               onEnded={() => {
+                // If envelope is still closed, replay Song 1! DO NOT transition to Song 2!
+                if (!isEnvelopeOpenedRef.current) {
+                  const startEl = startingAudioRef.current;
+                  if (startEl) {
+                    startEl.currentTime = 0;
+                    startEl.play().catch(() => {});
+                  }
+                  return;
+                }
+                // Only if envelope is open and hasMainSong:
                 if (hasMainSong) {
                   setCurrentTrack("main");
                   const mainEl = mainAudioRef.current || audioRef.current;
@@ -1675,11 +1783,20 @@ export default function InvitationRenderer({
               playsInline
               loop={config.loopMusic !== false}
               preload="auto"
+              onPlay={() => {
+                // HARD BROWSER-LEVEL EXCLUSION: If Song 2 starts, Song 1 MUST be stopped immediately!
+                if (startingAudioRef.current && !startingAudioRef.current.paused) {
+                  startingAudioRef.current.pause();
+                  startingAudioRef.current.currentTime = 0;
+                }
+              }}
               onError={(e) => {
                 if (e.target.src && !e.target.src.endsWith('/music_wedding.mp3')) {
                   e.target.src = '/music_wedding.mp3';
                   e.target.load();
-                  if (isPlayingMusic) e.target.play().catch(() => {});
+                  if (isPlayingMusic && isEnvelopeOpenedRef.current) {
+                    e.target.play().catch(() => {});
+                  }
                 }
               }}
             />

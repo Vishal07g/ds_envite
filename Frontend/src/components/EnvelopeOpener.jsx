@@ -94,18 +94,23 @@ export default function EnvelopeOpener({
   const envelopeBg = config.envelopeBgColor || "#5a0e1c"; // Deep rich burgundy/wine matching reference
   const envelopeBgImage = config.showEnvelopeTexture !== false ? config.envelopeBgImage : undefined;
   const sealColor = config.envelopeSealColor || "#c89f4b"; // Antique gold
-  const resolvedBride = (config.brideName || "").trim();
-  const resolvedGroom = (config.groomName || "").trim();
+  const resolvedBride = (config.coverBrideText || config.brideName || "").trim();
+  const resolvedGroom = (config.coverGroomText || config.groomName || "").trim();
   const autoCoupleNames = (resolvedBride && resolvedGroom)
     ? `${resolvedBride} & ${resolvedGroom}`
     : (resolvedBride || resolvedGroom || "");
 
+  const isDummyText = (txt) => {
+    if (!txt) return true;
+    const t = String(txt).trim().toLowerCase();
+    return t.includes("ananya") || t.includes("aarav") || t === "bride & groom" || t === "bride" || t === "groom";
+  };
+
   const isCustomEnvelopeName = config.envelopeNamesText &&
     config.envelopeNamesText.trim() &&
-    !config.envelopeNamesText.toLowerCase().includes("ananya") &&
-    !config.envelopeNamesText.toLowerCase().includes("aarav");
+    !isDummyText(config.envelopeNamesText);
 
-  const namesText = isCustomEnvelopeName ? config.envelopeNamesText : (autoCoupleNames || config.envelopeNamesText || "");
+  const namesText = (isCustomEnvelopeName ? config.envelopeNamesText : (autoCoupleNames || config.envelopeNamesText || "")).trim();
 
   const autoInitials = (resolvedBride && resolvedGroom)
     ? `${resolvedBride.charAt(0)} & ${resolvedGroom.charAt(0)}`
@@ -115,7 +120,7 @@ export default function EnvelopeOpener({
     !config.envelopeInitials.toUpperCase().includes("A & A") &&
     !config.envelopeInitials.toUpperCase().includes("A 👑 A");
 
-  const initials = isCustomInitials ? config.envelopeInitials : (autoInitials || config.envelopeInitials || "");
+  const initials = isCustomInitials ? config.envelopeInitials : (autoInitials || (resolvedBride && resolvedGroom ? `${resolvedBride.charAt(0)} & ${resolvedGroom.charAt(0)}` : "S & V"));
   const tagline = config.envelopeTagline || "Cordially Invited";
   const animDuration = Math.max(1.0, parseFloat(config.envelopeSpeed || "1.2"));
   const particleCount = parseInt(config.envelopeParticles || "24");

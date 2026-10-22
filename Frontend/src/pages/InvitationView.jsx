@@ -178,12 +178,13 @@ export default function InvitationView() {
 
   useEffect(() => {
     if (invitation?.config) {
-      const bride = invitation.config.brideName || "Bride";
-      const groom = invitation.config.groomName || "Groom";
+      const bride = invitation.config.coverBrideText || invitation.config.brideName || "Suman";
+      const groom = invitation.config.coverGroomText || invitation.config.groomName || "Vishal";
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ds-envite.vercel.app';
       const cleanSlug = dbStore.getInvitationShareSlug(invitation);
       const shareUrl = `${origin}/invite/${cleanSlug}`;
-      const thumbUrl = `${origin}/api/og-image?bride=${encodeURIComponent(bride)}&groom=${encodeURIComponent(groom)}`;
+      const dateParam = invitation.config.weddingDate ? `&date=${encodeURIComponent(invitation.config.weddingDate)}` : '';
+      const thumbUrl = `${origin}/api/og-image?bride=${encodeURIComponent(bride)}&groom=${encodeURIComponent(groom)}${dateParam}`;
 
       updateSocialMetaTags({
         brideName: bride,

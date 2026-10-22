@@ -160,7 +160,15 @@ export default function InvitationEditor() {
         }
 
         setInvitation(inv);
-        const cleanedConfig = { ...DEFAULT_CONFIG, ...inv.config };
+        const invConfig = inv.config || {};
+        const cleanedConfig = { 
+          ...DEFAULT_CONFIG, 
+          ...invConfig,
+          brideName: invConfig.brideName || invConfig.coverBrideText || "",
+          groomName: invConfig.groomName || invConfig.coverGroomText || "",
+          coverBrideText: invConfig.coverBrideText || invConfig.brideName || "",
+          coverGroomText: invConfig.coverGroomText || invConfig.groomName || "",
+        };
         if (cleanedConfig.scratchImage && typeof cleanedConfig.scratchImage === 'string' && cleanedConfig.scratchImage.includes('photo-1519225495810-7512c696505a')) {
           cleanedConfig.scratchImage = "";
         }
@@ -176,7 +184,31 @@ export default function InvitationEditor() {
   }, [id, location.state, currentUser]);
 
   const handleFieldChange = (field, val) => {
-    setConfig(prev => ({ ...prev, [field]: val }));
+    setConfig(prev => {
+      const next = { ...prev, [field]: val };
+      if (field === 'coverBrideText') {
+        next.brideName = val;
+        const groom = next.coverGroomText || next.groomName || '';
+        next.envelopeNamesText = `${val}${groom ? ` & ${groom}` : ''}`;
+        next.envelopeInitials = `${val.charAt(0)}${groom ? ` & ${groom.charAt(0)}` : ''}`;
+      } else if (field === 'coverGroomText') {
+        next.groomName = val;
+        const bride = next.coverBrideText || next.brideName || '';
+        next.envelopeNamesText = `${bride ? `${bride} & ` : ''}${val}`;
+        next.envelopeInitials = `${bride ? `${bride.charAt(0)} & ` : ''}${val.charAt(0)}`;
+      } else if (field === 'brideName') {
+        next.coverBrideText = val;
+        const groom = next.coverGroomText || next.groomName || '';
+        next.envelopeNamesText = `${val}${groom ? ` & ${groom}` : ''}`;
+        next.envelopeInitials = `${val.charAt(0)}${groom ? ` & ${groom.charAt(0)}` : ''}`;
+      } else if (field === 'groomName') {
+        next.coverGroomText = val;
+        const bride = next.coverBrideText || next.brideName || '';
+        next.envelopeNamesText = `${bride ? `${bride} & ` : ''}${val}`;
+        next.envelopeInitials = `${bride ? `${bride.charAt(0)} & ` : ''}${val.charAt(0)}`;
+      }
+      return next;
+    });
   };
 
   const handleSave = async () => {
