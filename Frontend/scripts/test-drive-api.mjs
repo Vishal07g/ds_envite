@@ -1,4 +1,4 @@
-const API_KEY = 'AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y';
+const API_KEY = process.env.VITE_GOOGLE_DRIVE_API_KEY || '';
 const ROOT_FOLDER_ID = '1F06tPPDFApqdxQL4SnqwN8b48CD7McHP';
 
 async function testApiKey() {

@@ -26,35 +26,35 @@ export const CURATED_MUSIC_PRESETS = [
     title: "Royal Shehnai & Sitar Melody",
     artist: "Indian Classical Ensemble",
     category: "Traditional & Cultural",
-    url: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3"
+    url: "/music_wedding.mp3"
+  },
+  {
+    id: "soft_flute",
+    title: "Soft Flute & Divine Harp (Ganesh Mantra)",
+    artist: "Sacred Harmonies",
+    category: "Devotional & Soft",
+    url: "/music_intro.mp3"
   },
   {
     id: "romantic_piano",
     title: "Romantic Piano & Strings",
     artist: "Harmonic Serenade",
     category: "Romantic",
-    url: "https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0a13f69d2.mp3"
+    url: "https://actions.google.com/sounds/v1/ambiences/outdoor_festival.ogg"
   },
   {
     id: "acoustic_love",
     title: "Acoustic Love & Harmony",
     artist: "Golden Sunset Duo",
     category: "Acoustic",
-    url: "https://cdn.pixabay.com/download/audio/2022/03/15/audio_c8c8a73467.mp3"
+    url: "/music_wedding.mp3"
   },
   {
     id: "cinematic_violin",
     title: "Cinematic Wedding Violin",
     artist: "Royal Philharmonic Solo",
     category: "Cinematic",
-    url: "https://cdn.pixabay.com/download/audio/2022/10/14/audio_9939f792e9.mp3"
-  },
-  {
-    id: "soft_flute",
-    title: "Soft Flute & Divine Harp",
-    artist: "Sacred Harmonies",
-    category: "Devotional & Soft",
-    url: "https://cdn.pixabay.com/download/audio/2022/11/06/audio_c1c4b7520e.mp3"
+    url: "/music_intro.mp3"
   }
 ];
 
@@ -141,14 +141,14 @@ const DEFAULT_CONFIG = {
 
   // Custom Dual Song Music System (Starting / Intro Song & Main Song)
   startingMusicEnabled: true,
-  startingMusicUrl: "https://cdn.pixabay.com/download/audio/2022/11/06/audio_c1c4b7520e.mp3",
-  startingMusicTitle: "Soft Flute & Divine Harp",
-  startingMusicArtist: "Opening Prelude",
+  startingMusicUrl: "/music_intro.mp3",
+  startingMusicTitle: "Vakratunda Ganesh Mantra",
+  startingMusicArtist: "Opening Blessing",
   startingMusicVolume: 0.8,
   startingMusicLoop: true,
 
   mainMusicEnabled: true,
-  musicUrl: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3",
+  musicUrl: "/music_wedding.mp3",
   musicTitle: "Royal Shehnai & Sitar Melody",
   musicArtist: "Indian Classical Ensemble",
   musicVolume: 0.8,
@@ -906,7 +906,7 @@ const INITIAL_INVITATIONS = [
     "coverTopTaglineText": "By the decree of love and destiny",
     "cursiveFontClass": "font-cursive",
     "customSacredSymbol": "",
-    "customSacredSymbolImg": "https://www.googleapis.com/drive/v3/files/1c6s4GwrdBbCSmx4tK6ci4km7A4pVKTi-?alt=media&key=AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y",
+    "customSacredSymbolImg": "https://lh3.googleusercontent.com/d/1c6s4GwrdBbCSmx4tK6ci4km7A4pVKTi-",
     "customSacredSymbolImgBlendMode": "normal",
     "customSacredSymbolImgOpacity": 1,
     "customSacredSymbolImgRotate": 0,
@@ -1014,7 +1014,7 @@ const INITIAL_INVITATIONS = [
     "galleryImage1": "",
     "galleryImage2": "",
     "galleryImage3": "",
-    "galleryImage4": "https://www.googleapis.com/drive/v3/files/1ykpf7aFVNXStbIkk4xIyZGkUpokkqvPd?alt=media&key=AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y",
+    "galleryImage4": "https://lh3.googleusercontent.com/d/1ykpf7aFVNXStbIkk4xIyZGkUpokkqvPd",
     "galleryImage5": "",
     "galleryImage6": "",
     "gallerySubtitle": "Our Love in Frames",

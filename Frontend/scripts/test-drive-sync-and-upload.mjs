@@ -102,12 +102,12 @@ async function runTestSuite() {
       label: 'Story Couple Image'
     },
     {
-      url: 'https://drive.google.com/uc?export=download&id=1kv2KpmoK76DwvC7RcSDA79UE_ihSH2lJ',
+      url: 'https://drive.google.com/uc?export=download&id=1qYZTfellhe_5X_dpAfIVapemWZA8eUhJ',
       type: 'audio',
       label: 'Main Wedding Song'
     },
     {
-      url: 'https://drive.google.com/uc?export=download&id=1ScEGe8HiEjdTdhbYh2R_6rTJMjHfsNu6',
+      url: 'https://drive.google.com/uc?export=download&id=1qKhE7CtMAbOVHZm507SxcCqCnBwA8E2-',
       type: 'audio',
       label: 'Starting Ganesh Mantra Song'
     }

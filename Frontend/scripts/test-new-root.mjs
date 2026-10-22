@@ -1,4 +1,4 @@
-const API_KEY = 'AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y';
+const API_KEY = process.env.VITE_GOOGLE_DRIVE_API_KEY || '';
 const NEW_ROOT = '1_pdrNFiXcOymZQEby52O3FbvImCU_SW8';
 
 async function testNewRoot() {
