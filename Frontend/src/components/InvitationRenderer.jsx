@@ -528,7 +528,7 @@ export default function InvitationRenderer({
   const isScratchingRef = useRef(false);
   const lastScratchPosRef = useRef({ x: 0, y: 0 });
 
-  const startingSongUrl = config.startingMusicUrl || (config.startingMusicEnabled !== false ? "https://cdn.pixabay.com/download/audio/2022/11/06/audio_c1c4b7520e.mp3" : "");
+  const startingSongUrl = config.startingMusicUrl || (config.startingMusicEnabled !== false ? "/music_intro.mp3" : "");
   const hasStartingSong = Boolean(config.startingMusicEnabled !== false && startingSongUrl);
   const hasMainSong = Boolean(config.mainMusicEnabled !== false && config.musicUrl);
   const [currentTrack, setCurrentTrack] = useState(() => {
@@ -927,6 +927,37 @@ export default function InvitationRenderer({
     }
   }, [isPlayingMusic, currentTrack]);
 
+  // Synchronous Direct User Gesture Audio Toggle (Mute / Unmute / Play / Pause)
+  const toggleMusicPlayback = useCallback((e) => {
+    if (e && e.stopPropagation) e.stopPropagation();
+    const activeEl = currentTrack === "starting" ? startingAudioRef.current : (mainAudioRef.current || audioRef.current);
+    if (!activeEl) return;
+
+    if (isPlayingMusic && !activeEl.paused) {
+      activeEl.pause();
+      if (onMusicToggle) onMusicToggle(false);
+    } else {
+      activeEl.muted = false;
+      activeEl.volume = config.musicVolume !== undefined ? Number(config.musicVolume) : 0.8;
+      const playPromise = activeEl.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          if (onMusicToggle) onMusicToggle(true);
+        }).catch(err => {
+          console.warn("Direct toggle play error:", err);
+          const fallbackSrc = currentTrack === "starting" ? "/music_intro.mp3" : "/music_wedding.mp3";
+          if (activeEl.src && !activeEl.src.includes(fallbackSrc)) {
+            activeEl.src = fallbackSrc;
+            activeEl.load();
+            activeEl.play().then(() => {
+              if (onMusicToggle) onMusicToggle(true);
+            }).catch(() => {});
+          }
+        });
+      }
+    }
+  }, [currentTrack, isPlayingMusic, onMusicToggle, config.musicVolume]);
+
   // Autoplay on first user interaction if enabled
   useEffect(() => {
     if (config.autoPlayMusic === false) return;
@@ -1071,19 +1102,22 @@ export default function InvitationRenderer({
           title="Click & Drag to move anywhere • Tap to expand music controls"
         >
           <div 
-            onClick={() => setIsWidgetMinimized(false)}
-            className="bg-slate-950/90 backdrop-blur-xl border border-amber-500/60 text-slate-100 rounded-full p-1.5 shadow-2xl flex items-center space-x-1.5 group hover:border-amber-400 hover:scale-105 transition-all cursor-pointer select-none"
-            title="Click to view full music controls"
+            className="bg-slate-950/90 backdrop-blur-xl border border-amber-500/60 text-slate-100 rounded-full p-1.5 shadow-2xl flex items-center space-x-1.5 group hover:border-amber-400 hover:scale-105 transition-all select-none"
+            title="Music Player Controls"
           >
-            <span className="text-slate-400 text-[10px] select-none pl-1 opacity-60 group-hover:opacity-100 cursor-grab">⠿</span>
+            <span 
+              className="text-slate-400 text-[10px] select-none pl-1 opacity-60 group-hover:opacity-100 cursor-grab"
+              title="Click & Drag player"
+            >
+              ⠿
+            </span>
+
+            {/* Direct Play / Unmute / Pause Button */}
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsWidgetMinimized(false);
-              }}
+              onClick={toggleMusicPlayback}
               className="w-7 h-7 rounded-full bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/50 flex items-center justify-center text-amber-400 transition cursor-pointer"
-              title="Expand Music Player Controls"
+              title={isPlayingMusic ? "Mute / Pause Music" : "Play / Unmute Music"}
             >
               {isPlayingMusic ? (
                 <div className="flex items-end space-x-[2px] h-3.5 w-3.5 justify-center py-0.5">
@@ -1092,8 +1126,21 @@ export default function InvitationRenderer({
                   <span className="w-[2px] bg-amber-400 animate-bounce h-full rounded-full" style={{ animationDuration: '0.4s' }} />
                 </div>
               ) : (
-                <span className="text-xs">🎵</span>
+                <SvgVolumeX className="w-3.5 h-3.5 text-slate-400" />
               )}
+            </button>
+
+            {/* Expand Controls Icon */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsWidgetMinimized(false);
+              }}
+              className="text-[10px] text-slate-400 hover:text-amber-300 pr-1 transition cursor-pointer"
+              title="Expand Full Controls"
+            >
+              ⚙
             </button>
           </div>
         </div>
@@ -1121,20 +1168,9 @@ export default function InvitationRenderer({
           {/* Play / Pause Toggle Button */}
           <button 
             type="button"
-            onClick={() => {
-              const activeEl = isStartingTrackActive ? startingAudioRef.current : (mainAudioRef.current || audioRef.current);
-              if (!activeEl) return;
-              if (isPlayingMusic) {
-                activeEl.pause();
-                if (onMusicToggle) onMusicToggle(false);
-              } else {
-                activeEl.play().then(() => {
-                  if (onMusicToggle) onMusicToggle(true);
-                }).catch(e => console.warn("Play error:", e));
-              }
-            }}
+            onClick={toggleMusicPlayback}
             className="w-7 h-7 rounded-full bg-amber-500/20 hover:bg-amber-500/40 border border-amber-500/50 flex items-center justify-center text-amber-400 transition cursor-pointer shrink-0"
-            title={isPlayingMusic ? "Pause Music" : "Play Music"}
+            title={isPlayingMusic ? "Pause Music" : "Play / Unmute Music"}
           >
             {isPlayingMusic ? (
               <div className="flex items-end space-x-[2px] h-3.5 w-3.5 justify-center py-0.5">
@@ -1606,10 +1642,17 @@ export default function InvitationRenderer({
             <audio
               ref={startingAudioRef}
               src={formatDriveDirectUrl(startingSongUrl, "audio")}
-              autoPlay
+              autoPlay={config.autoPlayMusic !== false}
               playsInline
               loop={config.startingMusicLoop !== false && !hasMainSong}
               preload="auto"
+              onError={(e) => {
+                if (e.target.src && !e.target.src.endsWith('/music_intro.mp3')) {
+                  e.target.src = '/music_intro.mp3';
+                  e.target.load();
+                  if (isPlayingMusic) e.target.play().catch(() => {});
+                }
+              }}
               onEnded={() => {
                 if (hasMainSong) {
                   setCurrentTrack("main");
@@ -1632,6 +1675,13 @@ export default function InvitationRenderer({
               playsInline
               loop={config.loopMusic !== false}
               preload="auto"
+              onError={(e) => {
+                if (e.target.src && !e.target.src.endsWith('/music_wedding.mp3')) {
+                  e.target.src = '/music_wedding.mp3';
+                  e.target.load();
+                  if (isPlayingMusic) e.target.play().catch(() => {});
+                }
+              }}
             />
           )}
         </>
@@ -1927,9 +1977,10 @@ export default function InvitationRenderer({
           <div className="flex items-center space-x-3">
             {onMusicToggle && (
               <button
-                onClick={() => onMusicToggle(!isPlayingMusic)}
-                className="p-1.5 rounded-full hover:bg-white/10 transition flex items-center justify-center text-xs"
-                title="Music Player"
+                type="button"
+                onClick={toggleMusicPlayback}
+                className="p-1.5 rounded-full hover:bg-white/10 transition flex items-center justify-center text-xs cursor-pointer"
+                title={isPlayingMusic ? "Pause Music" : "Play / Unmute Music"}
               >
                 {isPlayingMusic ? <SvgVolume2 className="w-4 h-4 animate-bounce text-emerald-400" /> : <SvgVolumeX className="w-4 h-4 opacity-50" />}
               </button>

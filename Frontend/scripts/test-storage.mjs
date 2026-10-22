@@ -2,7 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDdyT6WFoVteh72mhM6UOj35TPOG-tqI6A",
+  apiKey: process.env.VITE_FIREBASE_API_KEY || "",
   authDomain: "digital-invitation-e906f.firebaseapp.com",
   databaseURL: "https://digital-invitation-e906f-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "digital-invitation-e906f",
