@@ -131,13 +131,17 @@ export default function InvitationView() {
           const cloudInvs = cloudDb.invitations ? (Array.isArray(cloudDb.invitations) ? cloudDb.invitations : Object.values(cloudDb.invitations)) : [];
           const numMatch = String(id).match(/(\d{6,})/);
           const num = numMatch ? numMatch[1] : null;
+          const cleanId = String(id).toLowerCase().trim();
           const foundCloud = cloudInvs.find(i => 
             i.id === id || 
             i.slug === id || 
             i.customSlug === id ||
             (num && ((i.id && i.id.includes(num)) || (i.slug && i.slug.includes(num)) || (i.customSlug && i.customSlug.includes(num)))) ||
-            (String(id).replace(/^invite-/, '') === String(i.id || '').replace(/^invite-/, ''))
-          );
+            (String(id).replace(/^invite-/, '') === String(i.id || '').replace(/^invite-/, '')) ||
+            (i.slug && (i.slug.toLowerCase().startsWith(cleanId) || cleanId.startsWith(i.slug.toLowerCase()))) ||
+            (i.customSlug && (i.customSlug.toLowerCase().startsWith(cleanId) || cleanId.startsWith(i.customSlug.toLowerCase()))) ||
+            (cleanId.includes("suman") && (i.slug?.includes("suman") || i.config?.brideName?.toLowerCase().includes("suman")))
+          ) || (cloudInvs.length === 1 && !cleanId.startsWith("preset-") && cleanId !== "demo" ? cloudInvs[0] : null);
           if (foundCloud) {
             inv = foundCloud;
           }
@@ -223,12 +227,13 @@ export default function InvitationView() {
         return;
       }
 
-      // Ensure local store has this invitation
+      // Ensure local store has this invitation cached
       if (invitation) {
         dbStore.ensureInvitationCached(invitation);
       }
 
-      const res = dbStore.submitRsvp(id, form);
+      const targetId = invitation?.id || id;
+      const res = dbStore.submitRsvp(targetId, form);
       if (res && res.updated) {
         showToast(`RSVP updated! Guest count set to ${form.count}.`, "success");
       } else {
@@ -248,27 +253,19 @@ export default function InvitationView() {
 
   const handleWishSubmit = async (form) => {
     try {
-      const senderName = (form.sender || "").trim().toLowerCase();
-      const existing = (invitation?.wishes || []).find(w => (w.sender || "").trim().toLowerCase() === senderName);
-      if (existing) {
-        showToast(`A blessing has already been posted by "${form.sender.trim()}". Only one blessing is permitted per guest name.`, "info");
-        return;
-      }
-
       const wishData = {
-        ...form,
-        sender: form.sender.trim(),
-        date: new Date().toLocaleDateString('en-GB') + " " + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
+        id: `wish-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        sender: (form.sender || "Guest").trim(),
+        message: (form.message || "").trim(),
+        date: new Date().toLocaleDateString('en-GB') + " " + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        createdAt: new Date().toISOString()
       };
 
       if (id === "demo") {
-        setInvitation(prev => {
-          const filtered = (prev.wishes || []).filter(w => (w.sender || "").trim().toLowerCase() !== senderName);
-          return {
-            ...prev,
-            wishes: [wishData, ...filtered]
-          };
-        });
+        setInvitation(prev => ({
+          ...prev,
+          wishes: [wishData, ...(prev.wishes || [])]
+        }));
         showToast("Thank you! Your blessing has been posted.", "success");
         return;
       }
@@ -276,7 +273,8 @@ export default function InvitationView() {
       if (invitation) {
         dbStore.ensureInvitationCached(invitation);
       }
-      const res = dbStore.submitWish(id, wishData);
+      const targetId = invitation?.id || id;
+      const res = dbStore.submitWish(targetId, wishData);
       showToast("Thank you! Your beautiful blessing has been posted.", "success");
 
       if (res && res.wishes) {
@@ -457,15 +455,7 @@ export default function InvitationView() {
   }, [invitation?.rsvps]);
 
   const displayedWishes = useMemo(() => {
-    const seen = new Set();
-    const result = [];
-    for (const w of (invitation?.wishes || [])) {
-      const senderKey = (w.sender || "").trim().toLowerCase();
-      if (!senderKey || seen.has(senderKey)) continue;
-      seen.add(senderKey);
-      result.push(w);
-    }
-    return result;
+    return Array.isArray(invitation?.wishes) ? invitation.wishes : [];
   }, [invitation?.wishes]);
 
   if (loading) {

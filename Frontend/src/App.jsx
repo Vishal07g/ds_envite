@@ -69,9 +69,10 @@ function AppLayout({ children }) {
   }, [appBgColor, appBgGradient]);
 
   // Hide header on client invite, editor, and printable PDF pages
-  const isInvitePage = location.pathname.startsWith('/invite/');
-  const isEditorPage = location.pathname.startsWith('/admin/editor');
-  const isPrintPage = location.pathname.startsWith('/print');
+  const normalizedPath = (location.pathname || '').toLowerCase();
+  const isInvitePage = normalizedPath.startsWith('/invite');
+  const isEditorPage = normalizedPath.startsWith('/admin/editor');
+  const isPrintPage = normalizedPath.startsWith('/print');
 
   if (isInvitePage || isEditorPage || isPrintPage) {
     return <>{children}</>;

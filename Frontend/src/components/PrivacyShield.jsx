@@ -141,33 +141,6 @@ export default function PrivacyShield({
       }
     };
 
-    // 6. Window Blur & Visibility Change (Snipping Tool & external screenshot tool detector)
-    // When snipping tool, Power+Volume screenshot, or OS screen grab is triggered, browser loses focus immediately
-    const handleBlur = () => {
-      // Trigger instant opaque blackout so any snip captures only the shield
-      triggerShield("Window focus lost / OS Screen Capture active");
-    };
-
-    const handleFocus = () => {
-      setTimeout(() => {
-        dismissShield();
-      }, 350);
-    };
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === "hidden") {
-        triggerShield("Screen visibility changed / OS Screenshot buffer");
-      } else {
-        setTimeout(() => {
-          dismissShield();
-        }, 350);
-      }
-    };
-
-    const handlePageHide = () => {
-      triggerShield("Page suspended / OS Capture buffer");
-    };
-
     // 7. Context Menu prevention (Right-click to Inspect / Save Image As)
     const handleContextMenu = (e) => {
       e.preventDefault();
@@ -203,10 +176,6 @@ export default function PrivacyShield({
 
     window.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("keyup", handleKeyUp, true);
-    window.addEventListener("blur", handleBlur);
-    window.addEventListener("focus", handleFocus);
-    window.addEventListener("pagehide", handlePageHide);
-    document.addEventListener("visibilitychange", handleVisibilityChange);
     document.addEventListener("contextmenu", handleContextMenu, true);
     document.addEventListener("dragstart", handleDragStart, true);
     window.addEventListener("touchstart", handleMultiTouch, { capture: true, passive: false });
@@ -215,10 +184,6 @@ export default function PrivacyShield({
     return () => {
       window.removeEventListener("keydown", handleKeyDown, true);
       window.removeEventListener("keyup", handleKeyUp, true);
-      window.removeEventListener("blur", handleBlur);
-      window.removeEventListener("focus", handleFocus);
-      window.removeEventListener("pagehide", handlePageHide);
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
       document.removeEventListener("contextmenu", handleContextMenu, true);
       document.removeEventListener("dragstart", handleDragStart, true);
       window.removeEventListener("touchstart", handleMultiTouch, { capture: true });

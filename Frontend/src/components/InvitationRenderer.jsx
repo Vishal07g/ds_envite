@@ -1591,25 +1591,10 @@ export default function InvitationRenderer({
     return (rsvps || []).find(r => (r.name || "").trim().toLowerCase() === rsvpForm.name.trim().toLowerCase());
   }, [rsvps, rsvpForm.name]);
 
-  // Ensure displayed blessings are strictly 1 per sender name (deduplicated)
+  // Ensure all displayed blessings from guests are preserved and shown without being filtered
   const uniqueWishes = useMemo(() => {
-    const seen = new Set();
-    const result = [];
-    for (const w of (wishes || [])) {
-      const senderKey = (w.sender || "").trim().toLowerCase();
-      if (!senderKey || seen.has(senderKey)) continue;
-      seen.add(senderKey);
-      result.push(w);
-    }
-    return result;
+    return Array.isArray(wishes) ? wishes : [];
   }, [wishes]);
-
-  // Identify if the currently entered sender name has already posted a blessing
-  const existingBlessingForSender = useMemo(() => {
-    const typed = (wishForm.sender || "").trim().toLowerCase();
-    if (!typed) return null;
-    return uniqueWishes.find(w => (w.sender || "").trim().toLowerCase() === typed);
-  }, [uniqueWishes, wishForm.sender]);
 
   const handleRsvpFormSubmit = (e) => {
     e.preventDefault();
@@ -1630,15 +1615,6 @@ export default function InvitationRenderer({
     const sender = (wishForm.sender || "").trim();
     const message = (wishForm.message || "").trim();
     if (!sender || !message) return;
-
-    // Check if this guest already shared a blessing
-    const alreadyPosted = uniqueWishes.some(
-      w => (w.sender || "").trim().toLowerCase() === sender.toLowerCase()
-    );
-    if (alreadyPosted) {
-      alert(`A blessing has already been posted by "${sender}". Only one blessing is permitted per guest name.`);
-      return;
-    }
 
     if (onSubmitWish) {
       onSubmitWish({ sender, message });
@@ -4039,43 +4015,24 @@ export default function InvitationRenderer({
                     />
                   </div>
 
-                  {existingBlessingForSender && (
-                    <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs space-y-1 animate-fade-in">
-                      <div className="flex items-center space-x-1.5 font-semibold text-amber-300">
-                        <SvgHeart className="w-3.5 h-3.5 text-amber-400 shrink-0" fill="currentColor" />
-                        <span>Blessing already posted by "{existingBlessingForSender.sender}"</span>
-                      </div>
-                      <p className="italic text-[11px] text-slate-100 pl-5">"{existingBlessingForSender.message}"</p>
-                      <p className="text-[10px] text-amber-400/90 pl-5 pt-0.5">
-                        ✓ Only one blessing is permitted per guest name. To post a blessing for another person, please change the name above.
-                      </p>
-                    </div>
-                  )}
-
                   <div>
                     <label className="text-[9px] uppercase tracking-wider font-bold opacity-90 block mb-1">Your Blessing *</label>
                     <textarea
                       value={wishForm.message}
                       onChange={(e) => setWishForm(prev => ({ ...prev, message: e.target.value }))}
                       rows={3}
-                      disabled={!!existingBlessingForSender}
-                      className={`w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs focus:outline-none focus:border-amber-500/50 resize-none ${
-                        existingBlessingForSender ? "opacity-50 cursor-not-allowed bg-black/20" : ""
-                      }`}
-                      placeholder={existingBlessingForSender ? "This guest has already shared their blessing" : "Write a heartfelt message for the couple..."}
-                      required={!existingBlessingForSender}
+                      className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs focus:outline-none focus:border-amber-500/50 resize-none"
+                      placeholder="Write a heartfelt message for the couple..."
+                      required
                     />
                   </div>
                   <button
                     type="submit"
-                    disabled={!!existingBlessingForSender}
                     style={customStyles.glassButton}
-                    className={`w-full px-5 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-semibold flex items-center justify-center space-x-2 transition ${
-                      existingBlessingForSender ? "opacity-50 cursor-not-allowed bg-white/5" : "glass-btn-hover cursor-pointer"
-                    }`}
+                    className="w-full px-5 py-2.5 rounded-xl text-[10px] uppercase tracking-widest font-semibold flex items-center justify-center space-x-2 transition glass-btn-hover cursor-pointer"
                   >
                     <SvgHeart className="w-3.5 h-3.5" fill="currentColor" />
-                    <span>{existingBlessingForSender ? "Blessing Already Posted for this Name" : "Send Blessings"}</span>
+                    <span>Send Blessings</span>
                   </button>
                 </form>
 

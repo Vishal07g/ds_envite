@@ -6,6 +6,13 @@
     },
     {
       "source": "/invite/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot).*"
+        }
+      ],
       "destination": "/api/invite?slug=:slug"
     },
     {
