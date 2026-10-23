@@ -1097,26 +1097,14 @@ export default function InvitationRenderer({
     isEnvelopeOpenedRef.current = true;
     setEnvelopeOpeningAnim(true);
 
-    if (hasStartingSong) {
-      // In phone mode & desktop: play Song 1 (Starting Song) on user gesture
-      setCurrentTrack("starting");
-      const startEl = startingAudioRef.current;
-      if (startEl && startEl.paused) {
-        startEl.play().then(() => {
-          if (onMusicToggle) onMusicToggle(true);
-        }).catch(e => console.log("Starting audio play on envelope open:", e));
-      }
-      // Prime main audio on mobile gesture so browser authorizes playback later on onEnded
-      if (hasMainSong) {
-        const mainEl = mainAudioRef.current || audioRef.current;
-        if (mainEl) {
-          try {
-            mainEl.load();
-          } catch (_) {}
-        }
-      }
-    } else if (hasMainSong) {
-      // If there is no starting song, play Main Song immediately
+    // Stop Song 1 immediately when envelope is opened
+    if (startingAudioRef.current) {
+      startingAudioRef.current.pause();
+      startingAudioRef.current.currentTime = 0;
+    }
+
+    // Play Song 2 (Main Song) after opening envelope!
+    if (hasMainSong) {
       setCurrentTrack("main");
       const mainEl = mainAudioRef.current || audioRef.current;
       if (mainEl) {
@@ -1140,24 +1128,16 @@ export default function InvitationRenderer({
     }
     window.scrollTo({ top: 0, behavior: 'instant' });
 
-    // If starting song is active and playing, let it finish and transition via onEnded
-    if (hasStartingSong) {
-      const startEl = startingAudioRef.current;
-      if (startEl && !startEl.paused) {
-        setCurrentTrack("starting");
-      } else if (hasMainSong && isPlayingMusic) {
-        setCurrentTrack("main");
-        const mainEl = mainAudioRef.current || audioRef.current;
-        if (mainEl && mainEl.paused) {
-          mainEl.play().then(() => {
-            if (onMusicToggle) onMusicToggle(true);
-          }).catch(() => {});
-        }
-      }
-    } else if (hasMainSong && isPlayingMusic) {
+    // Strict guarantee: Song 1 is completely stopped, only Song 2 plays after envelope is opened
+    if (startingAudioRef.current && !startingAudioRef.current.paused) {
+      startingAudioRef.current.pause();
+      startingAudioRef.current.currentTime = 0;
+    }
+
+    if (hasMainSong) {
       setCurrentTrack("main");
       const mainEl = mainAudioRef.current || audioRef.current;
-      if (mainEl && mainEl.paused) {
+      if (mainEl && mainEl.paused && isPlayingMusic) {
         mainEl.play().then(() => {
           if (onMusicToggle) onMusicToggle(true);
         }).catch(() => {});

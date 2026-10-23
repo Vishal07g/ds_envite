@@ -387,8 +387,12 @@ export default function EnvelopeOpener({
         touchAction: 'none',
         overscrollBehavior: 'none',
       }}
-      onClick={handleUserClickOpen}
+      onClick={(e) => {
+        // Tapping background or envelope triggers starting song playback
+        window.dispatchEvent(new Event('envelopeUserTapped'));
+      }}
       onPointerDown={() => window.dispatchEvent(new Event('envelopeUserTapped'))}
+      onTouchStart={() => window.dispatchEvent(new Event('envelopeUserTapped'))}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300;1,600&family=Great+Vibes&family=Inter:wght@300;400;600&family=Italiana&family=Marcellus&family=Montserrat:wght@300;600&family=Pinyon+Script&family=Playball&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Rozha+One&family=Yatra+One&display=swap');
@@ -1017,6 +1021,10 @@ export default function EnvelopeOpener({
                 zIndex: 32,
               }}
               title="Click to Open Invitation"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleUserClickOpen();
+              }}
             >
               {/* Real 3D Wax Seal Image */}
               <div className="relative w-full h-full flex items-center justify-center">
