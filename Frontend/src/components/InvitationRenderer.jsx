@@ -2035,7 +2035,7 @@ export default function InvitationRenderer({
       {!isPrintMode && (
         <header className="sticky top-0 z-30 backdrop-blur-md bg-opacity-70 py-3 px-4 flex items-center justify-between border-b" style={{ borderColor: `${config.accentGold}35`, backgroundColor: `${config.primaryColor}df` }}>
           <div className="flex items-center space-x-2.5">
-            {isPaid ? (
+            {!isPaid ? (
               <Link 
                 to="/"
                 className="flex items-center group transition transform hover:scale-105 shrink-0 mr-1.5"

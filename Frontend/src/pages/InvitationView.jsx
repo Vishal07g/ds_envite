@@ -517,7 +517,7 @@ export default function InvitationView() {
       <PrivacyShield 
         targetContainerId="invitation-view-container"
         coupleNames={`${invitation?.config?.brideName || "Celebration"} & ${invitation?.config?.groomName || "Wedding"}`}
-        enableWatermarkPattern={true}
+        enableWatermarkPattern={!isPaid}
       />
 
       {toast.show && (
