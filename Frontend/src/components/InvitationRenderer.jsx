@@ -1097,14 +1097,26 @@ export default function InvitationRenderer({
     isEnvelopeOpenedRef.current = true;
     setEnvelopeOpeningAnim(true);
 
-    // WHEN ENVELOPE IS OPENED: Stop Song 1 immediately, and only play Song 2 (Main Song)!
-    if (hasMainSong) {
-      // 1. Immediately pause and reset Song 1
-      if (startingAudioRef.current) {
-        startingAudioRef.current.pause();
-        startingAudioRef.current.currentTime = 0;
+    if (hasStartingSong) {
+      // In phone mode & desktop: play Song 1 (Starting Song) on user gesture
+      setCurrentTrack("starting");
+      const startEl = startingAudioRef.current;
+      if (startEl && startEl.paused) {
+        startEl.play().then(() => {
+          if (onMusicToggle) onMusicToggle(true);
+        }).catch(e => console.log("Starting audio play on envelope open:", e));
       }
-      // 2. Switch to Song 2 and play
+      // Prime main audio on mobile gesture so browser authorizes playback later on onEnded
+      if (hasMainSong) {
+        const mainEl = mainAudioRef.current || audioRef.current;
+        if (mainEl) {
+          try {
+            mainEl.load();
+          } catch (_) {}
+        }
+      }
+    } else if (hasMainSong) {
+      // If there is no starting song, play Main Song immediately
       setCurrentTrack("main");
       const mainEl = mainAudioRef.current || audioRef.current;
       if (mainEl) {
@@ -1112,15 +1124,6 @@ export default function InvitationRenderer({
         mainEl.play().then(() => {
           if (onMusicToggle) onMusicToggle(true);
         }).catch(e => console.log("Main audio play on envelope open:", e));
-      }
-    } else if (hasStartingSong) {
-      // If only starting song exists, continue playing it
-      setCurrentTrack("starting");
-      const startEl = startingAudioRef.current;
-      if (startEl && startEl.paused) {
-        startEl.play().then(() => {
-          if (onMusicToggle) onMusicToggle(true);
-        }).catch(e => console.log("Starting audio play on envelope open:", e));
       }
     }
   };
@@ -1137,22 +1140,27 @@ export default function InvitationRenderer({
     }
     window.scrollTo({ top: 0, behavior: 'instant' });
 
-    // Strict guarantee: Song 1 is completely stopped, only Song 2 plays after envelope is opened
-    if (hasMainSong) {
-      if (startingAudioRef.current && !startingAudioRef.current.paused) {
-        startingAudioRef.current.pause();
-        startingAudioRef.current.currentTime = 0;
+    // If starting song is active and playing, let it finish and transition via onEnded
+    if (hasStartingSong) {
+      const startEl = startingAudioRef.current;
+      if (startEl && !startEl.paused) {
+        setCurrentTrack("starting");
+      } else if (hasMainSong && isPlayingMusic) {
+        setCurrentTrack("main");
+        const mainEl = mainAudioRef.current || audioRef.current;
+        if (mainEl && mainEl.paused) {
+          mainEl.play().then(() => {
+            if (onMusicToggle) onMusicToggle(true);
+          }).catch(() => {});
+        }
       }
+    } else if (hasMainSong && isPlayingMusic) {
       setCurrentTrack("main");
       const mainEl = mainAudioRef.current || audioRef.current;
-      if (mainEl && mainEl.paused && isPlayingMusic) {
+      if (mainEl && mainEl.paused) {
         mainEl.play().then(() => {
           if (onMusicToggle) onMusicToggle(true);
         }).catch(() => {});
-      }
-    } else if (hasStartingSong && isPlayingMusic) {
-      if (startingAudioRef.current && startingAudioRef.current.paused) {
-        startingAudioRef.current.play().catch(() => {});
       }
     }
   };
@@ -1708,7 +1716,7 @@ export default function InvitationRenderer({
               src={formatDriveDirectUrl(startingSongUrl, "audio")}
               autoPlay={config.autoPlayMusic !== false && !isEnvelopeOpened}
               playsInline
-              loop={!isEnvelopeOpened}
+              loop={!isEnvelopeOpened || !hasMainSong}
               preload="auto"
               onPlay={() => {
                 // HARD BROWSER-LEVEL EXCLUSION: If Song 1 starts, Song 2 MUST be stopped immediately!
