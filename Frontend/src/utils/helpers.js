@@ -289,7 +289,7 @@ export function formatDriveDirectUrl(url, type = "image") {
   const fileId = extractDriveFileId(trimmed);
   if (!fileId) return trimmed;
 
-  if (type === "audio" || type === "music" || type === "sound") {
+  if (type === "audio" || type === "music" || type === "sound" || type === "video" || type === "media") {
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
 

@@ -543,6 +543,53 @@ export default function InvitationRenderer({
     return hasMainSong ? "main" : (hasStartingSong ? "starting" : "main");
   });
 
+  // Automatically measure and cache uploaded cover image natural dimensions & ratio
+  const [coverImageDimensions, setCoverImageDimensions] = useState({ width: 0, height: 0, ratio: null });
+  useEffect(() => {
+    if (!config.heroImage) {
+      setCoverImageDimensions({ width: 0, height: 0, ratio: null });
+      return;
+    }
+    const img = new Image();
+    const src = formatDriveDirectUrl(config.heroImage, "image");
+    img.src = src;
+    if (img.complete && img.naturalWidth) {
+      setCoverImageDimensions({
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        ratio: img.naturalWidth / img.naturalHeight
+      });
+    } else {
+      img.onload = () => {
+        if (img.naturalWidth && img.naturalHeight) {
+          setCoverImageDimensions({
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+            ratio: img.naturalWidth / img.naturalHeight
+          });
+        }
+      };
+    }
+  }, [config.heroImage]);
+
+  const activeCoverRatio = useMemo(() => {
+    if (!config.coverMatchUploadedSize) return null;
+    if (config.coverAspectRatioPreset && config.coverAspectRatioPreset !== 'auto') {
+      const presets = {
+        '16/9': 16 / 9,
+        '4/5': 4 / 5,
+        '9/16': 9 / 16,
+        '1/1': 1,
+        '4/3': 4 / 3,
+        '21/9': 21 / 9
+      };
+      if (presets[config.coverAspectRatioPreset]) {
+        return presets[config.coverAspectRatioPreset];
+      }
+    }
+    return coverImageDimensions.ratio || null;
+  }, [config.coverMatchUploadedSize, config.coverAspectRatioPreset, coverImageDimensions.ratio]);
+
   // Automatically start playing Song 1 (Starting Song) as soon as invitation link is opened
   useEffect(() => {
     if (config.showMusic === false) return;
@@ -2197,11 +2244,24 @@ export default function InvitationRenderer({
           >
             <section 
               id="cover-section"
-              className="relative min-h-[75vh] flex flex-col justify-center items-center text-center p-6 bg-cover bg-center overflow-hidden w-full mx-auto rounded-3xl" 
+              className={`relative ${config.coverMatchUploadedSize ? 'min-h-0' : 'min-h-[75vh]'} flex flex-col justify-center items-center text-center p-6 bg-center overflow-hidden w-full mx-auto rounded-3xl`} 
               style={{ 
                 backgroundImage: `linear-gradient(${config.coverBgOverlayStart || 'rgba(0, 0, 0, 0.45)'}, ${config.coverBgOverlayEnd || 'rgba(0, 0, 0, 0.70)'}), url("${formatDriveDirectUrl(config.heroImage, "image")}")`,
-                backgroundSize: config.coverHeroScale ? `${config.coverHeroScale}%` : 'cover',
+                backgroundSize: config.coverMatchUploadedSize
+                  ? (config.coverFitStyle || (config.coverHeroScale ? `${config.coverHeroScale}%` : 'contain'))
+                  : (config.coverHeroScale ? `${config.coverHeroScale}%` : 'cover'),
+                backgroundRepeat: 'no-repeat',
                 backgroundPosition: `${config.coverHeroXOffset ?? 50}% ${config.coverHeroYOffset ?? 50}%`,
+                aspectRatio: config.coverMatchUploadedSize && activeCoverRatio
+                  ? `${activeCoverRatio}`
+                  : undefined,
+                minHeight: config.coverMatchUploadedSize && activeCoverRatio ? 'unset' : undefined,
+                width: config.coverMatchUploadedSize && config.coverResponsiveScale === false && coverImageDimensions.width
+                  ? `${coverImageDimensions.width}px`
+                  : '100%',
+                maxHeight: config.coverMatchUploadedSize && config.coverMaxHeightVh
+                  ? `${config.coverMaxHeightVh}vh`
+                  : undefined,
                 boxShadow: config.coverShadowEnabled !== false
                   ? `0 ${config.coverShadowY ?? 10}px ${config.coverShadowBlur ?? 25}px ${config.coverShadowSpread ?? -5}px ${config.coverShadowColor || 'rgba(0, 0, 0, 0.35)'}`
                   : 'none'

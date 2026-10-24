@@ -16,7 +16,7 @@ import AiAssistantModal from '../components/AiAssistantModal';
 import GuestManagerModal from '../components/GuestManagerModal';
 import { downloadPrintablePdfCard, downloadInvitationImage, downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
 import { getCoupleInitials } from '../utils/monogramThumbnail';
-import { formatDriveFolderName, GOOGLE_DRIVE_ROOT_FOLDER_URL } from '../utils/googleDriveStorage';
+import { formatDriveFolderName, GOOGLE_DRIVE_ROOT_FOLDER_URL, uploadInvitationFileToDrive } from '../utils/googleDriveStorage';
 import { formatDriveDirectUrl } from '../utils/helpers';
 
 export default function CustomerDashboard() {
@@ -1548,21 +1548,39 @@ export default function CustomerDashboard() {
                         const file = e.target.files && e.target.files[0];
                         if (!file) return;
                         try {
-                          const dataUrl = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
+                          const uploadRes = await uploadInvitationFileToDrive({
+                            file,
+                            invitation: musicModalTarget || {},
+                            category: "startingMusicUrl"
                           });
+                          const directUrl = formatDriveDirectUrl(uploadRes.url, "audio");
                           const titleName = file.name.replace(/\.[^/.]+$/, "");
                           setCustomerMusicForm(prev => ({
                             ...prev,
-                            startingMusicUrl: dataUrl,
+                            startingMusicUrl: directUrl,
                             startingMusicTitle: titleName,
                             startingMusicArtist: "Custom Intro"
                           }));
+                          showToast("Starting song uploaded to Google Drive!", "success");
                         } catch (err) {
-                          console.error("Audio read error:", err);
+                          console.error("Audio upload error, falling back to local:", err);
+                          try {
+                            const dataUrl = await new Promise((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onload = () => resolve(reader.result);
+                              reader.onerror = reject;
+                              reader.readAsDataURL(file);
+                            });
+                            const titleName = file.name.replace(/\.[^/.]+$/, "");
+                            setCustomerMusicForm(prev => ({
+                              ...prev,
+                              startingMusicUrl: dataUrl,
+                              startingMusicTitle: titleName,
+                              startingMusicArtist: "Custom Intro"
+                            }));
+                          } catch (readErr) {
+                            console.error("Audio read error:", readErr);
+                          }
                         }
                       }}
                       className="w-full text-xs text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 cursor-pointer shadow-sm"
@@ -1750,21 +1768,39 @@ export default function CustomerDashboard() {
                         const file = e.target.files && e.target.files[0];
                         if (!file) return;
                         try {
-                          const dataUrl = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
+                          const uploadRes = await uploadInvitationFileToDrive({
+                            file,
+                            invitation: musicModalTarget || {},
+                            category: "musicUrl"
                           });
+                          const directUrl = formatDriveDirectUrl(uploadRes.url, "audio");
                           const titleName = file.name.replace(/\.[^/.]+$/, "");
                           setCustomerMusicForm(prev => ({
                             ...prev,
-                            musicUrl: dataUrl,
+                            musicUrl: directUrl,
                             musicTitle: titleName,
                             musicArtist: "Custom Upload"
                           }));
+                          showToast("Main song uploaded to Google Drive!", "success");
                         } catch (err) {
-                          console.error("Audio read error:", err);
+                          console.error("Audio upload error, falling back to local:", err);
+                          try {
+                            const dataUrl = await new Promise((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onload = () => resolve(reader.result);
+                              reader.onerror = reject;
+                              reader.readAsDataURL(file);
+                            });
+                            const titleName = file.name.replace(/\.[^/.]+$/, "");
+                            setCustomerMusicForm(prev => ({
+                              ...prev,
+                              musicUrl: dataUrl,
+                              musicTitle: titleName,
+                              musicArtist: "Custom Upload"
+                            }));
+                          } catch (readErr) {
+                            console.error("Audio read error:", readErr);
+                          }
                         }
                       }}
                       className="w-full text-xs text-slate-300 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 cursor-pointer shadow-sm"
