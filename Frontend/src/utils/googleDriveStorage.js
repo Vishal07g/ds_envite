@@ -44,30 +44,47 @@ export function requestGoogleDriveAuth() {
       return reject(new Error("Google Identity Services script is still loading. Please wait 2 seconds and try again."));
     }
 
+    let isSettled = false;
+    const timeoutId = setTimeout(() => {
+      if (!isSettled) {
+        isSettled = true;
+        reject(new Error("Google Drive authorization timed out or popup was closed/blocked."));
+      }
+    }, 25000);
+
     try {
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_DRIVE_CLIENT_ID,
         scope: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive",
         callback: (tokenResponse) => {
+          if (isSettled) return;
+          isSettled = true;
+          clearTimeout(timeoutId);
           if (tokenResponse.error) {
             reject(new Error(tokenResponse.error_description || tokenResponse.error));
           } else {
             const token = tokenResponse.access_token;
             const expiresIn = parseInt(tokenResponse.expires_in || "3500", 10);
             const expiresTimestamp = String(Date.now() + (expiresIn - 60) * 1000);
-            sessionStorage.setItem("gdrive_oauth_token", token);
-            sessionStorage.setItem("gdrive_oauth_expires_at", expiresTimestamp);
-            try {
+            if (typeof sessionStorage !== "undefined") {
+              sessionStorage.setItem("gdrive_oauth_token", token);
+              sessionStorage.setItem("gdrive_oauth_expires_at", expiresTimestamp);
+            }
+            if (typeof localStorage !== "undefined") {
               localStorage.setItem("gdrive_oauth_token", token);
               localStorage.setItem("gdrive_oauth_expires_at", expiresTimestamp);
-            } catch(e) {}
+            }
             resolve(token);
           }
         }
       });
-      client.requestAccessToken();
+      client.requestAccessToken({ prompt: "" });
     } catch (err) {
-      reject(err);
+      if (!isSettled) {
+        isSettled = true;
+        clearTimeout(timeoutId);
+        reject(err);
+      }
     }
   });
 }
@@ -147,7 +164,7 @@ export async function uploadFileToDriveOAuth({ blob, fileName, mimeType = "image
   form.append("metadata", new Blob([JSON.stringify(metadata)], { type: "application/json" }));
   form.append("file", blob, fileName);
 
-  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink", {
+  const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&supportsAllDrives=true&fields=id,name,webViewLink", {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${authToken}`
@@ -164,7 +181,7 @@ export async function uploadFileToDriveOAuth({ blob, fileName, mimeType = "image
 
   // Set permissions so anyone with the link can view
   try {
-    await fetch(`https://www.googleapis.com/drive/v3/files/${uploaded.id}/permissions`, {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${uploaded.id}/permissions?supportsAllDrives=true`, {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${authToken}`,
@@ -172,7 +189,8 @@ export async function uploadFileToDriveOAuth({ blob, fileName, mimeType = "image
       },
       body: JSON.stringify({
         role: "reader",
-        type: "anyone"
+        type: "anyone",
+        allowFileDiscovery: false
       })
     });
   } catch(e) {}
@@ -447,6 +465,7 @@ export function getDriveDirectFileUrl(fileId, mimeType = "") {
   if (isAudioOrVideo) {
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
+  return `https://lh3.googleusercontent.com/d/${fileId}`;
 }
 
 /**
@@ -659,15 +678,8 @@ export async function uploadInvitationFileToDrive({
   let driveDirectUrl = null;
   const webhookUrl = getDriveWebhookUrl();
 
-  // 1. If Google Drive OAuth token is available (or can be requested), upload directly to Google Drive!
-  let oauthToken = getStoredOAuthToken();
-  if (!oauthToken && !webhookUrl && typeof window !== "undefined" && window.google?.accounts?.oauth2) {
-    try {
-      oauthToken = await requestGoogleDriveAuth();
-    } catch (authErr) {
-      console.warn("Google Drive authorization notice:", authErr);
-    }
-  }
+  // 1. If Google Drive OAuth token is already authorized, upload directly to Google Drive!
+  const oauthToken = getStoredOAuthToken();
 
   if (oauthToken) {
     try {
@@ -713,7 +725,7 @@ export async function uploadInvitationFileToDrive({
         };
       }
     } catch (oauthErr) {
-      console.warn("Direct Google Drive OAuth upload failed, falling back:", oauthErr);
+      console.warn("Direct Google Drive OAuth upload failed, falling back to local:", oauthErr);
     }
   }
 
@@ -750,6 +762,16 @@ export async function uploadInvitationFileToDrive({
             ? `https://drive.google.com/uc?export=download&id=${result.fileId}`
             : (result.fileUrl || `https://lh3.googleusercontent.com/d/${result.fileId}`);
           cloudUrl = driveDirectUrl;
+          return {
+            success: true,
+            url: cloudUrl,
+            driveDirectUrl,
+            driveFileId,
+            fileName,
+            folderName,
+            folderId: result.folderId || invitation?.driveStorage?.folderId,
+            folderUrl: result.folderUrl || invitation?.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL
+          };
         }
       }
     } catch (err) {
@@ -757,31 +779,13 @@ export async function uploadInvitationFileToDrive({
     }
   }
 
-  // 3. High-speed Realtime Storage (Firebase Storage synchronized with timeout protection)
-  if (!cloudUrl && storage) {
+  // 3. Fallback: Immediate high-speed compression so UI applies the file in milliseconds without hanging
+  if (file.type?.startsWith("image/")) {
     try {
-      const storagePath = `drive_storage/${folderName}/${fileName}`;
-      const fileStorageRef = storageRef(storage, storagePath);
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error("Storage timeout")), 3500)
-      );
-      const uploadPromise = uploadBytes(fileStorageRef, file, {
-        contentType: file.type || "image/jpeg",
-        customMetadata: {
-          invitationId: invitation?.id || "",
-          folderName: folderName,
-          driveRootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
-          category: category
-        }
-      });
-      await Promise.race([uploadPromise, timeoutPromise]);
-      cloudUrl = await getDownloadURL(fileStorageRef);
-    } catch (firebaseErr) {
-      console.warn("Firebase storage upload bypass, utilizing local data URL:", firebaseErr?.message || firebaseErr);
-    }
+      cloudUrl = await compressImage(file, 2048, 2048, 0.92);
+    } catch (e) {}
   }
 
-  // 3. Fallback to optimized compressed data URL if network/storage is unavailable
   if (!cloudUrl) {
     cloudUrl = await new Promise((resolve, reject) => {
       const reader = new FileReader();
