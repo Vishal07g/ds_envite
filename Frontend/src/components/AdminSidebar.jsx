@@ -14,6 +14,9 @@ import {
   formatDriveFolderName,
   formatDriveDirectUrl,
   extractDriveFileId,
+  getStoredOAuthToken,
+  requestGoogleDriveAuth,
+  transferInvitationToGoogleDriveOAuth,
   GOOGLE_DRIVE_ROOT_FOLDER_URL,
   GOOGLE_DRIVE_ROOT_FOLDER_ID
 } from '../utils/googleDriveStorage';
@@ -473,6 +476,51 @@ export default function AdminSidebar({
   const [isScrollLocked, setIsScrollLocked] = useState(false);
   const [driveUploading, setDriveUploading] = useState(false);
   const [uploadStatusText, setUploadStatusText] = useState("");
+  const [hasDriveAuth, setHasDriveAuth] = useState(() => Boolean(getStoredOAuthToken()));
+
+  const handleConnectDrive = async () => {
+    try {
+      setDriveUploading(true);
+      setUploadStatusText("Connecting to Google Drive...");
+      const token = await requestGoogleDriveAuth();
+      if (token) {
+        setHasDriveAuth(true);
+        setUploadStatusText("Connected! Syncing invitation assets to Drive folder...");
+        const targetInv = invitation || { config };
+        const res = await transferInvitationToGoogleDriveOAuth({
+          invitation: targetInv,
+          token,
+          onProgress: (p) => setUploadStatusText(p.message || "Syncing...")
+        });
+        if (res && res.success) {
+          if (res.updatedConfig) {
+            Object.keys(res.updatedConfig).forEach(k => {
+              if (res.updatedConfig[k] !== config[k]) {
+                onChangeField(k, res.updatedConfig[k]);
+              }
+            });
+          }
+          if (res.folderId) {
+            onChangeField("driveStorage", {
+              ...(targetInv.driveStorage || {}),
+              folderId: res.folderId,
+              folderName: res.folderName,
+              folderUrl: res.folderUrl,
+              lastSyncedAt: new Date().toISOString()
+            });
+          }
+        }
+        setUploadStatusText("Google Drive synchronized!");
+        setTimeout(() => setUploadStatusText(""), 4000);
+      }
+    } catch (err) {
+      console.error("Google Drive connection error:", err);
+      setUploadStatusText("Connection cancelled or timed out");
+      setTimeout(() => setUploadStatusText(""), 3000);
+    } finally {
+      setDriveUploading(false);
+    }
+  };
   const [isTabDropdownOpen, setIsTabDropdownOpen] = useState(false);
   const [activeElementField, setActiveElementField] = useState(null);
   const dropdownRef = React.useRef(null);
@@ -794,20 +842,34 @@ export default function AdminSidebar({
   };
 
   const handleFileChange = async (field, e) => {
-    const file = e.target.files[0];
+    const file = e.target.files && e.target.files[0];
     if (!file) return;
+
+    const isAudio = Boolean(file.type && (file.type.startsWith("audio/") || file.type.includes("mpeg") || file.type.includes("mp3")));
+    const isVideo = Boolean(file.type && (file.type.startsWith("video/") || file.type.includes("mp4") || file.type.includes("webm")));
+
     try {
       setDriveUploading(true);
-      setUploadStatusText("Uploading to Google Drive Cloud...");
-      const isAudio = Boolean(file.type && (file.type.startsWith("audio/") || file.type.includes("mpeg") || file.type.includes("mp3")));
-      const isVideo = Boolean(file.type && (file.type.startsWith("video/") || file.type.includes("mp4") || file.type.includes("webm")));
+      setUploadStatusText("Processing media...");
+
+      // 1. Instant local preview so UI never lags or hangs
+      if (file.type?.startsWith("image/")) {
+        try {
+          const quickCompressed = await compressImage(file, 2048, 2048, 0.92);
+          onChangeField(field, quickCompressed);
+        } catch (e) {}
+      }
+
+      // 2. Upload to Google Drive if authorized
       const uploadRes = await uploadInvitationFileToDrive({
         file,
         invitation: invitation || { config },
         category: field
       });
+
       const resolvedUrl = formatDriveDirectUrl(uploadRes.url, (isAudio || isVideo) ? "audio" : "image");
       onChangeField(field, resolvedUrl);
+
       if (uploadRes.folderId || uploadRes.folderUrl) {
         onChangeField("driveStorage", {
           ...(invitation?.driveStorage || {}),
@@ -817,7 +879,7 @@ export default function AdminSidebar({
           lastSyncedAt: new Date().toISOString()
         });
       }
-      setUploadStatusText("Saved to Google Drive!");
+      setUploadStatusText(uploadRes.driveFileId ? "Saved to Google Drive!" : "Media saved!");
       setTimeout(() => setUploadStatusText(""), 3000);
     } catch (err) {
       console.error("Error uploading to Drive, fallback to local:", err);
@@ -834,6 +896,7 @@ export default function AdminSidebar({
       }
     } finally {
       setDriveUploading(false);
+      if (e.target) e.target.value = "";
     }
   };
 
@@ -1285,26 +1348,37 @@ export default function AdminSidebar({
             type="file" 
             accept="image/*"
             onChange={async (e) => {
-              const file = e.target.files[0];
+              const file = e.target.files && e.target.files[0];
               if (file) {
                 try {
                   setDriveUploading(true);
-                  setUploadStatusText("Uploading HD Image to Google Drive...");
+                  setUploadStatusText("Uploading HD Image...");
+                  
+                  // 1. Instant local preview
+                  try {
+                    const instantPreview = await compressImage(file, 2048, 2048, 0.92);
+                    onChangeField(imageKey, instantPreview);
+                  } catch (e) {}
+
+                  // 2. Drive upload
                   const uploadRes = await uploadInvitationFileToDrive({
                     file,
                     invitation: invitation || { config },
                     category: imageKey
                   });
-                  onChangeField(imageKey, uploadRes.url);
+                  if (uploadRes.url) {
+                    onChangeField(imageKey, uploadRes.url);
+                  }
                   if (uploadRes.folderId && (!config.driveStorage?.folderId || config.driveStorage?.folderId !== uploadRes.folderId)) {
                     onChangeField("driveStorage", {
+                      ...(config.driveStorage || {}),
                       folderId: uploadRes.folderId,
                       folderName: uploadRes.folderName,
                       folderUrl: uploadRes.folderUrl,
                       lastSync: new Date().toISOString()
                     });
                   }
-                  setUploadStatusText("HD Image saved in Google Drive!");
+                  setUploadStatusText(uploadRes.driveFileId ? "HD Image saved in Google Drive!" : "HD Image saved!");
                   setTimeout(() => setUploadStatusText(""), 3000);
                 } catch (err) {
                   console.error("Error uploading HD image to Drive:", err);
@@ -1314,6 +1388,7 @@ export default function AdminSidebar({
                   } catch (e) {}
                 } finally {
                   setDriveUploading(false);
+                  if (e.target) e.target.value = "";
                 }
               }
             }}
@@ -1988,9 +2063,13 @@ export default function AdminSidebar({
         <div className="flex items-center space-x-2 min-w-0">
           <span className="text-base shrink-0">☁️</span>
           <div className="min-w-0">
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1.5">
               <span className="text-[9.5px] uppercase font-extrabold tracking-wider text-emerald-800">Drive Cloud Storage</span>
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              {hasDriveAuth ? (
+                <span className="inline-flex items-center px-1.5 py-0.2 bg-emerald-500/20 text-emerald-700 text-[8.5px] font-extrabold rounded">CONNECTED</span>
+              ) : (
+                <span className="inline-flex items-center px-1.5 py-0.2 bg-amber-500/20 text-amber-800 text-[8.5px] font-extrabold rounded">READY</span>
+              )}
             </div>
             <p 
               className="text-[10.5px] font-bold text-[#513321] truncate max-w-[210px]" 
@@ -2000,16 +2079,28 @@ export default function AdminSidebar({
             </p>
           </div>
         </div>
-        <a
-          href={invitation?.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="shrink-0 px-2 py-0.5 bg-emerald-100/70 hover:bg-emerald-200/80 border border-emerald-400/50 text-emerald-900 rounded-md text-[9.5px] font-extrabold flex items-center space-x-1 transition shadow-xs"
-          title="Open this invitation's folder in Google Drive"
-        >
-          <span>Open</span>
-          <span>↗</span>
-        </a>
+        <div className="flex items-center space-x-1.5 shrink-0">
+          {!hasDriveAuth && (
+            <button
+              type="button"
+              onClick={handleConnectDrive}
+              className="px-2 py-0.5 bg-amber-400 hover:bg-amber-500 text-slate-950 rounded-md text-[9.5px] font-extrabold transition shadow-xs cursor-pointer flex items-center space-x-1"
+              title="Connect Google Drive with 1 click to save uploaded files into this folder"
+            >
+              <span>🔑 Connect</span>
+            </button>
+          )}
+          <a
+            href={invitation?.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2 py-0.5 bg-emerald-100/70 hover:bg-emerald-200/80 border border-emerald-400/50 text-emerald-900 rounded-md text-[9.5px] font-extrabold flex items-center space-x-1 transition shadow-xs"
+            title="Open this invitation's folder in Google Drive"
+          >
+            <span>Open</span>
+            <span>↗</span>
+          </a>
+        </div>
       </div>
       {uploadStatusText && (
         <div className="px-3 py-1 bg-amber-50 border-b border-amber-300/60 text-[10px] text-amber-900 font-bold flex items-center space-x-1.5 animate-pulse">
