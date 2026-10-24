@@ -263,6 +263,195 @@ const CustomSelect = ({ value, onChange, options, className = "" }) => {
   );
 };
 
+const CoverSizeControls = ({ config, onChangeField }) => {
+  const [imgMeta, setImgMeta] = useState(null);
+
+  useEffect(() => {
+    if (!config.heroImage) {
+      setImgMeta(null);
+      return;
+    }
+    const img = new Image();
+    img.src = formatDriveDirectUrl(config.heroImage, "image");
+    if (img.complete && img.naturalWidth) {
+      setImgMeta({
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+        ratio: (img.naturalWidth / img.naturalHeight).toFixed(2)
+      });
+    } else {
+      img.onload = () => {
+        if (img.naturalWidth && img.naturalHeight) {
+          setImgMeta({
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+            ratio: (img.naturalWidth / img.naturalHeight).toFixed(2)
+          });
+        }
+      };
+    }
+  }, [config.heroImage]);
+
+  const isUploadedMode = Boolean(config.coverMatchUploadedSize);
+
+  return (
+    <div className="p-2.5 bg-slate-900/60 rounded-xl border border-amber-500/25 space-y-2.5 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div>
+          <span className="text-[9.5px] uppercase tracking-wider text-amber-300 font-bold flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+            Cover Dimensions &amp; Scaling
+          </span>
+          <span className="text-[7.5px] text-slate-400 block mt-0.5">Control sizing across laptop, tablet, PC &amp; mobile</span>
+        </div>
+        {imgMeta && (
+          <span className="px-1.5 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded text-[7.5px] font-mono">
+            {imgMeta.width}×{imgMeta.height} ({imgMeta.ratio}:1)
+          </span>
+        )}
+      </div>
+
+      {/* Mode Switcher */}
+      <div>
+        <label className="text-[8px] uppercase tracking-wider text-slate-400 font-semibold block mb-1">Cover Sizing Mode</label>
+        <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-slate-950 rounded-lg border border-slate-850">
+          <button
+            type="button"
+            onClick={() => onChangeField("coverMatchUploadedSize", false)}
+            className={`py-1.5 px-2 rounded-md text-[8.5px] font-bold transition flex items-center justify-center space-x-1 cursor-pointer ${
+              !isUploadedMode
+                ? 'bg-amber-500 text-slate-950 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <span>Default (75vh Fill)</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onChangeField("coverMatchUploadedSize", true);
+              if (config.coverResponsiveScale === undefined) {
+                onChangeField("coverResponsiveScale", true);
+              }
+            }}
+            className={`py-1.5 px-2 rounded-md text-[8.5px] font-bold transition flex items-center justify-center space-x-1 cursor-pointer ${
+              isUploadedMode
+                ? 'bg-amber-500 text-slate-950 shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <span>As Uploaded Image</span>
+          </button>
+        </div>
+      </div>
+
+      {isUploadedMode && (
+        <div className="space-y-2 pt-1.5 border-t border-slate-800/80">
+          {/* Responsive Scale across Devices Toggle */}
+          <div className="p-2 bg-slate-950/70 rounded-lg border border-slate-850 flex items-center justify-between">
+            <div className="pr-2">
+              <span className="text-[8.5px] font-bold text-slate-200 block">Responsive Scale Across Devices</span>
+              <span className="text-[7px] text-slate-400 block leading-tight mt-0.5">
+                Automatically adjusts width &amp; height to match device screens (laptop, tablet, PC &amp; phone) with zero cropping.
+              </span>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                checked={config.coverResponsiveScale !== false}
+                onChange={(e) => onChangeField("coverResponsiveScale", e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-amber-500"></div>
+            </label>
+          </div>
+
+          {/* Fit Style */}
+          <div>
+            <div className="flex justify-between text-[8px] text-slate-400 mb-1">
+              <span>Image Display Fit</span>
+              <span className="text-amber-400 font-mono text-[7.5px] uppercase">{config.coverFitStyle || 'contain'}</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1">
+              {[
+                { id: 'contain', label: 'Contain (0% Crop)' },
+                { id: 'cover', label: 'Cover (Fill)' },
+                { id: '100% 100%', label: '100% Stretch' }
+              ].map(fit => (
+                <button
+                  key={fit.id}
+                  type="button"
+                  onClick={() => onChangeField("coverFitStyle", fit.id)}
+                  className={`py-1 px-1 rounded text-[7.5px] font-bold border transition cursor-pointer ${
+                    (config.coverFitStyle || 'contain') === fit.id
+                      ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {fit.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Aspect Ratio Preset / Auto */}
+          <div>
+            <div className="flex justify-between text-[8px] text-slate-400 mb-1">
+              <span>Aspect Ratio</span>
+              <span className="text-amber-400 font-mono text-[7.5px]">
+                {config.coverAspectRatioPreset && config.coverAspectRatioPreset !== 'auto'
+                  ? config.coverAspectRatioPreset 
+                  : (imgMeta ? `Auto (${imgMeta.ratio}:1)` : 'Auto (Img)')}
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-1">
+              {[
+                { id: 'auto', label: 'Auto (Img)' },
+                { id: '16/9', label: '16:9' },
+                { id: '4/5', label: '4:5 (Insta)' },
+                { id: '9/16', label: '9:16' }
+              ].map(ratio => (
+                <button
+                  key={ratio.id}
+                  type="button"
+                  onClick={() => onChangeField("coverAspectRatioPreset", ratio.id)}
+                  className={`py-1 px-1 rounded text-[7.5px] font-bold border transition cursor-pointer ${
+                    (config.coverAspectRatioPreset || 'auto') === ratio.id
+                      ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                      : 'bg-slate-950 border-slate-850 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {ratio.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Max Height on PC / Laptops */}
+          <div>
+            <div className="flex justify-between text-[8px] text-slate-400 mb-0.5">
+              <span>Max Height Limit (PC / Laptops)</span>
+              <span className="text-amber-400 font-mono text-[8px]">
+                {config.coverMaxHeightVh ? `${config.coverMaxHeightVh}vh` : 'Unlimited (Full Natural)'}
+              </span>
+            </div>
+            <input 
+              type="range" min="0" max="100" step="5"
+              value={config.coverMaxHeightVh || 0}
+              onChange={(e) => onChangeField("coverMaxHeightVh", parseInt(e.target.value))}
+              className="w-full h-1 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-amber-500"
+            />
+            <div className="flex justify-between text-[7px] text-slate-500 mt-0.5">
+              <span>0 (Full Natural Height)</span>
+              <span>100vh</span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function AdminSidebar({ 
   invitation,
   config, 
@@ -611,13 +800,23 @@ export default function AdminSidebar({
       setDriveUploading(true);
       setUploadStatusText("Uploading to Google Drive Cloud...");
       const isAudio = Boolean(file.type && (file.type.startsWith("audio/") || file.type.includes("mpeg") || file.type.includes("mp3")));
+      const isVideo = Boolean(file.type && (file.type.startsWith("video/") || file.type.includes("mp4") || file.type.includes("webm")));
       const uploadRes = await uploadInvitationFileToDrive({
         file,
         invitation: invitation || { config },
         category: field
       });
-      const resolvedUrl = formatDriveDirectUrl(uploadRes.url, isAudio ? "audio" : "image");
+      const resolvedUrl = formatDriveDirectUrl(uploadRes.url, (isAudio || isVideo) ? "audio" : "image");
       onChangeField(field, resolvedUrl);
+      if (uploadRes.folderId || uploadRes.folderUrl) {
+        onChangeField("driveStorage", {
+          ...(invitation?.driveStorage || {}),
+          folderName: uploadRes.folderName,
+          folderId: uploadRes.folderId || invitation?.driveStorage?.folderId,
+          folderUrl: uploadRes.folderUrl || invitation?.driveStorage?.folderUrl,
+          lastSyncedAt: new Date().toISOString()
+        });
+      }
       setUploadStatusText("Saved to Google Drive!");
       setTimeout(() => setUploadStatusText(""), 3000);
     } catch (err) {
@@ -656,6 +855,15 @@ export default function AdminSidebar({
             category: `gallery_${idx}`
           });
           onChangeField(`galleryImage${idx}`, uploadRes.url);
+          if (uploadRes.folderId || uploadRes.folderUrl) {
+            onChangeField("driveStorage", {
+              ...(invitation?.driveStorage || {}),
+              folderName: uploadRes.folderName,
+              folderId: uploadRes.folderId || invitation?.driveStorage?.folderId,
+              folderUrl: uploadRes.folderUrl || invitation?.driveStorage?.folderUrl,
+              lastSyncedAt: new Date().toISOString()
+            });
+          }
           if (!config[`galleryCaption${idx}`]) {
             onChangeField(`galleryCaption${idx}`, file.name.replace(/\.[^/.]+$/, ""));
           }
@@ -1088,6 +1296,14 @@ export default function AdminSidebar({
                     category: imageKey
                   });
                   onChangeField(imageKey, uploadRes.url);
+                  if (uploadRes.folderId && (!config.driveStorage?.folderId || config.driveStorage?.folderId !== uploadRes.folderId)) {
+                    onChangeField("driveStorage", {
+                      folderId: uploadRes.folderId,
+                      folderName: uploadRes.folderName,
+                      folderUrl: uploadRes.folderUrl,
+                      lastSync: new Date().toISOString()
+                    });
+                  }
                   setUploadStatusText("HD Image saved in Google Drive!");
                   setTimeout(() => setUploadStatusText(""), 3000);
                 } catch (err) {
@@ -1244,8 +1460,15 @@ export default function AdminSidebar({
         }`}
       >
         {/* Accordion Header */}
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setActiveElementField(isOpen ? null : key);
+            }
+          }}
           onClick={() => setActiveElementField(isOpen ? null : key)}
           className="w-full px-3 py-2.5 flex items-center justify-between cursor-pointer text-left select-none transition-colors element-tool-header"
           style={{
@@ -1308,7 +1531,7 @@ export default function AdminSidebar({
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
             </svg>
           </div>
-        </button>
+        </div>
 
         {/* Smooth Accordion Body (24fps Hardware Accelerated) */}
         {isOpen && (
@@ -2206,18 +2429,47 @@ export default function AdminSidebar({
                         const file = e.target.files && e.target.files[0];
                         if (!file) return;
                         try {
-                          const dataUrl = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
+                          setDriveUploading(true);
+                          setUploadStatusText("Uploading starting song to Google Drive...");
+                          const uploadRes = await uploadInvitationFileToDrive({
+                            file,
+                            invitation: invitation || { config },
+                            category: "startingMusicUrl"
                           });
+                          const directUrl = formatDriveDirectUrl(uploadRes.url, "audio");
                           const customName = file.name.replace(/\.[^/.]+$/, "");
-                          onChangeField("startingMusicUrl", dataUrl);
+                          onChangeField("startingMusicUrl", directUrl);
                           onChangeField("startingMusicTitle", customName);
                           onChangeField("startingMusicArtist", "Custom Intro");
+                          if (uploadRes.folderId || uploadRes.folderUrl) {
+                            onChangeField("driveStorage", {
+                              ...(invitation?.driveStorage || {}),
+                              folderName: uploadRes.folderName,
+                              folderId: uploadRes.folderId || invitation?.driveStorage?.folderId,
+                              folderUrl: uploadRes.folderUrl || invitation?.driveStorage?.folderUrl,
+                              lastSyncedAt: new Date().toISOString()
+                            });
+                          }
+                          setUploadStatusText("Starting song saved in Google Drive!");
+                          setTimeout(() => setUploadStatusText(""), 3000);
                         } catch (err) {
-                          console.error("Failed to read starting audio file:", err);
+                          console.error("Failed to upload starting audio file to Drive:", err);
+                          try {
+                            const dataUrl = await new Promise((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onload = () => resolve(reader.result);
+                              reader.onerror = reject;
+                              reader.readAsDataURL(file);
+                            });
+                            const customName = file.name.replace(/\.[^/.]+$/, "");
+                            onChangeField("startingMusicUrl", dataUrl);
+                            onChangeField("startingMusicTitle", customName);
+                            onChangeField("startingMusicArtist", "Custom Intro");
+                          } catch (readErr) {
+                            console.error("Fallback audio reading error:", readErr);
+                          }
+                        } finally {
+                          setDriveUploading(false);
                         }
                       }}
                       className="w-full text-xs text-slate-300 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 cursor-pointer shadow-sm"
@@ -2348,18 +2600,47 @@ export default function AdminSidebar({
                         const file = e.target.files && e.target.files[0];
                         if (!file) return;
                         try {
-                          const dataUrl = await new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onload = () => resolve(reader.result);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
+                          setDriveUploading(true);
+                          setUploadStatusText("Uploading main song to Google Drive...");
+                          const uploadRes = await uploadInvitationFileToDrive({
+                            file,
+                            invitation: invitation || { config },
+                            category: "musicUrl"
                           });
+                          const directUrl = formatDriveDirectUrl(uploadRes.url, "audio");
                           const customName = file.name.replace(/\.[^/.]+$/, "");
-                          onChangeField("musicUrl", dataUrl);
+                          onChangeField("musicUrl", directUrl);
                           onChangeField("musicTitle", customName);
                           onChangeField("musicArtist", "Custom Upload");
+                          if (uploadRes.folderId || uploadRes.folderUrl) {
+                            onChangeField("driveStorage", {
+                              ...(invitation?.driveStorage || {}),
+                              folderName: uploadRes.folderName,
+                              folderId: uploadRes.folderId || invitation?.driveStorage?.folderId,
+                              folderUrl: uploadRes.folderUrl || invitation?.driveStorage?.folderUrl,
+                              lastSyncedAt: new Date().toISOString()
+                            });
+                          }
+                          setUploadStatusText("Main song saved in Google Drive!");
+                          setTimeout(() => setUploadStatusText(""), 3000);
                         } catch (err) {
-                          console.error("Failed to read audio file:", err);
+                          console.error("Failed to upload audio file to Drive:", err);
+                          try {
+                            const dataUrl = await new Promise((resolve, reject) => {
+                              const reader = new FileReader();
+                              reader.onload = () => resolve(reader.result);
+                              reader.onerror = reject;
+                              reader.readAsDataURL(file);
+                            });
+                            const customName = file.name.replace(/\.[^/.]+$/, "");
+                            onChangeField("musicUrl", dataUrl);
+                            onChangeField("musicTitle", customName);
+                            onChangeField("musicArtist", "Custom Upload");
+                          } catch (readErr) {
+                            console.error("Fallback audio reading error:", readErr);
+                          }
+                        } finally {
+                          setDriveUploading(false);
                         }
                       }}
                       className="w-full text-xs text-slate-300 file:mr-2 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-bold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 cursor-pointer shadow-sm"
@@ -3136,16 +3417,8 @@ export default function AdminSidebar({
                       type="file"
                       accept="image/*"
                       onChange={async (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          try {
-                            const compressed = await compressImage(file);
-                            onChangeField("envelopeWaxSealImg", compressed);
-                            onChangeField("envelopeSealType", "custom");
-                          } catch (err) {
-                            console.error("Error compressing seal image:", err);
-                          }
-                        }
+                        await handleFileChange("envelopeWaxSealImg", e);
+                        onChangeField("envelopeSealType", "custom");
                       }}
                       className="w-full text-[9px] text-slate-300 file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[8.5px] file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-600 cursor-pointer"
                     />
@@ -3251,17 +3524,7 @@ export default function AdminSidebar({
                     <input 
                       type="file" 
                       accept="image/*"
-                      onChange={async (e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          try {
-                            const compressed = await compressImage(file);
-                            onChangeField("envelopeBgImage", compressed);
-                          } catch (err) {
-                            console.error("Error compressing envelope image:", err);
-                          }
-                        }
-                      }}
+                      onChange={(e) => handleFileChange("envelopeBgImage", e)}
                       className="w-full text-[10px] text-slate-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[9px] file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-600 cursor-pointer"
                     />
 
@@ -3569,16 +3832,8 @@ export default function AdminSidebar({
                             type="file"
                             accept="image/*"
                             onChange={async (e) => {
-                              const file = e.target.files[0];
-                              if (file) {
-                                try {
-                                  const compressed = await compressImage(file, 1024, 1024, 0.9);
-                                  onChangeField("envelopeSymbolImg", compressed);
-                                  onChangeField("envelopeSymbolType", "image");
-                                } catch (err) {
-                                  console.error("Error loading clipart image:", err);
-                                }
-                              }
+                              await handleFileChange("envelopeSymbolImg", e);
+                              onChangeField("envelopeSymbolType", "image");
                             }}
                             className="w-full text-[9px] text-slate-300 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[8.5px] file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-400 cursor-pointer"
                           />
@@ -4513,6 +4768,9 @@ export default function AdminSidebar({
                     placeholder="https://example.com/background.jpg"
                   />
                 </div>
+
+                {/* Cover Size as per Uploaded Image & Responsive Device Scaling */}
+                <CoverSizeControls config={config} onChangeField={onChangeField} />
 
                 <div className="p-2.5 bg-slate-900/40 rounded border border-slate-850 space-y-2">
                   <span className="text-[9px] uppercase tracking-wider text-slate-300 block">Scaling &amp; Crop Offset</span>

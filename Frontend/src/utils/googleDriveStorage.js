@@ -21,8 +21,14 @@ export const GOOGLE_DRIVE_CLIENT_ID =
  * Get active stored OAuth access token
  */
 export function getStoredOAuthToken() {
-  const token = sessionStorage.getItem("gdrive_oauth_token");
-  const expiresAt = parseInt(sessionStorage.getItem("gdrive_oauth_expires_at") || "0", 10);
+  const token = (typeof sessionStorage !== "undefined" ? sessionStorage.getItem("gdrive_oauth_token") : null) || 
+                (typeof localStorage !== "undefined" ? localStorage.getItem("gdrive_oauth_token") : null);
+  const expiresAt = parseInt(
+    (typeof sessionStorage !== "undefined" ? sessionStorage.getItem("gdrive_oauth_expires_at") : null) || 
+    (typeof localStorage !== "undefined" ? localStorage.getItem("gdrive_oauth_expires_at") : "0") || 
+    "0", 
+    10
+  );
   if (token && Date.now() < expiresAt) {
     return token;
   }
@@ -48,8 +54,13 @@ export function requestGoogleDriveAuth() {
           } else {
             const token = tokenResponse.access_token;
             const expiresIn = parseInt(tokenResponse.expires_in || "3500", 10);
+            const expiresTimestamp = String(Date.now() + (expiresIn - 60) * 1000);
             sessionStorage.setItem("gdrive_oauth_token", token);
-            sessionStorage.setItem("gdrive_oauth_expires_at", String(Date.now() + (expiresIn - 60) * 1000));
+            sessionStorage.setItem("gdrive_oauth_expires_at", expiresTimestamp);
+            try {
+              localStorage.setItem("gdrive_oauth_token", token);
+              localStorage.setItem("gdrive_oauth_expires_at", expiresTimestamp);
+            } catch(e) {}
             resolve(token);
           }
         }
@@ -298,36 +309,68 @@ export async function transferInvitationToGoogleDriveOAuth({ invitation, token, 
  * Real-time Google Drive v3 Direct API Query Service
  */
 export async function queryDriveChildren(parentFolderId = GOOGLE_DRIVE_ROOT_FOLDER_ID) {
-  if (!GOOGLE_DRIVE_API_KEY || !parentFolderId) return [];
-  try {
-    const url = `https://www.googleapis.com/drive/v3/files?q='${encodeURIComponent(parentFolderId)}'+in+parents+and+trashed=false&key=${GOOGLE_DRIVE_API_KEY}&fields=files(id,name,mimeType,size,webContentLink,webViewLink,thumbnailLink)&pageSize=100`;
-    const res = await fetch(url);
-    if (!res.ok) return [];
-    const data = await res.json();
-    return data.files || [];
-  } catch (err) {
-    console.warn("Failed to query Google Drive folder via API key:", err);
-    return [];
+  if (!parentFolderId) return [];
+  const safeId = encodeURIComponent(parentFolderId);
+  const q = `'${safeId}'+in+parents+and+trashed=false`;
+  const oauthToken = getStoredOAuthToken();
+  if (oauthToken) {
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,mimeType,size,webContentLink,webViewLink,thumbnailLink)&pageSize=100`, {
+        headers: { "Authorization": `Bearer ${oauthToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.files || [];
+      }
+    } catch(e) {}
   }
+  if (GOOGLE_DRIVE_API_KEY) {
+    try {
+      const url = `https://www.googleapis.com/drive/v3/files?q=${q}&key=${GOOGLE_DRIVE_API_KEY}&fields=files(id,name,mimeType,size,webContentLink,webViewLink,thumbnailLink)&pageSize=100`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        return data.files || [];
+      }
+    } catch (err) {
+      console.warn("Failed to query Google Drive folder via API key:", err);
+    }
+  }
+  return [];
 }
 
 /**
  * Find subfolder in Google Drive root by exact name
  */
-export async function findDriveFolderByName(folderName) {
-  if (!GOOGLE_DRIVE_API_KEY || !folderName) return null;
-  try {
-    const safeName = folderName.replace(/'/g, "\\'");
-    const q = `'${GOOGLE_DRIVE_ROOT_FOLDER_ID}'+in+parents+and+mimeType='application/vnd.google-apps.folder'+and+name='${encodeURIComponent(safeName)}'+and+trashed=false`;
-    const url = `https://www.googleapis.com/drive/v3/files?q=${q}&key=${GOOGLE_DRIVE_API_KEY}&fields=files(id,name,webViewLink)`;
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const data = await res.json();
-    return (data.files && data.files.length > 0) ? data.files[0] : null;
-  } catch (err) {
-    console.warn("Error finding folder on Drive:", err);
-    return null;
+export async function findDriveFolderByName(folderName, parentFolderId = GOOGLE_DRIVE_ROOT_FOLDER_ID) {
+  if (!folderName) return null;
+  const safeName = folderName.replace(/'/g, "\\'");
+  const q = `'${parentFolderId}'+in+parents+and+mimeType='application/vnd.google-apps.folder'+and+name='${encodeURIComponent(safeName)}'+and+trashed=false`;
+  const oauthToken = getStoredOAuthToken();
+  if (oauthToken) {
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files?q=${q}&fields=files(id,name,webViewLink)`, {
+        headers: { "Authorization": `Bearer ${oauthToken}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.files && data.files.length > 0) return data.files[0];
+      }
+    } catch(e) {}
   }
+  if (GOOGLE_DRIVE_API_KEY) {
+    try {
+      const url = `https://www.googleapis.com/drive/v3/files?q=${q}&key=${GOOGLE_DRIVE_API_KEY}&fields=files(id,name,webViewLink)`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const data = await res.json();
+        return (data.files && data.files.length > 0) ? data.files[0] : null;
+      }
+    } catch (err) {
+      console.warn("Error finding folder on Drive:", err);
+    }
+  }
+  return null;
 }
 /**
  * Extract Google Drive file ID from any Google Drive URL format:
@@ -389,19 +432,21 @@ export function formatDriveDirectUrl(url, type = "image") {
  */
 export function getDriveDirectFileUrl(fileId, mimeType = "") {
   if (!fileId) return "";
-  const isAudio = Boolean(
+  const isAudioOrVideo = Boolean(
     mimeType && (
       mimeType.startsWith("audio/") || 
+      mimeType.startsWith("video/") || 
       mimeType.includes("mpeg") || 
       mimeType.includes("mp3") || 
       mimeType.includes("wav") || 
-      mimeType.includes("ogg")
+      mimeType.includes("ogg") ||
+      mimeType.includes("mp4") ||
+      mimeType.includes("webm")
     )
   );
-  if (isAudio) {
+  if (isAudioOrVideo) {
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
-  return `https://lh3.googleusercontent.com/d/${fileId}`;
 }
 
 /**
@@ -614,31 +659,57 @@ export async function uploadInvitationFileToDrive({
   let driveDirectUrl = null;
   const webhookUrl = getDriveWebhookUrl();
 
-  // 1. If Google Drive OAuth token is available, upload directly to Google Drive!
-  const oauthToken = getStoredOAuthToken();
+  // 1. If Google Drive OAuth token is available (or can be requested), upload directly to Google Drive!
+  let oauthToken = getStoredOAuthToken();
+  if (!oauthToken && !webhookUrl && typeof window !== "undefined" && window.google?.accounts?.oauth2) {
+    try {
+      oauthToken = await requestGoogleDriveAuth();
+    } catch (authErr) {
+      console.warn("Google Drive authorization notice:", authErr);
+    }
+  }
+
   if (oauthToken) {
     try {
       let targetFolderId = invitation?.driveStorage?.folderId;
       if (!targetFolderId) {
-        const f = await getOrCreateDriveFolderOAuth(folderName, GOOGLE_DRIVE_ROOT_FOLDER_ID, oauthToken);
-        targetFolderId = f.id;
+        const found = await findDriveFolderByName(folderName);
+        if (found) {
+          targetFolderId = found.id;
+        } else {
+          const f = await getOrCreateDriveFolderOAuth(folderName, GOOGLE_DRIVE_ROOT_FOLDER_ID, oauthToken);
+          targetFolderId = f.id;
+        }
       }
+      const isMedia = Boolean(
+        file.type && (
+          file.type.startsWith("audio/") || 
+          file.type.startsWith("video/") || 
+          file.type.includes("mpeg") || 
+          file.type.includes("mp3") ||
+          file.type.includes("mp4")
+        )
+      );
       const uploaded = await uploadFileToDriveOAuth({
         blob: file,
         fileName: fileName,
-        mimeType: file.type || "image/jpeg",
+        mimeType: file.type || (isMedia ? "audio/mpeg" : "image/jpeg"),
         folderId: targetFolderId,
         token: oauthToken
       });
       if (uploaded && uploaded.directUrl) {
+        const streamUrl = isMedia
+          ? `https://drive.google.com/uc?export=download&id=${uploaded.fileId}`
+          : uploaded.directUrl;
         return {
           success: true,
-          url: uploaded.directUrl,
-          driveDirectUrl: uploaded.directUrl,
+          url: streamUrl,
+          driveDirectUrl: streamUrl,
           driveFileId: uploaded.fileId,
           fileName: uploaded.fileName,
           folderName,
-          folderUrl: invitation?.driveStorage?.folderUrl || `https://drive.google.com/drive/folders/${targetFolderId}`
+          folderId: targetFolderId,
+          folderUrl: `https://drive.google.com/drive/folders/${targetFolderId}`
         };
       }
     } catch (oauthErr) {
@@ -788,7 +859,39 @@ export async function uploadBase64ToDriveStorage({
   let driveFileId = null;
   const webhookUrl = getDriveWebhookUrl();
 
-  // 1. Google Drive direct upload via Webhook into the invitation's folder
+  // 1. Google Drive direct upload via OAuth into the invitation's folder
+  const oauthToken = getStoredOAuthToken();
+  if (oauthToken && !cloudUrl) {
+    try {
+      let targetFolderId = invitation?.driveStorage?.folderId;
+      if (!targetFolderId) {
+        const found = await findDriveFolderByName(folderName);
+        if (found) targetFolderId = found.id;
+      }
+      if (!targetFolderId) {
+        const created = await getOrCreateDriveFolderOAuth(folderName, GOOGLE_DRIVE_ROOT_FOLDER_ID, oauthToken);
+        targetFolderId = created.id;
+      }
+      const uploaded = await uploadFileToDriveOAuth({
+        blob: converted.blob,
+        fileName: fileName,
+        mimeType: converted.mimeType,
+        folderId: targetFolderId,
+        token: oauthToken
+      });
+      if (uploaded && uploaded.directUrl) {
+        driveFileId = uploaded.fileId;
+        const isMedia = Boolean(converted.mimeType && (converted.mimeType.startsWith("audio/") || converted.mimeType.startsWith("video/") || converted.mimeType.includes("mpeg") || converted.mimeType.includes("mp3")));
+        cloudUrl = isMedia
+          ? `https://drive.google.com/uc?export=download&id=${uploaded.fileId}`
+          : (uploaded.directUrl || `https://lh3.googleusercontent.com/d/${uploaded.fileId}`);
+      }
+    } catch (oauthErr) {
+      console.warn("OAuth background migration upload warning:", oauthErr);
+    }
+  }
+
+  // 2. Google Drive direct upload via Webhook into the invitation's folder
   if (webhookUrl) {
     try {
       const response = await fetch(webhookUrl, {

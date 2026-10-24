@@ -1988,13 +1988,15 @@ export const dbStore = {
       lastSyncedAt: new Date().toISOString()
     };
 
-    if (folderRenamed) {
-      console.log(`[Google Drive Cloud] Auto-renaming folder to "${newFolderName}" (was "${oldFolderName}")`);
+    if (folderRenamed || !current.driveStorage?.folderId) {
+      if (folderRenamed) {
+        console.log(`[Google Drive Cloud] Auto-renaming folder to "${newFolderName}" (was "${oldFolderName}")`);
+      }
       syncDriveFolder({
         invitation: { ...current, ...updates, config: newConfig },
-        oldFolderName
+        oldFolderName: folderRenamed ? oldFolderName : null
       }).then(res => {
-        if (res) {
+        if (res && (res.folderId || res.folderUrl)) {
           const freshDb = getDb();
           const target = freshDb.invitations.find(i => i.id === id);
           if (target) {
@@ -2002,7 +2004,7 @@ export const dbStore = {
             saveDb(freshDb);
           }
         }
-      }).catch(err => console.warn("Google Drive auto-rename warning:", err));
+      }).catch(err => console.warn("Google Drive auto-sync warning:", err));
     }
 
     db.invitations[idx] = {
@@ -2017,39 +2019,67 @@ export const dbStore = {
     saveDb(db);
     window.dispatchEvent(new Event("db_synced"));
 
-    // Permanent Google Drive Sync: If any base64 image data is saved, migrate it to Google Drive in the background to free Firebase space
+    // Permanent Google Drive Sync: If any base64 media (images, audio, videos) is saved, migrate it to Google Drive in the background to free Firebase space
     if (updates.config) {
-      const base64Keys = Object.keys(updates.config).filter(k => typeof updates.config[k] === 'string' && updates.config[k].startsWith('data:image'));
-      if (base64Keys.length > 0) {
-        setTimeout(async () => {
-          try {
-            const freshDb = getDb();
-            const target = (freshDb.invitations || []).find(i => i.id === id);
-            if (!target || !target.config) return;
-            let didMigrate = false;
-            for (const k of base64Keys) {
-              if (target.config[k] && target.config[k].startsWith('data:image')) {
+      setTimeout(async () => {
+        try {
+          const freshDb = getDb();
+          const target = (freshDb.invitations || []).find(i => i.id === id);
+          if (!target || !target.config) return;
+          let didMigrate = false;
+
+          // 1. Top-level base64 config properties (images, audio, videos)
+          const base64Keys = Object.keys(target.config).filter(k => typeof target.config[k] === 'string' && target.config[k].startsWith('data:'));
+          for (const k of base64Keys) {
+            if (target.config[k] && target.config[k].startsWith('data:')) {
+              const res = await uploadBase64ToDriveStorage({
+                base64Data: target.config[k],
+                invitation: target,
+                category: k,
+                customFileName: `${k}_drive`
+              });
+              if (res.success && res.url && res.url.startsWith('http')) {
+                target.config[k] = res.url;
+                didMigrate = true;
+                if (res.folderId && (!target.driveStorage?.folderId || target.driveStorage?.folderId !== res.folderId)) {
+                  target.driveStorage = {
+                    folderId: res.folderId,
+                    folderName: res.folderName || target.driveStorage?.folderName,
+                    folderUrl: res.folderUrl || target.driveStorage?.folderUrl,
+                    lastSync: new Date().toISOString()
+                  };
+                }
+              }
+            }
+          }
+
+          // 2. Timeline events custom clipart / photos
+          if (Array.isArray(target.config.timelineEvents)) {
+            for (let tIdx = 0; tIdx < target.config.timelineEvents.length; tIdx++) {
+              const evt = target.config.timelineEvents[tIdx];
+              if (evt && typeof evt.customImageUrl === 'string' && evt.customImageUrl.startsWith('data:')) {
                 const res = await uploadBase64ToDriveStorage({
-                  base64Data: target.config[k],
+                  base64Data: evt.customImageUrl,
                   invitation: target,
-                  category: k,
-                  customFileName: `${k}_drive`
+                  category: `timeline_event_${evt.id || tIdx}`,
+                  customFileName: `timeline_event_${evt.id || tIdx}`
                 });
-                if (res.success && res.url.startsWith('http')) {
-                  target.config[k] = res.url;
+                if (res.success && res.url && res.url.startsWith('http')) {
+                  target.config.timelineEvents[tIdx].customImageUrl = res.url;
                   didMigrate = true;
                 }
               }
             }
-            if (didMigrate) {
-              saveDb(freshDb);
-              window.dispatchEvent(new Event("db_synced"));
-            }
-          } catch(e) {
-            console.warn("Background Drive migration notice:", e);
           }
-        }, 300);
-      }
+
+          if (didMigrate) {
+            saveDb(freshDb);
+            window.dispatchEvent(new Event("db_synced"));
+          }
+        } catch(e) {
+          console.warn("Background Drive migration notice:", e);
+        }
+      }, 300);
     }
 
     return db.invitations[idx];

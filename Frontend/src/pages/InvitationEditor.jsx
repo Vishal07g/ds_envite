@@ -184,6 +184,10 @@ export default function InvitationEditor() {
   }, [id, location.state, currentUser]);
 
   const handleFieldChange = (field, val) => {
+    if (field === 'driveStorage') {
+      setInvitation(prev => prev ? { ...prev, driveStorage: val } : prev);
+      return;
+    }
     setConfig(prev => {
       const next = { ...prev, [field]: val };
       if (field === 'coverBrideText') {
@@ -217,7 +221,8 @@ export default function InvitationEditor() {
       customerId: customerId || null,
       config,
       isPaid,
-      status
+      status,
+      driveStorage: invitation?.driveStorage
     };
 
     try {
