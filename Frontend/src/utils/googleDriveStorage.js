@@ -206,6 +206,108 @@ export async function uploadFileToDriveOAuth({ blob, fileName, mimeType = "image
 }
 
 /**
+ * Permanently delete a file from Google Drive to free storage space
+ */
+export async function deleteDriveFileOAuth(fileId, token) {
+  if (!fileId) return false;
+  const authToken = token || getStoredOAuthToken();
+  const webhookUrl = getDriveWebhookUrl();
+
+  // 1. Delete via OAuth token
+  if (authToken) {
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${authToken}`
+        }
+      });
+      return res.status === 204 || res.ok;
+    } catch (err) {
+      console.warn(`Failed to delete Google Drive file ${fileId} via OAuth:`, err);
+    }
+  }
+
+  // 2. Delete via Webhook
+  if (webhookUrl) {
+    try {
+      const res = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "deleteFile",
+          fileId: fileId
+        })
+      });
+      return res.ok;
+    } catch (e) {}
+  }
+
+  return false;
+}
+
+/**
+ * Clean up all orphaned / unused files from an invitation's Google Drive folder
+ * Ensures only files actively used by the invitation currently remain in Drive
+ */
+export async function cleanUnusedDriveFilesOAuth({ invitation, token }) {
+  const authToken = token || getStoredOAuthToken();
+  if (!authToken || !invitation) return { success: false, deletedCount: 0 };
+
+  const targetFolderId = invitation?.driveStorage?.folderId;
+  if (!targetFolderId) return { success: false, deletedCount: 0 };
+
+  try {
+    // 1. Extract all active Drive file IDs in the current invitation config
+    const activeFileIds = new Set();
+    const config = invitation.config || {};
+    
+    // Check all top-level config properties
+    for (const key of Object.keys(config)) {
+      const val = config[key];
+      if (typeof val === 'string') {
+        const id = extractDriveFileId(val);
+        if (id) activeFileIds.add(id);
+      }
+    }
+
+    // Check timeline events
+    if (Array.isArray(config.timelineEvents)) {
+      for (const evt of config.timelineEvents) {
+        if (evt?.customImageUrl) {
+          const id = extractDriveFileId(evt.customImageUrl);
+          if (id) activeFileIds.add(id);
+        }
+      }
+    }
+
+    // 2. Query all files inside this invitation's Drive folder
+    const listUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(`'${targetFolderId}' in parents and trashed = false`)}&fields=files(id,name,mimeType)&supportsAllDrives=true&pageSize=100`;
+    const listRes = await fetch(listUrl, {
+      headers: { "Authorization": `Bearer ${authToken}` }
+    });
+
+    if (!listRes.ok) return { success: false, deletedCount: 0 };
+    const listData = await listRes.json();
+    const files = listData.files || [];
+
+    let deletedCount = 0;
+    for (const f of files) {
+      if (f.mimeType !== 'application/vnd.google-apps.folder' && !activeFileIds.has(f.id)) {
+        console.log(`Clearing unused file from Drive: ${f.name} (${f.id})`);
+        const deleted = await deleteDriveFileOAuth(f.id, authToken);
+        if (deleted) deletedCount++;
+      }
+    }
+
+    return { success: true, deletedCount, totalFiles: files.length };
+  } catch (err) {
+    console.error("cleanUnusedDriveFilesOAuth error:", err);
+    return { success: false, deletedCount: 0, error: err.message };
+  }
+}
+
+/**
  * Perform 1-click end-to-end transfer of invitation assets to Google Drive via OAuth
  */
 export async function transferInvitationToGoogleDriveOAuth({ invitation, token, onProgress }) {
@@ -663,20 +765,24 @@ export async function uploadInvitationFileToDrive({
   file,
   invitation,
   category = "photo",
-  customFileName = null
+  customFileName = null,
+  previousUrl = null
 }) {
   if (!file) throw new Error("No file provided");
   const config = invitation?.config || {};
   const folderName = formatDriveFolderName(config, invitation?.title);
   const fileExt = file.name ? file.name.split(".").pop() : "jpg";
-  const timestamp = Date.now();
-  const safeBaseName = (customFileName || `${category}_${timestamp}`).replace(/[^a-zA-Z0-9_-]/g, "_");
+  const rawBaseName = customFileName || (file.name ? file.name.replace(/\.[^/.]+$/, "") : `${category}_${Date.now()}`);
+  const safeBaseName = rawBaseName.replace(/[^a-zA-Z0-9_-]/g, "_");
   const fileName = `${safeBaseName}.${fileExt}`;
   
   let cloudUrl = "";
   let driveFileId = null;
   let driveDirectUrl = null;
   const webhookUrl = getDriveWebhookUrl();
+
+  // Extract previous file ID to remove old version and save Drive storage
+  const previousFileId = extractDriveFileId(previousUrl || config[category]);
 
   // 1. If Google Drive OAuth token is already authorized, upload directly to Google Drive!
   const oauthToken = getStoredOAuthToken();
@@ -693,6 +799,21 @@ export async function uploadInvitationFileToDrive({
           targetFolderId = f.id;
         }
       }
+
+      // Check if a file with the same name already exists in target folder to replace it
+      let existingSameNameIds = [];
+      try {
+        const safeNameQuery = fileName.replace(/'/g, "\\'");
+        const qSame = `'${targetFolderId}' in parents and name = '${safeNameQuery}' and trashed = false`;
+        const searchSameRes = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(qSame)}&fields=files(id,name)&supportsAllDrives=true`, {
+          headers: { "Authorization": `Bearer ${oauthToken}` }
+        });
+        if (searchSameRes.ok) {
+          const sData = await searchSameRes.json();
+          existingSameNameIds = (sData.files || []).map(f => f.id);
+        }
+      } catch (e) {}
+
       const isMedia = Boolean(
         file.type && (
           file.type.startsWith("audio/") || 
@@ -702,6 +823,7 @@ export async function uploadInvitationFileToDrive({
           file.type.includes("mp4")
         )
       );
+
       const uploaded = await uploadFileToDriveOAuth({
         blob: file,
         fileName: fileName,
@@ -709,7 +831,20 @@ export async function uploadInvitationFileToDrive({
         folderId: targetFolderId,
         token: oauthToken
       });
+
       if (uploaded && uploaded.directUrl) {
+        // Automatically delete previous file from Google Drive to free storage space!
+        if (previousFileId && previousFileId !== uploaded.fileId) {
+          deleteDriveFileOAuth(previousFileId, oauthToken).catch(() => {});
+        }
+
+        // Replace older files with the same name from Google Drive folder
+        for (const sameId of existingSameNameIds) {
+          if (sameId !== uploaded.fileId && sameId !== previousFileId) {
+            deleteDriveFileOAuth(sameId, oauthToken).catch(() => {});
+          }
+        }
+
         const streamUrl = isMedia
           ? `https://drive.google.com/uc?export=download&id=${uploaded.fileId}`
           : uploaded.directUrl;
@@ -748,6 +883,7 @@ export async function uploadInvitationFileToDrive({
           folderId: invitation?.driveStorage?.folderId || null,
           folderName: folderName,
           fileName: fileName,
+          previousFileId: previousFileId || null,
           mimeType: file.type || "image/jpeg",
           base64Data: base64Data
         })
