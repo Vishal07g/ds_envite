@@ -17,6 +17,8 @@ import {
   getStoredOAuthToken,
   requestGoogleDriveAuth,
   transferInvitationToGoogleDriveOAuth,
+  deleteDriveFileOAuth,
+  cleanUnusedDriveFilesOAuth,
   GOOGLE_DRIVE_ROOT_FOLDER_URL,
   GOOGLE_DRIVE_ROOT_FOLDER_ID
 } from '../utils/googleDriveStorage';
@@ -521,6 +523,27 @@ export default function AdminSidebar({
       setDriveUploading(false);
     }
   };
+
+  const handleCleanDriveSpace = async () => {
+    try {
+      setDriveUploading(true);
+      setUploadStatusText("Scanning Drive for unused files...");
+      const targetInv = invitation || { config };
+      const res = await cleanUnusedDriveFilesOAuth({ invitation: targetInv });
+      if (res.deletedCount > 0) {
+        setUploadStatusText(`Cleaned! Removed ${res.deletedCount} unused file(s) from Drive.`);
+      } else {
+        setUploadStatusText("Drive is clean! No unused files found.");
+      }
+      setTimeout(() => setUploadStatusText(""), 4000);
+    } catch (err) {
+      console.error("Clean Drive space error:", err);
+      setUploadStatusText("Error cleaning Drive space");
+      setTimeout(() => setUploadStatusText(""), 3000);
+    } finally {
+      setDriveUploading(false);
+    }
+  };
   const [isTabDropdownOpen, setIsTabDropdownOpen] = useState(false);
   const [activeElementField, setActiveElementField] = useState(null);
   const dropdownRef = React.useRef(null);
@@ -860,11 +883,12 @@ export default function AdminSidebar({
         } catch (e) {}
       }
 
-      // 2. Upload to Google Drive if authorized
+      // 2. Upload to Google Drive if authorized (and auto-delete previous file)
       const uploadRes = await uploadInvitationFileToDrive({
         file,
         invitation: invitation || { config },
-        category: field
+        category: field,
+        previousUrl: config[field]
       });
 
       const resolvedUrl = formatDriveDirectUrl(uploadRes.url, (isAudio || isVideo) ? "audio" : "image");
@@ -915,7 +939,8 @@ export default function AdminSidebar({
           const uploadRes = await uploadInvitationFileToDrive({
             file,
             invitation: invitation || { config },
-            category: `gallery_${idx}`
+            category: `gallery_${idx}`,
+            previousUrl: config[`galleryImage${idx}`]
           });
           onChangeField(`galleryImage${idx}`, uploadRes.url);
           if (uploadRes.folderId || uploadRes.folderUrl) {
@@ -1326,6 +1351,10 @@ export default function AdminSidebar({
             <button
               type="button"
               onClick={() => {
+                if (imgUrl) {
+                  const fid = extractDriveFileId(imgUrl);
+                  if (fid) deleteDriveFileOAuth(fid).catch(() => {});
+                }
                 onChangeField(imageKey, "");
                 onChangeField(scaleKey, 100);
                 onChangeField(xOffsetKey, 50);
@@ -1360,11 +1389,12 @@ export default function AdminSidebar({
                     onChangeField(imageKey, instantPreview);
                   } catch (e) {}
 
-                  // 2. Drive upload
+                  // 2. Drive upload (and automatically delete previous HD image from Drive)
                   const uploadRes = await uploadInvitationFileToDrive({
                     file,
                     invitation: invitation || { config },
-                    category: imageKey
+                    category: imageKey,
+                    previousUrl: imgUrl
                   });
                   if (uploadRes.url) {
                     onChangeField(imageKey, uploadRes.url);
@@ -2080,7 +2110,7 @@ export default function AdminSidebar({
           </div>
         </div>
         <div className="flex items-center space-x-1.5 shrink-0">
-          {!hasDriveAuth && (
+          {!hasDriveAuth ? (
             <button
               type="button"
               onClick={handleConnectDrive}
@@ -2088,6 +2118,15 @@ export default function AdminSidebar({
               title="Connect Google Drive with 1 click to save uploaded files into this folder"
             >
               <span>🔑 Connect</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleCleanDriveSpace}
+              className="px-2 py-0.5 bg-emerald-700/10 hover:bg-emerald-700/20 text-emerald-900 border border-emerald-600/30 rounded-md text-[9.5px] font-extrabold transition shadow-xs cursor-pointer flex items-center space-x-1"
+              title="Clean unused and replaced images from Google Drive to free storage"
+            >
+              <span>🧹 Clean Space</span>
             </button>
           )}
           <a
@@ -2525,7 +2564,8 @@ export default function AdminSidebar({
                           const uploadRes = await uploadInvitationFileToDrive({
                             file,
                             invitation: invitation || { config },
-                            category: "startingMusicUrl"
+                            category: "startingMusicUrl",
+                            previousUrl: config.startingMusicUrl
                           });
                           const directUrl = formatDriveDirectUrl(uploadRes.url, "audio");
                           const customName = file.name.replace(/\.[^/.]+$/, "");
@@ -2696,7 +2736,8 @@ export default function AdminSidebar({
                           const uploadRes = await uploadInvitationFileToDrive({
                             file,
                             invitation: invitation || { config },
-                            category: "musicUrl"
+                            category: "musicUrl",
+                            previousUrl: config.musicUrl
                           });
                           const directUrl = formatDriveDirectUrl(uploadRes.url, "audio");
                           const customName = file.name.replace(/\.[^/.]+$/, "");
@@ -6150,6 +6191,10 @@ export default function AdminSidebar({
                           <button 
                             type="button"
                             onClick={() => {
+                              if (imgUrl) {
+                                const fid = extractDriveFileId(imgUrl);
+                                if (fid) deleteDriveFileOAuth(fid).catch(() => {});
+                              }
                               onChangeField(`galleryImage${idx}`, "");
                               onChangeField(`galleryCaption${idx}`, "");
                             }}
