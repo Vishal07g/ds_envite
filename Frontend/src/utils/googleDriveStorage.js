@@ -529,7 +529,7 @@ export function extractDriveFileId(url) {
 
 /**
  * Format any Google Drive URL into an ultra-fast, permanently embeddable/playable direct streaming URL.
- * - type: 'image' -> 'https://lh3.googleusercontent.com/d/{fileId}' (Google global CDN, CORS enabled, no rate limits)
+ * - type: 'image' -> 'https://lh3.googleusercontent.com/d/{fileId}=s0' (Google global CDN Full HD original resolution, CORS enabled, no rate limits)
  * - type: 'audio' / 'media' -> 'https://drive.google.com/uc?export=download&id={fileId}' (Direct binary stream)
  */
 export function formatDriveDirectUrl(url, type = "image") {
@@ -540,16 +540,28 @@ export function formatDriveDirectUrl(url, type = "image") {
   const fileId = extractDriveFileId(trimmed);
   if (!fileId) return trimmed;
 
-  if (type === "audio" || type === "music" || type === "sound") {
+  if (type === "audio" || type === "music" || type === "sound" || type === "video" || type === "media") {
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
 
-  // Default is image (high-speed Google CDN)
-  return `https://lh3.googleusercontent.com/d/${fileId}`;
+  // Always serve crystal-clear Full HD / original uncompressed resolution (=s0)
+  if (trimmed.includes("googleusercontent.com")) {
+    if (/=(?:s\d+|w\d+-h\d+.*)$/i.test(trimmed)) {
+      return trimmed.replace(/=(?:s\d+|w\d+-h\d+.*)$/i, "=s0");
+    }
+    if (trimmed.includes("=s0") || trimmed.includes("=s2560") || trimmed.includes("=s3840")) {
+      return trimmed;
+    }
+    if (!trimmed.includes("=")) {
+      return `${trimmed}=s0`;
+    }
+    return trimmed;
+  }
+  return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
 }
 
 /**
- * Generate high-speed CDN streaming URL for Google Drive file
+ * Generate high-speed CDN streaming URL for Google Drive file with Full HD resolution
  */
 export function getDriveDirectFileUrl(fileId, mimeType = "") {
   if (!fileId) return "";
@@ -568,7 +580,7 @@ export function getDriveDirectFileUrl(fileId, mimeType = "") {
   if (isAudioOrVideo) {
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
-  return `https://lh3.googleusercontent.com/d/${fileId}`;
+  return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
 }
 
 /**
@@ -864,7 +876,7 @@ export async function uploadInvitationFileToDrive({
 
         const streamUrl = isMedia
           ? `https://drive.google.com/uc?export=download&id=${uploaded.fileId}`
-          : (localHdDataUrl || uploaded.directUrl);
+          : (uploaded.directUrl || localHdDataUrl);
         return {
           success: true,
           url: streamUrl,
@@ -913,8 +925,8 @@ export async function uploadInvitationFileToDrive({
           const isAudio = Boolean(file.type && (file.type.startsWith("audio/") || file.type.includes("mpeg") || file.type.includes("mp3")));
           driveDirectUrl = isAudio 
             ? `https://drive.google.com/uc?export=download&id=${result.fileId}`
-            : (result.fileUrl || `https://lh3.googleusercontent.com/d/${result.fileId}`);
-          cloudUrl = isAudio ? driveDirectUrl : (localHdDataUrl || driveDirectUrl);
+            : (result.fileUrl ? (result.fileUrl.includes("=") ? result.fileUrl : `${result.fileUrl}=s0`) : `https://lh3.googleusercontent.com/d/${result.fileId}=s0`);
+          cloudUrl = isAudio ? driveDirectUrl : (driveDirectUrl || localHdDataUrl);
           return {
             success: true,
             url: cloudUrl,
@@ -1043,7 +1055,7 @@ export async function uploadBase64ToDriveStorage({
         const isMedia = Boolean(converted.mimeType && (converted.mimeType.startsWith("audio/") || converted.mimeType.startsWith("video/") || converted.mimeType.includes("mpeg") || converted.mimeType.includes("mp3")));
         cloudUrl = isMedia
           ? `https://drive.google.com/uc?export=download&id=${uploaded.fileId}`
-          : (uploaded.directUrl || `https://lh3.googleusercontent.com/d/${uploaded.fileId}`);
+          : (uploaded.directUrl ? (uploaded.directUrl.includes("=") ? uploaded.directUrl : `${uploaded.directUrl}=s0`) : `https://lh3.googleusercontent.com/d/${uploaded.fileId}=s0`);
       }
     } catch (oauthErr) {
       console.warn("OAuth background migration upload warning:", oauthErr);
@@ -1071,7 +1083,7 @@ export async function uploadBase64ToDriveStorage({
         const result = await response.json();
         if (result.status === "success") {
           driveFileId = result.fileId;
-          cloudUrl = result.fileUrl || `https://lh3.googleusercontent.com/d/${result.fileId}`;
+          cloudUrl = result.fileUrl ? (result.fileUrl.includes("=") ? result.fileUrl : `${result.fileUrl}=s0`) : `https://lh3.googleusercontent.com/d/${result.fileId}=s0`;
         }
       }
     } catch (err) {

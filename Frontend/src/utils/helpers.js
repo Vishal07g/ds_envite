@@ -151,20 +151,30 @@ export function formatWeddingTime(dateStr) {
   }
 }
 
-// Client-side image compression using canvas - guarantees at least 1K / 2K HD quality
-export function compressImage(file, maxWidth = 2560, maxHeight = 2560, quality = 0.96, preserveAlpha = false) {
+// Client-side image processing - guarantees Full HD / 4K Ultra HD quality without blur or pixelation
+export function compressImage(file, maxWidth = 3840, maxHeight = 3840, quality = 0.98, preserveAlpha = true) {
   return new Promise((resolve, reject) => {
+    if (!file) return resolve("");
+    
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
+      const rawDataUrl = event.target.result;
       const img = new Image();
-      img.src = event.target.result;
+      img.src = rawDataUrl;
       img.onload = () => {
+        // If image is already within Full HD / 4K bounds and reasonable file size (< 8MB),
+        // preserve the raw uncompressed data to ensure 100% bit-perfect, razor-sharp fidelity without canvas compression artifacts!
+        const isPngOrWebp = file.type === 'image/png' || file.type === 'image/webp' || file.type === 'image/svg+xml';
+        if (img.width <= maxWidth && img.height <= maxHeight && (!file.size || file.size < 8 * 1024 * 1024)) {
+          return resolve(rawDataUrl);
+        }
+
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
 
-        // Calculate new dimensions keeping aspect ratio
+        // Calculate new dimensions keeping aspect ratio (up to 4K Ultra HD)
         if (width > height) {
           if (width > maxWidth) {
             height = Math.round((height * maxWidth) / width);
@@ -184,8 +194,7 @@ export function compressImage(file, maxWidth = 2560, maxHeight = 2560, quality =
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         
-        // Preserve transparency only if preserveAlpha is true AND file is image/png
-        const usePng = preserveAlpha && file.type === 'image/png';
+        const usePng = (preserveAlpha || isPngOrWebp) && file.type !== 'image/jpeg';
         
         if (!usePng) {
           // Fill canvas background with white to avoid transparent parts rendering as black in JPEG
@@ -195,7 +204,7 @@ export function compressImage(file, maxWidth = 2560, maxHeight = 2560, quality =
         
         ctx.drawImage(img, 0, 0, width, height);
 
-        const format = usePng ? 'image/png' : 'image/jpeg';
+        const format = usePng ? (file.type || 'image/png') : 'image/jpeg';
         const dataUrl = canvas.toDataURL(format, format === 'image/jpeg' ? quality : undefined);
         resolve(dataUrl);
       };
@@ -280,7 +289,7 @@ export function extractDriveFileId(url) {
 
 /**
  * Automatically format Google Drive URLs into fast, permanent embeddable CDN URLs
- * - type: 'image' -> 'https://lh3.googleusercontent.com/d/{fileId}'
+ * - type: 'image' -> 'https://lh3.googleusercontent.com/d/{fileId}=s0' (Full HD original resolution)
  * - type: 'audio' / 'media' -> 'https://drive.google.com/uc?export=download&id={fileId}'
  */
 export function formatDriveDirectUrl(url, type = "image") {
@@ -295,8 +304,17 @@ export function formatDriveDirectUrl(url, type = "image") {
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
 
-  // Preserve full high-definition resolution (=s0 serves original uploaded resolution)
-  if (trimmed.includes("googleusercontent.com") && trimmed.includes("=")) {
+  // Always serve crystal-clear Full HD / original uncompressed resolution (=s0)
+  if (trimmed.includes("googleusercontent.com")) {
+    if (/=(?:s\d+|w\d+-h\d+.*)$/i.test(trimmed)) {
+      return trimmed.replace(/=(?:s\d+|w\d+-h\d+.*)$/i, "=s0");
+    }
+    if (trimmed.includes("=s0") || trimmed.includes("=s2560") || trimmed.includes("=s3840")) {
+      return trimmed;
+    }
+    if (!trimmed.includes("=")) {
+      return `${trimmed}=s0`;
+    }
     return trimmed;
   }
   return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
