@@ -2483,27 +2483,34 @@ a.editor-toolbar-btn-primary span {
 
 
 /* ------------------------------------------------
-   INVITATION QUALITY MODES (PAID HD vs PREVIEW)
+   INVITATION QUALITY MODES (FULL HD & ULTRA HD)
    ------------------------------------------------ */
-.invitation-hd-ultra {
-  image-rendering: -webkit-optimize-contrast;
-  image-rendering: crisp-edges;
+.invitation-hd-ultra,
+.invitation-preview-quality {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
 
+.invitation-hd-ultra img,
+.invitation-preview-quality img,
+.invitation-render-root img,
+#invitation-view-container img,
+#cover-section {
+  image-rendering: auto;
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: high-quality;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
 .invitation-hd-ultra img {
-  filter: contrast(102%) brightness(101%);
+  filter: contrast(101%) brightness(100.5%);
   transition: filter 0.3s ease;
 }
 
-.invitation-preview-quality {
-  -webkit-font-smoothing: subpixel-antialiased;
-}
-
 .invitation-preview-quality img {
-  filter: contrast(98%);
+  filter: none;
 }
 
 /* ------------------------------------------------

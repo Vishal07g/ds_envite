@@ -2377,6 +2377,9 @@ export default function InvitationRenderer({
                       : (config.coverHeroScale ? `${config.coverHeroScale}%` : 'cover'),
                     backgroundRepeat: 'no-repeat',
                     backgroundPosition: `${config.coverHeroXOffset ?? 50}% ${config.coverHeroYOffset ?? 50}%`,
+                    imageRendering: '-webkit-optimize-contrast',
+                    WebkitBackfaceVisibility: 'hidden',
+                    backfaceVisibility: 'hidden',
                     aspectRatio: isUploadedCover && activeCoverRatio
                       ? `${activeCoverRatio}`
                       : undefined,
@@ -3152,6 +3155,7 @@ export default function InvitationRenderer({
                       src={formatDriveDirectUrl(config.storyImage, "image")}
                       alt="Lovely Couple Frame"
                       className="w-full h-full object-cover"
+                      style={{ imageRendering: 'auto', WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
                     />
                     {config.storyFrameBorderTheme === 'custom-png' && config.customPngFrame && (
                       <img 
@@ -3593,9 +3597,10 @@ export default function InvitationRenderer({
                       {config.venueCeremonyImage && (
                         <div className="mt-4 pt-4 border-t border-white/10 flex justify-center">
                           <img 
-                            src={config.venueCeremonyImage} 
+                            src={formatDriveDirectUrl(config.venueCeremonyImage, "image")} 
                             alt="Ceremony Venue" 
                             className={`w-full max-h-[180px] object-cover transition-all duration-700 ${getFrameClasses(config.venueCeremonyFrameShape || 'landscape', config.venueCeremonyFrameBorderTheme || 'minimalist')}`}
+                            style={{ imageRendering: 'auto', WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
                           />
                         </div>
                       )}
@@ -3701,9 +3706,10 @@ export default function InvitationRenderer({
                       {config.venueReceptionImage && (
                         <div className="mt-4 pt-4 border-t border-white/10 flex justify-center">
                           <img 
-                            src={config.venueReceptionImage} 
+                            src={formatDriveDirectUrl(config.venueReceptionImage, "image")} 
                             alt="Reception Venue" 
                             className={`w-full max-h-[180px] object-cover transition-all duration-700 ${getFrameClasses(config.venueReceptionFrameShape || 'landscape', config.venueReceptionFrameBorderTheme || 'minimalist')}`}
+                            style={{ imageRendering: 'auto', WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
                           />
                         </div>
                       )}
@@ -3985,7 +3991,10 @@ export default function InvitationRenderer({
                                   style={{ 
                                     transform: `scale(1.15) translateX(${normalizedDiff * -35}px)`,
                                     width: '100%',
-                                    height: '100%'
+                                    height: '100%',
+                                    imageRendering: 'auto',
+                                    WebkitBackfaceVisibility: 'hidden',
+                                    backfaceVisibility: 'hidden'
                                   }}
                                 />
                               ) : (
@@ -3993,6 +4002,7 @@ export default function InvitationRenderer({
                                   src={imgUrl} 
                                   alt={caption || `Gallery ${idx}`}
                                   className="w-full h-full object-cover"
+                                  style={{ imageRendering: 'auto', WebkitBackfaceVisibility: 'hidden', backfaceVisibility: 'hidden' }}
                                 />
                               )}
                             </div>

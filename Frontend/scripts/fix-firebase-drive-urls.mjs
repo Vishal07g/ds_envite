@@ -16,12 +16,13 @@ function extractDriveFileId(url) {
 
 function formatDriveDirectUrl(url, type = 'image') {
   if (!url || typeof url !== 'string') return url;
-  const fileId = extractDriveFileId(url);
-  if (!fileId) return url;
+  const trimmed = url.trim();
+  const fileId = extractDriveFileId(trimmed);
+  if (!fileId) return trimmed;
   if (type === 'audio' || type === 'music' || type === 'sound') {
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
-  return `https://lh3.googleusercontent.com/d/${fileId}`;
+  return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
 }
 
 async function fixFirebaseData() {
@@ -34,6 +35,7 @@ async function fixFirebaseData() {
   const IMAGE_KEYS = [
     'heroImage', 'storyImage', 'scratchImage', 'scratchSectionBgImage',
     'customSacredSymbolImg', 'envelopeWaxSealImg', 'envelopeSymbolImg', 'envelopeBgImage',
+    'venueCeremonyImage', 'venueReceptionImage',
     'galleryImage1', 'galleryImage2', 'galleryImage3', 'galleryImage4', 'galleryImage5',
     'galleryImage6', 'galleryImage7', 'galleryImage8', 'galleryImage9', 'galleryImage10'
   ];
@@ -42,7 +44,7 @@ async function fixFirebaseData() {
   invitations.forEach((inv, i) => {
     const cfg = inv.config || {};
     IMAGE_KEYS.forEach(key => {
-      if (cfg[key] && typeof cfg[key] === 'string' && cfg[key].includes('drive')) {
+      if (cfg[key] && typeof cfg[key] === 'string' && (cfg[key].includes('drive') || cfg[key].includes('googleusercontent.com'))) {
         const direct = formatDriveDirectUrl(cfg[key], 'image');
         if (direct !== cfg[key]) {
           console.log(`[Inv ${i}] Fixed image "${key}":\n  Old: ${cfg[key]}\n  New: ${direct}`);
@@ -52,7 +54,7 @@ async function fixFirebaseData() {
       }
     });
     AUDIO_KEYS.forEach(key => {
-      if (cfg[key] && typeof cfg[key] === 'string' && cfg[key].includes('drive')) {
+      if (cfg[key] && typeof cfg[key] === 'string' && (cfg[key].includes('drive') || cfg[key].includes('googleusercontent.com'))) {
         const direct = formatDriveDirectUrl(cfg[key], 'audio');
         if (direct !== cfg[key]) {
           console.log(`[Inv ${i}] Fixed audio "${key}":\n  Old: ${cfg[key]}\n  New: ${direct}`);

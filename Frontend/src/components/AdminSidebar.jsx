@@ -980,7 +980,7 @@ export default function AdminSidebar({
       let localHdData = null;
       if (file.type?.startsWith("image/")) {
         try {
-          localHdData = await compressImage(file, 2560, 2560, 0.96);
+          localHdData = await compressImage(file, 3840, 3840, 0.98, true);
         } catch (e) {
           localHdData = await new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -1006,8 +1006,8 @@ export default function AdminSidebar({
         const resolvedUrl = formatDriveDirectUrl(uploadRes.url, "audio");
         onChangeField(field, resolvedUrl);
       } else {
-        // Keep the local HD image data so it displays 100% reliably in any browser
-        onChangeField(field, localHdData || uploadRes.url);
+        const finalImgUrl = uploadRes.driveDirectUrl || uploadRes.url || localHdData;
+        onChangeField(field, finalImgUrl);
       }
 
       if (uploadRes.folderId || uploadRes.folderUrl) {
@@ -1054,7 +1054,7 @@ export default function AdminSidebar({
         try {
           let hdData = null;
           try {
-            hdData = await compressImage(file, 2560, 2560, 0.96);
+            hdData = await compressImage(file, 3840, 3840, 0.98, true);
             onChangeField(`galleryImage${idx}`, hdData);
           } catch (compErr) {}
 
@@ -1064,7 +1064,7 @@ export default function AdminSidebar({
             category: `gallery_${idx}`,
             previousUrl: config[`galleryImage${idx}`]
           });
-          onChangeField(`galleryImage${idx}`, hdData || uploadRes.url);
+          onChangeField(`galleryImage${idx}`, uploadRes.driveDirectUrl || uploadRes.url || hdData);
           if (uploadRes.folderId || uploadRes.folderUrl) {
             onChangeField("driveStorage", {
               ...(invitation?.driveStorage || {}),
@@ -1508,7 +1508,7 @@ export default function AdminSidebar({
                   // 1. Process HD Image locally
                   let instantPreview = null;
                   try {
-                    instantPreview = await compressImage(file, 2560, 2560, 0.96);
+                    instantPreview = await compressImage(file, 3840, 3840, 0.98, true);
                     onChangeField(imageKey, instantPreview);
                   } catch (e) {
                     try {
@@ -1529,10 +1529,9 @@ export default function AdminSidebar({
                     category: imageKey,
                     previousUrl: imgUrl
                   });
-                  if (instantPreview) {
-                    onChangeField(imageKey, instantPreview);
-                  } else if (uploadRes.url) {
-                    onChangeField(imageKey, uploadRes.url);
+                  const finalImgUrl = uploadRes.driveDirectUrl || uploadRes.url || instantPreview;
+                  if (finalImgUrl) {
+                    onChangeField(imageKey, finalImgUrl);
                   }
                   if (uploadRes.folderId && (!config.driveStorage?.folderId || config.driveStorage?.folderId !== uploadRes.folderId)) {
                     onChangeField("driveStorage", {
@@ -1548,7 +1547,7 @@ export default function AdminSidebar({
                 } catch (err) {
                   console.error("Error uploading HD image to Drive:", err);
                   try {
-                    const hdCompressed = await compressImage(file, 2048, 2048, 0.95);
+                    const hdCompressed = await compressImage(file, 3840, 3840, 0.98, true);
                     onChangeField(imageKey, hdCompressed);
                   } catch (e) {}
                 } finally {
