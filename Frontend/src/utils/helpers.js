@@ -151,8 +151,8 @@ export function formatWeddingTime(dateStr) {
   }
 }
 
-// Client-side image compression using canvas
-export function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.7, preserveAlpha = false) {
+// Client-side image compression using canvas - guarantees at least 1K / 2K HD quality
+export function compressImage(file, maxWidth = 2560, maxHeight = 2560, quality = 0.96, preserveAlpha = false) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -181,6 +181,8 @@ export function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0
         canvas.height = height;
 
         const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
         
         // Preserve transparency only if preserveAlpha is true AND file is image/png
         const usePng = preserveAlpha && file.type === 'image/png';
@@ -293,7 +295,11 @@ export function formatDriveDirectUrl(url, type = "image") {
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
 
-  return `https://lh3.googleusercontent.com/d/${fileId}`;
+  // Preserve full high-definition resolution (=s0 serves original uploaded resolution)
+  if (trimmed.includes("googleusercontent.com") && trimmed.includes("=")) {
+    return trimmed;
+  }
+  return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
 }
 
 

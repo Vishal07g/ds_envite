@@ -371,6 +371,49 @@ const CoverSizeControls = ({ config, onChangeField }) => {
             </label>
           </div>
 
+          {/* Names & Content Proportional Scale with Image */}
+          <div className="p-2 bg-slate-950/70 rounded-lg border border-slate-850 space-y-1.5">
+            <div className="flex items-center justify-between">
+              <div className="pr-2">
+                <span className="text-[8.5px] font-bold text-slate-200 block">Names &amp; Content Proportional Scale</span>
+                <span className="text-[7px] text-slate-400 block leading-tight mt-0.5">
+                  Scales Bride &amp; Groom names, ampersand, divider &amp; quotes proportionally with image size so nothing is cut on phone mode.
+                </span>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  checked={config.coverAutoScaleContent !== false}
+                  onChange={(e) => onChangeField("coverAutoScaleContent", e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-8 h-4 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3.5 after:transition-all peer-checked:bg-amber-500"></div>
+              </label>
+            </div>
+
+            {config.coverAutoScaleContent !== false && (
+              <div className="pt-1 border-t border-slate-900">
+                <div className="flex justify-between text-[7.5px] text-slate-400 mb-0.5">
+                  <span>Name &amp; Typography Scale Multiplier</span>
+                  <span className="text-amber-400 font-mono text-[7.5px] font-bold">
+                    {config.coverContentScale || 100}%
+                  </span>
+                </div>
+                <input 
+                  type="range" min="50" max="150" step="5"
+                  value={config.coverContentScale || 100}
+                  onChange={(e) => onChangeField("coverContentScale", parseInt(e.target.value))}
+                  className="w-full h-1 bg-slate-900 rounded appearance-none cursor-pointer accent-amber-500"
+                />
+                <div className="flex justify-between text-[6.5px] text-slate-500 mt-0.5">
+                  <span>Compact (50%)</span>
+                  <span>Default (100%)</span>
+                  <span>Enlarged (150%)</span>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Fit Style */}
           <div>
             <div className="flex justify-between text-[8px] text-slate-400 mb-1">
@@ -449,6 +492,64 @@ const CoverSizeControls = ({ config, onChangeField }) => {
             <div className="flex justify-between text-[7px] text-slate-500 mt-0.5">
               <span>0 (Full Natural Height)</span>
               <span>100vh</span>
+            </div>
+          </div>
+
+          {/* Card Text Overlays (For Pre-Designed Artwork with Printed Names) */}
+          <div className="pt-2 border-t border-slate-800/80 space-y-1.5">
+            <span className="text-[8px] uppercase tracking-wider text-slate-400 font-bold block">
+              Text &amp; Element Overlays
+            </span>
+            <div className="grid grid-cols-2 gap-1 text-[7.5px]">
+              <label className="flex items-center space-x-1.5 p-1.5 bg-slate-950/80 rounded border border-slate-850 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.showCoverCoupleNames !== false}
+                  onChange={(e) => onChangeField("showCoverCoupleNames", e.target.checked)}
+                  className="rounded text-amber-500 focus:ring-0 w-3 h-3 cursor-pointer"
+                />
+                <span className="text-slate-300">Couple Names</span>
+              </label>
+
+              <label className="flex items-center space-x-1.5 p-1.5 bg-slate-950/80 rounded border border-slate-850 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.showCoverTopTagline !== false}
+                  onChange={(e) => onChangeField("showCoverTopTagline", e.target.checked)}
+                  className="rounded text-amber-500 focus:ring-0 w-3 h-3 cursor-pointer"
+                />
+                <span className="text-slate-300">Top Tagline</span>
+              </label>
+
+              <label className="flex items-center space-x-1.5 p-1.5 bg-slate-950/80 rounded border border-slate-850 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.showCoverSubheading !== false}
+                  onChange={(e) => onChangeField("showCoverSubheading", e.target.checked)}
+                  className="rounded text-amber-500 focus:ring-0 w-3 h-3 cursor-pointer"
+                />
+                <span className="text-slate-300">Subheading</span>
+              </label>
+
+              <label className="flex items-center space-x-1.5 p-1.5 bg-slate-950/80 rounded border border-slate-850 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={config.showCoverQuote !== false}
+                  onChange={(e) => onChangeField("showCoverQuote", e.target.checked)}
+                  className="rounded text-amber-500 focus:ring-0 w-3 h-3 cursor-pointer"
+                />
+                <span className="text-slate-300">Intro Quote</span>
+              </label>
+
+              <label className="flex items-center space-x-1.5 p-1.5 bg-slate-950/80 rounded border border-slate-850 cursor-pointer col-span-2">
+                <input
+                  type="checkbox"
+                  checked={config.showCoverRevealBtn !== false}
+                  onChange={(e) => onChangeField("showCoverRevealBtn", e.target.checked)}
+                  className="rounded text-amber-500 focus:ring-0 w-3 h-3 cursor-pointer"
+                />
+                <span className="text-slate-300">Reveal Secret Save The Date Button</span>
+              </label>
             </div>
           </div>
         </div>
@@ -875,12 +976,22 @@ export default function AdminSidebar({
       setDriveUploading(true);
       setUploadStatusText("Processing media...");
 
-      // 1. Instant local preview so UI never lags or hangs
+      // 1. Process HD image data locally
+      let localHdData = null;
       if (file.type?.startsWith("image/")) {
         try {
-          const quickCompressed = await compressImage(file, 2048, 2048, 0.92);
-          onChangeField(field, quickCompressed);
-        } catch (e) {}
+          localHdData = await compressImage(file, 2560, 2560, 0.96);
+        } catch (e) {
+          localHdData = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        }
+        if (localHdData) {
+          onChangeField(field, localHdData);
+        }
       }
 
       // 2. Upload to Google Drive if authorized (and auto-delete previous file)
@@ -891,8 +1002,13 @@ export default function AdminSidebar({
         previousUrl: config[field]
       });
 
-      const resolvedUrl = formatDriveDirectUrl(uploadRes.url, (isAudio || isVideo) ? "audio" : "image");
-      onChangeField(field, resolvedUrl);
+      if (isAudio || isVideo) {
+        const resolvedUrl = formatDriveDirectUrl(uploadRes.url, "audio");
+        onChangeField(field, resolvedUrl);
+      } else {
+        // Keep the local HD image data so it displays 100% reliably in any browser
+        onChangeField(field, localHdData || uploadRes.url);
+      }
 
       if (uploadRes.folderId || uploadRes.folderUrl) {
         onChangeField("driveStorage", {
@@ -903,7 +1019,7 @@ export default function AdminSidebar({
           lastSyncedAt: new Date().toISOString()
         });
       }
-      setUploadStatusText(uploadRes.driveFileId ? "Saved to Google Drive!" : "Media saved!");
+      setUploadStatusText(uploadRes.driveFileId ? "Saved & Synced to Google Drive!" : "HD Media saved!");
       setTimeout(() => setUploadStatusText(""), 3000);
     } catch (err) {
       console.error("Error uploading to Drive, fallback to local:", err);
@@ -936,13 +1052,19 @@ export default function AdminSidebar({
       if (!config[`galleryImage${idx}`]) {
         const file = files[filesUploadedCount];
         try {
+          let hdData = null;
+          try {
+            hdData = await compressImage(file, 2560, 2560, 0.96);
+            onChangeField(`galleryImage${idx}`, hdData);
+          } catch (compErr) {}
+
           const uploadRes = await uploadInvitationFileToDrive({
             file,
             invitation: invitation || { config },
             category: `gallery_${idx}`,
             previousUrl: config[`galleryImage${idx}`]
           });
-          onChangeField(`galleryImage${idx}`, uploadRes.url);
+          onChangeField(`galleryImage${idx}`, hdData || uploadRes.url);
           if (uploadRes.folderId || uploadRes.folderUrl) {
             onChangeField("driveStorage", {
               ...(invitation?.driveStorage || {}),
@@ -1383,11 +1505,22 @@ export default function AdminSidebar({
                   setDriveUploading(true);
                   setUploadStatusText("Uploading HD Image...");
                   
-                  // 1. Instant local preview
+                  // 1. Process HD Image locally
+                  let instantPreview = null;
                   try {
-                    const instantPreview = await compressImage(file, 2048, 2048, 0.92);
+                    instantPreview = await compressImage(file, 2560, 2560, 0.96);
                     onChangeField(imageKey, instantPreview);
-                  } catch (e) {}
+                  } catch (e) {
+                    try {
+                      instantPreview = await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                      });
+                      onChangeField(imageKey, instantPreview);
+                    } catch (readErr) {}
+                  }
 
                   // 2. Drive upload (and automatically delete previous HD image from Drive)
                   const uploadRes = await uploadInvitationFileToDrive({
@@ -1396,7 +1529,9 @@ export default function AdminSidebar({
                     category: imageKey,
                     previousUrl: imgUrl
                   });
-                  if (uploadRes.url) {
+                  if (instantPreview) {
+                    onChangeField(imageKey, instantPreview);
+                  } else if (uploadRes.url) {
                     onChangeField(imageKey, uploadRes.url);
                   }
                   if (uploadRes.folderId && (!config.driveStorage?.folderId || config.driveStorage?.folderId !== uploadRes.folderId)) {
@@ -4828,6 +4963,11 @@ export default function AdminSidebar({
                         src={formatDriveDirectUrl(config.heroImage, "image")} 
                         alt="Cover BG Preview" 
                         className="w-full h-full object-cover" 
+                        onError={(e) => {
+                          if (!e.currentTarget.src.includes('cover_suman_vishal_1k.jpg')) {
+                            e.currentTarget.src = '/cover_suman_vishal_1k.jpg';
+                          }
+                        }}
                       />
                     </div>
                     <div className="flex-1 min-w-0 space-y-1">
