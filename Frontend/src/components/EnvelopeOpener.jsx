@@ -236,6 +236,7 @@ export default function EnvelopeOpener({
 
   const handleUserClickOpen = () => {
     if (animPhase > 0) return;
+    window.dispatchEvent(new Event('envelopeUserTapped'));
     if (onOpen) onOpen();
     triggerOpenSequence();
   };

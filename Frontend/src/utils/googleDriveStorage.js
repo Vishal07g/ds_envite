@@ -1,6 +1,7 @@
 // Google Drive Cloud Storage Integration Service for Wedding Invitations
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { storage } from "./firebase.js";
+import { compressImage } from "./helpers.js";
 
 const env = (typeof import.meta !== "undefined" && import.meta.env) ? import.meta.env : (typeof process !== "undefined" && process.env ? process.env : {});
 
@@ -781,6 +782,22 @@ export async function uploadInvitationFileToDrive({
   let driveDirectUrl = null;
   const webhookUrl = getDriveWebhookUrl();
 
+  // Pre-process high-definition image data so images are immediately displayable in any browser without Google login cookies
+  let localHdDataUrl = null;
+  const isImage = Boolean(file.type && file.type.startsWith("image/"));
+  if (isImage) {
+    try {
+      localHdDataUrl = await compressImage(file, 2560, 2560, 0.96);
+    } catch (e) {
+      localHdDataUrl = await new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      });
+    }
+  }
+
   // Extract previous file ID to remove old version and save Drive storage
   const previousFileId = extractDriveFileId(previousUrl || config[category]);
 
@@ -847,11 +864,11 @@ export async function uploadInvitationFileToDrive({
 
         const streamUrl = isMedia
           ? `https://drive.google.com/uc?export=download&id=${uploaded.fileId}`
-          : uploaded.directUrl;
+          : (localHdDataUrl || uploaded.directUrl);
         return {
           success: true,
           url: streamUrl,
-          driveDirectUrl: streamUrl,
+          driveDirectUrl: uploaded.directUrl,
           driveFileId: uploaded.fileId,
           fileName: uploaded.fileName,
           folderName,
@@ -897,7 +914,7 @@ export async function uploadInvitationFileToDrive({
           driveDirectUrl = isAudio 
             ? `https://drive.google.com/uc?export=download&id=${result.fileId}`
             : (result.fileUrl || `https://lh3.googleusercontent.com/d/${result.fileId}`);
-          cloudUrl = driveDirectUrl;
+          cloudUrl = isAudio ? driveDirectUrl : (localHdDataUrl || driveDirectUrl);
           return {
             success: true,
             url: cloudUrl,
@@ -916,9 +933,11 @@ export async function uploadInvitationFileToDrive({
   }
 
   // 3. Fallback: Immediate high-speed compression so UI applies the file in milliseconds without hanging
-  if (file.type?.startsWith("image/")) {
+  if (localHdDataUrl) {
+    cloudUrl = localHdDataUrl;
+  } else if (file.type?.startsWith("image/")) {
     try {
-      cloudUrl = await compressImage(file, 2048, 2048, 0.92);
+      cloudUrl = await compressImage(file, 2560, 2560, 0.96);
     } catch (e) {}
   }
 

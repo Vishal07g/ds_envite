@@ -474,7 +474,7 @@ export default function InvitationRenderer({
   onDeleteWish,
   isModerator = false,
   showEnvelopeFirst = true,
-  isPlayingMusic = false,
+  isPlayingMusic = true,
   onMusicToggle,
   onChangeField,
   onSelectElement,
@@ -543,32 +543,58 @@ export default function InvitationRenderer({
     return hasMainSong ? "main" : (hasStartingSong ? "starting" : "main");
   });
 
-  // Automatically measure and cache uploaded cover image natural dimensions & ratio
+  // Guarantee that whenever envelope is closed, currentTrack is strictly "starting"
+  useEffect(() => {
+    if (!isEnvelopeOpened && hasStartingSong && currentTrack !== "starting") {
+      setCurrentTrack("starting");
+    }
+  }, [isEnvelopeOpened, hasStartingSong, currentTrack]);
+
+  // Automatically measure, cache and validate uploaded cover image natural dimensions & ratio
+  const [coverImgSrc, setCoverImgSrc] = useState(config.heroImage);
   const [coverImageDimensions, setCoverImageDimensions] = useState({ width: 0, height: 0, ratio: null });
+
   useEffect(() => {
     if (!config.heroImage) {
+      setCoverImgSrc("");
       setCoverImageDimensions({ width: 0, height: 0, ratio: null });
       return;
     }
+    const directSrc = formatDriveDirectUrl(config.heroImage, "image");
+    setCoverImgSrc(directSrc);
+
     const img = new Image();
-    const src = formatDriveDirectUrl(config.heroImage, "image");
-    img.src = src;
+    img.onload = () => {
+      if (img.naturalWidth && img.naturalHeight) {
+        setCoverImageDimensions({
+          width: img.naturalWidth,
+          height: img.naturalHeight,
+          ratio: img.naturalWidth / img.naturalHeight
+        });
+      }
+    };
+    img.onerror = () => {
+      // If external/Google Drive URL fails to load, gracefully fallback to high-resolution 1K asset
+      if (directSrc !== '/cover_suman_vishal_1k.jpg') {
+        setCoverImgSrc('/cover_suman_vishal_1k.jpg');
+        const fallbackImg = new Image();
+        fallbackImg.onload = () => {
+          setCoverImageDimensions({
+            width: fallbackImg.naturalWidth,
+            height: fallbackImg.naturalHeight,
+            ratio: fallbackImg.naturalWidth / fallbackImg.naturalHeight
+          });
+        };
+        fallbackImg.src = '/cover_suman_vishal_1k.jpg';
+      }
+    };
+    img.src = directSrc;
     if (img.complete && img.naturalWidth) {
       setCoverImageDimensions({
         width: img.naturalWidth,
         height: img.naturalHeight,
         ratio: img.naturalWidth / img.naturalHeight
       });
-    } else {
-      img.onload = () => {
-        if (img.naturalWidth && img.naturalHeight) {
-          setCoverImageDimensions({
-            width: img.naturalWidth,
-            height: img.naturalHeight,
-            ratio: img.naturalWidth / img.naturalHeight
-          });
-        }
-      };
     }
   }, [config.heroImage]);
 
@@ -1141,24 +1167,26 @@ export default function InvitationRenderer({
   }, [isEnvelopeOpened, config.showEnvelope]);
 
   const handleEnvelopeOpen = () => {
-    isEnvelopeOpenedRef.current = true;
+    // Keep isEnvelopeOpenedRef false during opening sequence so Song 1 continues playing; only trigger opening animation
     setEnvelopeOpeningAnim(true);
 
-    // Stop Song 1 immediately when envelope is opened
-    if (startingAudioRef.current) {
-      startingAudioRef.current.pause();
-      startingAudioRef.current.currentTime = 0;
-    }
-
-    // Play Song 2 (Main Song) after opening envelope!
-    if (hasMainSong) {
-      setCurrentTrack("main");
-      const mainEl = mainAudioRef.current || audioRef.current;
-      if (mainEl) {
-        mainEl.currentTime = 0;
-        mainEl.play().then(() => {
+    // CRITICAL FIX: Ensure Song 1 (Intro Track) continues playing throughout the opening sequence!
+    // Do NOT stop Song 1 here. Song 1 plays until the invitation is fully opened.
+    if (hasStartingSong && startingAudioRef.current && isPlayingMusic) {
+      startingAudioRef.current.muted = false;
+      startingAudioRef.current.volume = config.musicVolume !== undefined ? Number(config.musicVolume) : 0.8;
+      const playPromise = startingAudioRef.current.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
           if (onMusicToggle) onMusicToggle(true);
-        }).catch(e => console.log("Main audio play on envelope open:", e));
+        }).catch(err => {
+          console.warn("Direct envelope gesture play error:", err);
+          if (startingAudioRef.current.src && !startingAudioRef.current.src.endsWith('/music_intro.mp3')) {
+            startingAudioRef.current.src = '/music_intro.mp3';
+            startingAudioRef.current.load();
+            startingAudioRef.current.play().catch(() => {});
+          }
+        });
       }
     }
   };
@@ -1175,19 +1203,30 @@ export default function InvitationRenderer({
     }
     window.scrollTo({ top: 0, behavior: 'instant' });
 
-    // Strict guarantee: Song 1 is completely stopped, only Song 2 plays after envelope is opened
-    if (startingAudioRef.current && !startingAudioRef.current.paused) {
-      startingAudioRef.current.pause();
-      startingAudioRef.current.currentTime = 0;
-    }
-
+    // Transition from Song 1 (Intro) to Song 2 (Main Song) now that invitation is completely opened!
     if (hasMainSong) {
+      // Pause & reset Song 1 now that envelope is opened
+      if (startingAudioRef.current && !startingAudioRef.current.paused) {
+        startingAudioRef.current.pause();
+        startingAudioRef.current.currentTime = 0;
+      }
+
+      // Switch track and start Song 2 (Main Song)
       setCurrentTrack("main");
       const mainEl = mainAudioRef.current || audioRef.current;
-      if (mainEl && mainEl.paused && isPlayingMusic) {
+      if (mainEl && isPlayingMusic) {
+        mainEl.currentTime = 0;
+        mainEl.muted = false;
+        mainEl.volume = config.musicVolume !== undefined ? Number(config.musicVolume) : 0.8;
         mainEl.play().then(() => {
           if (onMusicToggle) onMusicToggle(true);
-        }).catch(() => {});
+        }).catch(e => console.log("Main audio play on envelope complete:", e));
+      }
+    } else {
+      // If there is only Song 1, keep playing Song 1
+      setCurrentTrack("starting");
+      if (startingAudioRef.current && startingAudioRef.current.paused && isPlayingMusic) {
+        startingAudioRef.current.play().catch(() => {});
       }
     }
   };
@@ -1221,7 +1260,7 @@ export default function InvitationRenderer({
           onMouseDown={handleDragStart}
           onTouchStart={handleDragStart}
           style={posStyle}
-          className={`fixed z-50 flex items-center animate-fade-in ${isDragging ? 'cursor-grabbing scale-105' : 'cursor-grab'}`}
+          className={`fixed z-[70] flex items-center animate-fade-in ${isDragging ? 'cursor-grabbing scale-105' : 'cursor-grab'}`}
           title="Click & Drag to move anywhere • Tap to expand music controls"
         >
           <div 
@@ -1277,7 +1316,7 @@ export default function InvitationRenderer({
         onMouseDown={handleDragStart}
         onTouchStart={handleDragStart}
         style={posStyle}
-        className={`fixed z-50 flex items-center animate-fade-in ${isDragging ? 'cursor-grabbing scale-105' : ''}`}
+        className={`fixed z-[70] flex items-center animate-fade-in ${isDragging ? 'cursor-grabbing scale-105' : ''}`}
       >
         <div className="bg-slate-950/90 backdrop-blur-xl border border-amber-500/50 text-slate-100 rounded-full px-3 py-1.5 shadow-2xl flex items-center space-x-2 relative transition-all">
           {/* Drag Handle */}
@@ -1763,8 +1802,8 @@ export default function InvitationRenderer({
                 }
               }}
               onEnded={() => {
-                // If envelope is still closed, replay Song 1! DO NOT transition to Song 2!
-                if (!isEnvelopeOpenedRef.current) {
+                // If envelope is still closed or still opening, replay Song 1! DO NOT transition to Song 2!
+                if (!isEnvelopeOpenedRef.current || envelopeOpeningAnim) {
                   const startEl = startingAudioRef.current;
                   if (startEl) {
                     startEl.currentTime = 0;
@@ -2242,265 +2281,373 @@ export default function InvitationRenderer({
             perspective={config.scroll3DPerspective || 900}
             effectType={config.scroll3DEffectType || '3d-roll'}
           >
-            <section 
-              id="cover-section"
-              className={`relative ${config.coverMatchUploadedSize ? 'min-h-0' : 'min-h-[75vh]'} flex flex-col justify-center items-center text-center p-6 bg-center overflow-hidden w-full mx-auto rounded-3xl`} 
-              style={{ 
-                backgroundImage: `linear-gradient(${config.coverBgOverlayStart || 'rgba(0, 0, 0, 0.45)'}, ${config.coverBgOverlayEnd || 'rgba(0, 0, 0, 0.70)'}), url("${formatDriveDirectUrl(config.heroImage, "image")}")`,
-                backgroundSize: config.coverMatchUploadedSize
-                  ? (config.coverFitStyle || (config.coverHeroScale ? `${config.coverHeroScale}%` : 'contain'))
-                  : (config.coverHeroScale ? `${config.coverHeroScale}%` : 'cover'),
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: `${config.coverHeroXOffset ?? 50}% ${config.coverHeroYOffset ?? 50}%`,
-                aspectRatio: config.coverMatchUploadedSize && activeCoverRatio
-                  ? `${activeCoverRatio}`
-                  : undefined,
-                minHeight: config.coverMatchUploadedSize && activeCoverRatio ? 'unset' : undefined,
-                width: config.coverMatchUploadedSize && config.coverResponsiveScale === false && coverImageDimensions.width
-                  ? `${coverImageDimensions.width}px`
-                  : '100%',
-                maxHeight: config.coverMatchUploadedSize && config.coverMaxHeightVh
-                  ? `${config.coverMaxHeightVh}vh`
-                  : undefined,
-                boxShadow: config.coverShadowEnabled !== false
-                  ? `0 ${config.coverShadowY ?? 10}px ${config.coverShadowBlur ?? 25}px ${config.coverShadowSpread ?? -5}px ${config.coverShadowColor || 'rgba(0, 0, 0, 0.35)'}`
-                  : 'none'
-              }}
-            >
-              {config.coverInnerBorderEnabled !== false && (
-                <div 
-                  className="absolute inset-4 sm:inset-8 rounded-2xl pointer-events-none flex flex-col justify-between p-3"
-                  style={customStyles.coverInnerBorder}
-                >
-                  {config.coverBorderEnabled !== false && (
-                    <>
-                      <div className="flex justify-between">
-                        <div style={{ ...customStyles.coverBorder, borderRightWidth: 0, borderBottomWidth: 0 }} />
-                        <div style={{ ...customStyles.coverBorder, borderLeftWidth: 0, borderBottomWidth: 0 }} />
-                      </div>
-                      <div className="flex justify-between">
-                        <div style={{ ...customStyles.coverBorder, borderRightWidth: 0, borderTopWidth: 0 }} />
-                        <div style={{ ...customStyles.coverBorder, borderLeftWidth: 0, borderTopWidth: 0 }} />
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
+            {(() => {
+              const isUploadedCover = Boolean(config.coverMatchUploadedSize);
+              const autoScaleContent = config.coverAutoScaleContent !== false;
+              const contentScale = (config.coverContentScale !== undefined ? config.coverContentScale : 100) / 100;
+              const shouldScale = isUploadedCover || autoScaleContent;
 
-              <div className="max-w-3xl relative z-10 px-4">
-                {config.showCoverTopTagline !== false && (
-                  <EditableText config={config}
-                    as="span"
-                    isEditing={!!onChangeField}
-                    onChangeField={onChangeField}
-                    onSelect={onSelectElement}
-                    tabId="cover"
-                    field="coverTopTaglineText"
-                    activeColorId={activeColorId}
-                    setActiveColorId={setActiveColorId}
-                    popoverId="coverTopTagline"
-                    onChangeColor={(color) => onChangeField && onChangeField('coverTopTaglineTextColor', color)}
-                    colorValue={config.coverTopTaglineTextColor || config.coverTopTaglineColor || config.accentGold || '#f59e0b'}
-                    className={`${config.coverTopTaglineTextFont || config.coverTopTaglineFont || 'font-sans'} ${config.coverTopTaglineTextSize || config.coverTopTaglineSize || 'text-[10px] sm:text-xs'} ${config.coverTopTaglineSpacing || 'tracking-[0.3em]'} uppercase block mb-4`}
-                    style={{ 
-                      color: config.coverTopTaglineTextColor || config.coverTopTaglineColor || config.accentGold || '#f59e0b',
-                      textAlign: (config.coverTopTaglineTextAlign || config.coverTopTaglineAlign) === 'left' ? 'left' : (config.coverTopTaglineTextAlign || config.coverTopTaglineAlign) === 'right' ? 'right' : 'center',
-                      opacity: (config.coverTopTaglineTextOpacity !== undefined ? config.coverTopTaglineTextOpacity : config.coverTopTaglineOpacity) !== undefined ? (config.coverTopTaglineTextOpacity !== undefined ? config.coverTopTaglineTextOpacity : config.coverTopTaglineOpacity) : 1,
-                      filter: (config.coverTopTaglineTextGlow !== undefined ? config.coverTopTaglineTextGlow : config.coverTopTaglineGlow) !== undefined ? `brightness(${config.coverTopTaglineTextGlow !== undefined ? config.coverTopTaglineTextGlow : config.coverTopTaglineGlow}%)` : undefined,
-                      transform: (config.coverTopTaglineTextYOffset || config.coverTopTaglineYOffset) ? `translateY(${config.coverTopTaglineTextYOffset || config.coverTopTaglineYOffset}px)` : undefined
-                    }}
-                    value={config.coverTopTaglineText !== undefined ? config.coverTopTaglineText : "Under the Auspices of Love and Destiny"}
-                  />
-                )}
+              const getScaledFontSize = (sizeClass, defaultMaxPx, defaultMinPx, cqwFactor, scale = 1) => {
+                let maxPx = defaultMaxPx;
+                let minPx = defaultMinPx;
+                let factor = cqwFactor;
+                
+                if (sizeClass && !sizeClass.includes('sm:') && !sizeClass.includes('md:')) {
+                  const pxMatch = sizeClass.match(/text-\[(\d+)px\]/);
+                  if (pxMatch) {
+                    maxPx = parseInt(pxMatch[1], 10);
+                  } else {
+                    const map = {
+                      'text-xs': 12, 'text-sm': 14, 'text-base': 16,
+                      'text-lg': 18, 'text-xl': 20, 'text-2xl': 24,
+                      'text-3xl': 30, 'text-4xl': 36
+                    };
+                    if (map[sizeClass]) maxPx = map[sizeClass];
+                  }
+                  minPx = Math.max(9, Math.round(maxPx * 0.45));
+                  factor = (maxPx / 10).toFixed(1);
+                }
+                
+                return `clamp(${minPx * scale}px, ${factor * scale}cqw, ${maxPx * scale}px)`;
+              };
 
-              <div className={`${config.heroTitleAlign || 'text-center'} mt-2`}>
-                {config.showCoverSubheading !== false && (
-                  <EditableText config={config}
-                    as="span"
-                    isEditing={!!onChangeField}
-                    onChangeField={onChangeField}
-                    onSelect={onSelectElement}
-                    tabId="cover"
-                    field="coverSubheadingText"
-                    activeColorId={activeColorId}
-                    setActiveColorId={setActiveColorId}
-                    popoverId="coverSubheading"
-                    onChangeColor={(color) => onChangeField && onChangeField('coverSubheadingTextColor', color)}
-                    colorValue={config.coverSubheadingTextColor || config.coverSubheadingColor || '#ffffff'}
-                    className={`block mb-2 ${config.coverSubheadingTextFont || config.coverSubheadingFont || 'font-serif'} ${config.coverSubheadingTextSize || config.coverSubheadingSize || 'text-xl sm:text-2xl'} ${config.coverSubheadingItalic !== false ? 'italic' : ''}`}
-                    style={{ 
-                      color: config.coverSubheadingTextColor || config.coverSubheadingColor || '#ffffff',
-                      textAlign: (config.coverSubheadingTextAlign || config.coverSubheadingAlign) === 'left' ? 'left' : (config.coverSubheadingTextAlign || config.coverSubheadingAlign) === 'right' ? 'right' : 'center',
-                      opacity: (config.coverSubheadingTextOpacity !== undefined ? config.coverSubheadingTextOpacity : config.coverSubheadingOpacity) !== undefined ? (config.coverSubheadingTextOpacity !== undefined ? config.coverSubheadingTextOpacity : config.coverSubheadingOpacity) : 0.8,
-                      filter: (config.coverSubheadingTextGlow !== undefined ? config.coverSubheadingTextGlow : config.coverSubheadingGlow) !== undefined ? `brightness(${config.coverSubheadingTextGlow !== undefined ? config.coverSubheadingTextGlow : config.coverSubheadingGlow}%)` : undefined,
-                      transform: (config.coverSubheadingTextYOffset || config.coverSubheadingYOffset) ? `translateY(${config.coverSubheadingTextYOffset || config.coverSubheadingYOffset}px)` : undefined
-                    }}
-                    value={config.coverSubheadingText !== undefined ? config.coverSubheadingText : "The Union Ceremony of"}
-                  />
-                )}
-
-                {config.showCoverCoupleNames !== false && (
-                  <h1 className="tracking-wider">
-                    <EditableText config={config}
-                      as="span"
-                      isEditing={!!onChangeField}
-                      onChangeField={onChangeField}
-                      onSelect={onSelectElement}
-                      tabId="cover"
-                      field="coverBrideText"
-                      activeColorId={activeColorId}
-                      setActiveColorId={setActiveColorId}
-                      popoverId="coverBride"
-                      onChangeColor={(color) => onChangeField && onChangeField('coverBrideTextColor', color)}
-                      colorValue={config.coverBrideTextColor || config.coverBrideColor || '#ffffff'}
-                      className={`font-semibold block sm:inline ${config.coverBrideTextFont || config.coverBrideFont || 'font-serif'} ${config.coverBrideTextSize || config.coverBrideSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
-                      style={{ 
-                        color: config.coverBrideTextColor || config.coverBrideColor || '#ffffff',
-                        textAlign: (config.coverBrideTextAlign || config.coverBrideAlign) === 'left' ? 'left' : (config.coverBrideTextAlign || config.coverBrideAlign) === 'right' ? 'right' : 'center',
-                        opacity: (config.coverBrideTextOpacity !== undefined ? config.coverBrideTextOpacity : config.coverBrideOpacity) !== undefined ? (config.coverBrideTextOpacity !== undefined ? config.coverBrideTextOpacity : config.coverBrideOpacity) : 1,
-                        filter: (config.coverBrideTextGlow !== undefined ? config.coverBrideTextGlow : config.coverBrideGlow) !== undefined ? `brightness(${config.coverBrideTextGlow !== undefined ? config.coverBrideTextGlow : config.coverBrideGlow}%)` : undefined,
-                        transform: (config.coverBrideTextYOffset || config.coverBrideYOffset || config.brideNameYOffset) ? `translateY(${config.coverBrideTextYOffset || config.coverBrideYOffset || config.brideNameYOffset}px)` : undefined
-                      }}
-                      value={config.coverBrideText !== undefined ? config.coverBrideText : config.brideName}
-                    />
-                    
-                    <EditableText config={config}
-                      as="span"
-                      isEditing={!!onChangeField}
-                      onChangeField={onChangeField}
-                      onSelect={onSelectElement}
-                      tabId="cover"
-                      field="coverAmpersandText"
-                      activeColorId={activeColorId}
-                      setActiveColorId={setActiveColorId}
-                      popoverId="coverAmpersand"
-                      onChangeColor={(color) => onChangeField && onChangeField('coverAmpersandTextColor', color)}
-                      colorValue={config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b'}
-                      className={`block my-2 ${config.coverAmpersandTextFont || config.coverAmpersandFont || 'font-cursive'} ${config.coverAmpersandTextSize || config.coverAmpersandSize || 'text-3xl sm:text-5xl'}`} 
-                      style={{ 
-                        color: config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b',
-                        textAlign: (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'left' ? 'left' : (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'right' ? 'right' : 'center',
-                        opacity: (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) !== undefined ? (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) : 1,
-                        filter: (config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow) !== undefined ? `brightness(${config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow}%)` : undefined,
-                        transform: (config.coverAmpersandTextYOffset || config.coverAmpersandYOffset) ? `translateY(${config.coverAmpersandTextYOffset || config.coverAmpersandYOffset}px)` : undefined
-                      }}
-                      value={config.coverAmpersandText !== undefined ? config.coverAmpersandText : "&"}
-                    />
-                    
-                    <EditableText config={config}
-                      as="span"
-                      isEditing={!!onChangeField}
-                      onChangeField={onChangeField}
-                      onSelect={onSelectElement}
-                      tabId="cover"
-                      field="coverGroomText"
-                      activeColorId={activeColorId}
-                      setActiveColorId={setActiveColorId}
-                      popoverId="coverGroom"
-                      onChangeColor={(color) => onChangeField && onChangeField('coverGroomTextColor', color)}
-                      colorValue={config.coverGroomTextColor || config.coverGroomColor || '#ffffff'}
-                      className={`font-semibold block sm:inline ${config.coverGroomTextFont || config.coverGroomFont || 'font-serif'} ${config.coverGroomTextSize || config.coverGroomSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
-                      style={{ 
-                        color: config.coverGroomTextColor || config.coverGroomColor || '#ffffff',
-                        textAlign: (config.coverGroomTextAlign || config.coverGroomAlign) === 'left' ? 'left' : (config.coverGroomTextAlign || config.coverGroomAlign) === 'right' ? 'right' : 'center',
-                        opacity: (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) !== undefined ? (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) : 1,
-                        filter: (config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow) !== undefined ? `brightness(${config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow}%)` : undefined,
-                        transform: (config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset) ? `translateY(${config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset}px)` : undefined
-                      }}
-                      value={config.coverGroomText !== undefined ? config.coverGroomText : config.groomName}
-                    />
-                  </h1>
-                )}
-              </div>
-
-              {config.showCoverQuote !== false && (
-                <>
-                  <div className={`w-24 h-0.5 my-4 sm:my-5 relative ${
-                    (config.heroTitleAlign === 'text-left') ? 'mr-auto ml-0' :
-                    (config.heroTitleAlign === 'text-right') ? 'ml-auto mr-0' : 'mx-auto'
-                  }`} style={{ backgroundColor: `${config.accentGold || '#f59e0b'}60` }}>
-                    <div className="absolute -top-1.5 left-1/2 transform -translate-x-1/2 bg-slate-900 p-0.5 rounded-full">
-                      <SvgHeart className="w-3.5 h-3.5 text-rose-500" fill="currentColor" />
-                    </div>
-                  </div>
-
-                  <EditableText config={config}
-                    as="p"
-                    isEditing={!!onChangeField}
-                    onChangeField={onChangeField}
-                    onSelect={onSelectElement}
-                    tabId="cover"
-                    field="coverQuoteText"
-                    activeColorId={activeColorId}
-                    setActiveColorId={setActiveColorId}
-                    popoverId="coverQuote"
-                    onChangeColor={(color) => onChangeField && onChangeField('coverQuoteTextColor', color)}
-                    colorValue={config.coverQuoteTextColor || config.coverQuoteColor || '#ffffff'}
-                    className={`italic max-w-xl mb-4 leading-relaxed ${config.coverQuoteTextFont || config.coverQuoteFont || 'font-cursive'} ${config.coverQuoteTextSize || config.coverQuoteSize || 'text-base sm:text-xl'}`}
-                    style={{ 
-                      color: config.coverQuoteTextColor || config.coverQuoteColor || '#ffffff',
-                      textAlign: (config.coverQuoteTextAlign || config.coverQuoteAlign) === 'left' ? 'left' : (config.coverQuoteTextAlign || config.coverQuoteAlign) === 'right' ? 'right' : 'center',
-                      opacity: (config.coverQuoteTextOpacity !== undefined ? config.coverQuoteTextOpacity : config.coverQuoteOpacity) !== undefined ? (config.coverQuoteTextOpacity !== undefined ? config.coverQuoteTextOpacity : config.coverQuoteOpacity) : 1,
-                      filter: (config.coverQuoteTextGlow !== undefined ? config.coverQuoteTextGlow : config.coverQuoteGlow) !== undefined ? `brightness(${config.coverQuoteTextGlow !== undefined ? config.coverQuoteTextGlow : config.coverQuoteGlow}%)` : undefined,
-                      transform: (config.coverQuoteTextYOffset || config.coverQuoteYOffset || config.introQuoteYOffset) ? `translateY(${config.coverQuoteTextYOffset || config.coverQuoteYOffset || config.introQuoteYOffset}px)` : undefined
-                    }}
-                    value={config.coverQuoteText ? `"${config.coverQuoteText}"` : (config.introQuote ? `"${config.introQuote}"` : "")}
-                  />
-                </>
-              )}
-
-              {/* Action Button under Heading */}
-              {!isPrintMode && config.showCoverRevealBtn !== false && (
-                <div className="mb-3">
-                  <button
-                    onClick={() => {
-                      const el = document.getElementById('scratch-section');
-                      if (el) el.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    style={{
-                      ...customStyles.glassButton,
-                      color: config.coverRevealBtnTextColor || config.coverRevealBtnColor || config.glassBtnText || "#ffffff",
-                      opacity: config.coverRevealBtnTextOpacity !== undefined ? config.coverRevealBtnTextOpacity : 1,
-                      filter: config.coverRevealBtnTextGlow !== undefined ? `brightness(${config.coverRevealBtnTextGlow}%)` : undefined,
-                      transform: config.coverRevealBtnTextYOffset ? `translateY(${config.coverRevealBtnTextYOffset}px)` : undefined
-                    }}
-                    className={`glass-btn-hover px-6 py-3 rounded-xl uppercase tracking-widest font-semibold flex items-center space-x-2 mx-auto ${config.coverRevealBtnTextFont || config.coverRevealBtnFont || 'font-sans'} ${config.coverRevealBtnTextSize || config.coverRevealBtnSize || 'text-[10px]'}`}
-                  >
-                    <SvgSparkles className="w-3.5 h-3.5" />
-                    <span>{config.coverRevealBtnText || "Reveal Secret Save the Date"}</span>
-                  </button>
-                </div>
-              )}
-
-              {config.showCoverBottomTagline !== false && (
-                <EditableText config={config}
-                  as="p"
-                  isEditing={!!onChangeField}
-                  onChangeField={onChangeField}
-                  onSelect={onSelectElement}
-                  tabId="cover"
-                  field="coverBottomTaglineText"
-                  activeColorId={activeColorId}
-                  setActiveColorId={setActiveColorId}
-                  popoverId="coverBottomTagline"
-                  onChangeColor={(color) => onChangeField && onChangeField('coverBottomTaglineTextColor', color)}
-                  colorValue={config.coverBottomTaglineTextColor || config.coverBottomTaglineColor || config.accentGold || '#f59e0b'}
-                  className={`tracking-widest uppercase backdrop-blur-md px-6 py-2.5 rounded-full inline-block border border-white/10 italic ${config.coverBottomTaglineTextFont || config.coverBottomTaglineFont || 'font-sans'} ${config.coverBottomTaglineTextSize || config.coverBottomTaglineSize || 'text-[9px] sm:text-xs'}`}
+              return (
+                <section 
+                  id="cover-section"
+                  className={`relative ${isUploadedCover ? 'min-h-0' : 'min-h-[75vh]'} flex flex-col justify-center items-center text-center ${isUploadedCover ? 'p-2 sm:p-4 md:p-6' : 'p-3 sm:p-5 md:p-6'} bg-center overflow-hidden w-full mx-auto rounded-3xl`} 
                   style={{ 
-                    color: config.coverBottomTaglineTextColor || config.coverBottomTaglineColor || config.accentGold || '#f59e0b',
-                    backgroundColor: config.coverBottomTaglineBg || 'rgba(0, 0, 0, 0.4)',
-                    textAlign: (config.coverBottomTaglineTextAlign || config.coverBottomTaglineAlign) === 'left' ? 'left' : (config.coverBottomTaglineTextAlign || config.coverBottomTaglineAlign) === 'right' ? 'right' : 'center',
-                    opacity: (config.coverBottomTaglineTextOpacity !== undefined ? config.coverBottomTaglineTextOpacity : config.coverBottomTaglineOpacity) !== undefined ? (config.coverBottomTaglineTextOpacity !== undefined ? config.coverBottomTaglineTextOpacity : config.coverBottomTaglineOpacity) : 1,
-                    filter: (config.coverBottomTaglineTextGlow !== undefined ? config.coverBottomTaglineTextGlow : config.coverBottomTaglineGlow) !== undefined ? `brightness(${config.coverBottomTaglineTextGlow !== undefined ? config.coverBottomTaglineTextGlow : config.coverBottomTaglineGlow}%)` : undefined,
-                    transform: (config.coverBottomTaglineTextYOffset || config.coverBottomTaglineYOffset) ? `translateY(${config.coverBottomTaglineTextYOffset || config.coverBottomTaglineYOffset}px)` : undefined
+                    containerType: 'inline-size',
+                    backgroundImage: `linear-gradient(${config.coverBgOverlayStart || 'rgba(0, 0, 0, 0.45)'}, ${config.coverBgOverlayEnd || 'rgba(0, 0, 0, 0.70)'}), url("${coverImgSrc || formatDriveDirectUrl(config.heroImage, "image")}")`,
+                    backgroundSize: isUploadedCover
+                      ? (config.coverFitStyle || (config.coverHeroScale ? `${config.coverHeroScale}%` : 'contain'))
+                      : (config.coverHeroScale ? `${config.coverHeroScale}%` : 'cover'),
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: `${config.coverHeroXOffset ?? 50}% ${config.coverHeroYOffset ?? 50}%`,
+                    aspectRatio: isUploadedCover && activeCoverRatio
+                      ? `${activeCoverRatio}`
+                      : undefined,
+                    minHeight: isUploadedCover && activeCoverRatio ? 'unset' : undefined,
+                    width: isUploadedCover && config.coverResponsiveScale === false && coverImageDimensions.width
+                      ? `${coverImageDimensions.width}px`
+                      : '100%',
+                    maxHeight: isUploadedCover && config.coverMaxHeightVh
+                      ? `${config.coverMaxHeightVh}vh`
+                      : undefined,
+                    boxShadow: config.coverShadowEnabled !== false
+                      ? `0 ${config.coverShadowY ?? 10}px ${config.coverShadowBlur ?? 25}px ${config.coverShadowSpread ?? -5}px ${config.coverShadowColor || 'rgba(0, 0, 0, 0.35)'}`
+                      : 'none',
+                    padding: shouldScale ? 'clamp(6px, 1.8cqw, 24px) clamp(10px, 3cqw, 32px)' : undefined
                   }}
-                  value={config.coverBottomTaglineText !== undefined ? config.coverBottomTaglineText : "✦ A Sacred Promise of Eternal Love • Uncover Our Secret Date Below ✦"}
-                />
-              )}
-            </div>
-          </section>
-        </Scroll3DContainer>
-      )}
+                >
+                  {config.coverInnerBorderEnabled !== false && (
+                    <div 
+                      className="absolute rounded-2xl pointer-events-none flex flex-col justify-between"
+                      style={{
+                        ...customStyles.coverInnerBorder,
+                        inset: shouldScale ? 'clamp(6px, 2cqw, 32px)' : undefined,
+                        padding: shouldScale ? 'clamp(3px, 1cqw, 12px)' : undefined
+                      }}
+                    >
+                      {config.coverBorderEnabled !== false && (
+                        <>
+                          <div className="flex justify-between">
+                            <div style={{ ...customStyles.coverBorder, borderRightWidth: 0, borderBottomWidth: 0 }} />
+                            <div style={{ ...customStyles.coverBorder, borderLeftWidth: 0, borderBottomWidth: 0 }} />
+                          </div>
+                          <div className="flex justify-between">
+                            <div style={{ ...customStyles.coverBorder, borderRightWidth: 0, borderTopWidth: 0 }} />
+                            <div style={{ ...customStyles.coverBorder, borderLeftWidth: 0, borderTopWidth: 0 }} />
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
+
+                  <div 
+                    className="max-w-3xl relative z-10 w-full flex flex-col items-center justify-center"
+                    style={{
+                      paddingLeft: shouldScale ? 'clamp(4px, 1.5cqw, 16px)' : undefined,
+                      paddingRight: shouldScale ? 'clamp(4px, 1.5cqw, 16px)' : undefined
+                    }}
+                  >
+                    {config.showCoverTopTagline !== false && (
+                      <EditableText config={config}
+                        as="span"
+                        isEditing={!!onChangeField}
+                        onChangeField={onChangeField}
+                        onSelect={onSelectElement}
+                        tabId="cover"
+                        field="coverTopTaglineText"
+                        activeColorId={activeColorId}
+                        setActiveColorId={setActiveColorId}
+                        popoverId="coverTopTagline"
+                        onChangeColor={(color) => onChangeField && onChangeField('coverTopTaglineTextColor', color)}
+                        colorValue={config.coverTopTaglineTextColor || config.coverTopTaglineColor || config.accentGold || '#f59e0b'}
+                        className={`${config.coverTopTaglineTextFont || config.coverTopTaglineFont || 'font-sans'} ${config.coverTopTaglineTextSize || config.coverTopTaglineSize || 'text-[10px] sm:text-xs'} ${config.coverTopTaglineSpacing || 'tracking-[0.3em]'} uppercase block mb-4`}
+                        style={{ 
+                          color: config.coverTopTaglineTextColor || config.coverTopTaglineColor || config.accentGold || '#f59e0b',
+                          textAlign: (config.coverTopTaglineTextAlign || config.coverTopTaglineAlign) === 'left' ? 'left' : (config.coverTopTaglineTextAlign || config.coverTopTaglineAlign) === 'right' ? 'right' : 'center',
+                          opacity: (config.coverTopTaglineTextOpacity !== undefined ? config.coverTopTaglineTextOpacity : config.coverTopTaglineOpacity) !== undefined ? (config.coverTopTaglineTextOpacity !== undefined ? config.coverTopTaglineTextOpacity : config.coverTopTaglineOpacity) : 1,
+                          filter: (config.coverTopTaglineTextGlow !== undefined ? config.coverTopTaglineTextGlow : config.coverTopTaglineGlow) !== undefined ? `brightness(${config.coverTopTaglineTextGlow !== undefined ? config.coverTopTaglineTextGlow : config.coverTopTaglineGlow}%)` : undefined,
+                          transform: (config.coverTopTaglineTextYOffset || config.coverTopTaglineYOffset) ? `translateY(${config.coverTopTaglineTextYOffset || config.coverTopTaglineYOffset}px)` : undefined,
+                          fontSize: shouldScale ? getScaledFontSize(config.coverTopTaglineTextSize || config.coverTopTaglineSize, 12, 7.5, 1.4, contentScale) : undefined,
+                          marginBottom: shouldScale ? `clamp(2px, 0.6cqw, 16px)` : undefined,
+                          lineHeight: shouldScale ? 1.2 : undefined
+                        }}
+                        value={config.coverTopTaglineText !== undefined ? config.coverTopTaglineText : "Under the Auspices of Love and Destiny"}
+                      />
+                    )}
+
+                    <div 
+                      className={`${config.heroTitleAlign || 'text-center'} mt-2 w-full`}
+                      style={{
+                        marginTop: shouldScale ? 'clamp(1px, 0.4cqw, 8px)' : undefined
+                      }}
+                    >
+                      {config.showCoverSubheading !== false && (
+                        <EditableText config={config}
+                          as="span"
+                          isEditing={!!onChangeField}
+                          onChangeField={onChangeField}
+                          onSelect={onSelectElement}
+                          tabId="cover"
+                          field="coverSubheadingText"
+                          activeColorId={activeColorId}
+                          setActiveColorId={setActiveColorId}
+                          popoverId="coverSubheading"
+                          onChangeColor={(color) => onChangeField && onChangeField('coverSubheadingTextColor', color)}
+                          colorValue={config.coverSubheadingTextColor || config.coverSubheadingColor || '#ffffff'}
+                          className={`block mb-2 ${config.coverSubheadingTextFont || config.coverSubheadingFont || 'font-serif'} ${config.coverSubheadingTextSize || config.coverSubheadingSize || 'text-xl sm:text-2xl'} ${config.coverSubheadingItalic !== false ? 'italic' : ''}`}
+                          style={{ 
+                            color: config.coverSubheadingTextColor || config.coverSubheadingColor || '#ffffff',
+                            textAlign: (config.coverSubheadingTextAlign || config.coverSubheadingAlign) === 'left' ? 'left' : (config.coverSubheadingTextAlign || config.coverSubheadingAlign) === 'right' ? 'right' : 'center',
+                            opacity: (config.coverSubheadingTextOpacity !== undefined ? config.coverSubheadingTextOpacity : config.coverSubheadingOpacity) !== undefined ? (config.coverSubheadingTextOpacity !== undefined ? config.coverSubheadingTextOpacity : config.coverSubheadingOpacity) : 0.8,
+                            filter: (config.coverSubheadingTextGlow !== undefined ? config.coverSubheadingTextGlow : config.coverSubheadingGlow) !== undefined ? `brightness(${config.coverSubheadingTextGlow !== undefined ? config.coverSubheadingTextGlow : config.coverSubheadingGlow}%)` : undefined,
+                            transform: (config.coverSubheadingTextYOffset || config.coverSubheadingYOffset) ? `translateY(${config.coverSubheadingTextYOffset || config.coverSubheadingYOffset}px)` : undefined,
+                            fontSize: shouldScale ? getScaledFontSize(config.coverSubheadingTextSize || config.coverSubheadingSize, 22, 9, 2.2, contentScale) : undefined,
+                            marginBottom: shouldScale ? `clamp(1px, 0.4cqw, 8px)` : undefined,
+                            lineHeight: shouldScale ? 1.2 : undefined
+                          }}
+                          value={config.coverSubheadingText !== undefined ? config.coverSubheadingText : "The Union Ceremony of"}
+                        />
+                      )}
+
+                      {config.showCoverCoupleNames !== false && (
+                        <h1 
+                          className="tracking-wider flex flex-col sm:inline-block items-center justify-center max-w-full"
+                          style={{
+                            lineHeight: shouldScale ? 1.15 : undefined
+                          }}
+                        >
+                          <EditableText config={config}
+                            as="span"
+                            isEditing={!!onChangeField}
+                            onChangeField={onChangeField}
+                            onSelect={onSelectElement}
+                            tabId="cover"
+                            field="coverBrideText"
+                            activeColorId={activeColorId}
+                            setActiveColorId={setActiveColorId}
+                            popoverId="coverBride"
+                            onChangeColor={(color) => onChangeField && onChangeField('coverBrideTextColor', color)}
+                            colorValue={config.coverBrideTextColor || config.coverBrideColor || '#ffffff'}
+                            className={`font-semibold block sm:inline ${config.coverBrideTextFont || config.coverBrideFont || 'font-serif'} ${config.coverBrideTextSize || config.coverBrideSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
+                            style={{ 
+                              color: config.coverBrideTextColor || config.coverBrideColor || '#ffffff',
+                              textAlign: (config.coverBrideTextAlign || config.coverBrideAlign) === 'left' ? 'left' : (config.coverBrideTextAlign || config.coverBrideAlign) === 'right' ? 'right' : 'center',
+                              opacity: (config.coverBrideTextOpacity !== undefined ? config.coverBrideTextOpacity : config.coverBrideOpacity) !== undefined ? (config.coverBrideTextOpacity !== undefined ? config.coverBrideTextOpacity : config.coverBrideOpacity) : 1,
+                              filter: (config.coverBrideTextGlow !== undefined ? config.coverBrideTextGlow : config.coverBrideGlow) !== undefined ? `brightness(${config.coverBrideTextGlow !== undefined ? config.coverBrideTextGlow : config.coverBrideGlow}%)` : undefined,
+                              transform: (config.coverBrideTextYOffset || config.coverBrideYOffset || config.brideNameYOffset) ? `translateY(${config.coverBrideTextYOffset || config.coverBrideYOffset || config.brideNameYOffset}px)` : undefined,
+                              fontSize: shouldScale ? getScaledFontSize(config.coverBrideTextSize || config.coverBrideSize, 60, 15, 5.2, contentScale) : undefined,
+                              lineHeight: shouldScale ? 1.15 : undefined
+                            }}
+                            value={config.coverBrideText !== undefined ? config.coverBrideText : config.brideName}
+                          />
+                          
+                          <EditableText config={config}
+                            as="span"
+                            isEditing={!!onChangeField}
+                            onChangeField={onChangeField}
+                            onSelect={onSelectElement}
+                            tabId="cover"
+                            field="coverAmpersandText"
+                            activeColorId={activeColorId}
+                            setActiveColorId={setActiveColorId}
+                            popoverId="coverAmpersand"
+                            onChangeColor={(color) => onChangeField && onChangeField('coverAmpersandTextColor', color)}
+                            colorValue={config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b'}
+                            className={`block my-2 ${config.coverAmpersandTextFont || config.coverAmpersandFont || 'font-cursive'} ${config.coverAmpersandTextSize || config.coverAmpersandSize || 'text-3xl sm:text-5xl'}`} 
+                            style={{ 
+                              color: config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b',
+                              textAlign: (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'left' ? 'left' : (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'right' ? 'right' : 'center',
+                              opacity: (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) !== undefined ? (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) : 1,
+                              filter: (config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow) !== undefined ? `brightness(${config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow}%)` : undefined,
+                              transform: (config.coverAmpersandTextYOffset || config.coverAmpersandYOffset) ? `translateY(${config.coverAmpersandTextYOffset || config.coverAmpersandYOffset}px)` : undefined,
+                              fontSize: shouldScale ? getScaledFontSize(config.coverAmpersandTextSize || config.coverAmpersandSize, 38, 12, 3.6, contentScale) : undefined,
+                              margin: shouldScale ? `clamp(1px, 0.5cqw, 8px) 0` : undefined,
+                              lineHeight: shouldScale ? 1.1 : undefined
+                            }}
+                            value={config.coverAmpersandText !== undefined ? config.coverAmpersandText : "&"}
+                          />
+                          
+                          <EditableText config={config}
+                            as="span"
+                            isEditing={!!onChangeField}
+                            onChangeField={onChangeField}
+                            onSelect={onSelectElement}
+                            tabId="cover"
+                            field="coverGroomText"
+                            activeColorId={activeColorId}
+                            setActiveColorId={setActiveColorId}
+                            popoverId="coverGroom"
+                            onChangeColor={(color) => onChangeField && onChangeField('coverGroomTextColor', color)}
+                            colorValue={config.coverGroomTextColor || config.coverGroomColor || '#ffffff'}
+                            className={`font-semibold block sm:inline ${config.coverGroomTextFont || config.coverGroomFont || 'font-serif'} ${config.coverGroomTextSize || config.coverGroomSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
+                            style={{ 
+                              color: config.coverGroomTextColor || config.coverGroomColor || '#ffffff',
+                              textAlign: (config.coverGroomTextAlign || config.coverGroomAlign) === 'left' ? 'left' : (config.coverGroomTextAlign || config.coverGroomAlign) === 'right' ? 'right' : 'center',
+                              opacity: (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) !== undefined ? (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) : 1,
+                              filter: (config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow) !== undefined ? `brightness(${config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow}%)` : undefined,
+                              transform: (config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset) ? `translateY(${config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset}px)` : undefined,
+                              fontSize: shouldScale ? getScaledFontSize(config.coverGroomTextSize || config.coverGroomSize, 60, 15, 5.2, contentScale) : undefined,
+                              lineHeight: shouldScale ? 1.15 : undefined
+                            }}
+                            value={config.coverGroomText !== undefined ? config.coverGroomText : config.groomName}
+                          />
+                        </h1>
+                      )}
+                    </div>
+
+                    {config.showCoverQuote !== false && (
+                      <>
+                        <div 
+                          className={`h-0.5 relative ${
+                            (config.heroTitleAlign === 'text-left') ? 'mr-auto ml-0' :
+                            (config.heroTitleAlign === 'text-right') ? 'ml-auto mr-0' : 'mx-auto'
+                          }`} 
+                          style={{ 
+                            backgroundColor: `${config.accentGold || '#f59e0b'}60`,
+                            width: shouldScale ? 'clamp(32px, 9cqw, 80px)' : '6rem',
+                            height: shouldScale ? 'clamp(1px, 0.2cqw, 2px)' : '2px',
+                            marginTop: shouldScale ? 'clamp(3px, 1cqw, 16px)' : undefined,
+                            marginBottom: shouldScale ? 'clamp(3px, 1cqw, 16px)' : undefined
+                          }}
+                        >
+                          <div 
+                            className="absolute left-1/2 transform -translate-x-1/2 bg-slate-900 rounded-full flex items-center justify-center"
+                            style={{
+                              top: '50%',
+                              transform: 'translate(-50%, -50%)',
+                              padding: shouldScale ? 'clamp(1px, 0.3cqw, 2px)' : '2px'
+                            }}
+                          >
+                            <SvgHeart 
+                              className="text-rose-500" 
+                              fill="currentColor" 
+                              style={{
+                                width: shouldScale ? 'clamp(8px, 1.8cqw, 14px)' : '14px',
+                                height: shouldScale ? 'clamp(8px, 1.8cqw, 14px)' : '14px'
+                              }}
+                            />
+                          </div>
+                        </div>
+
+                        <EditableText config={config}
+                          as="p"
+                          isEditing={!!onChangeField}
+                          onChangeField={onChangeField}
+                          onSelect={onSelectElement}
+                          tabId="cover"
+                          field="coverQuoteText"
+                          activeColorId={activeColorId}
+                          setActiveColorId={setActiveColorId}
+                          popoverId="coverQuote"
+                          onChangeColor={(color) => onChangeField && onChangeField('coverQuoteTextColor', color)}
+                          colorValue={config.coverQuoteTextColor || config.coverQuoteColor || '#ffffff'}
+                          className={`italic max-w-xl leading-relaxed ${config.coverQuoteTextFont || config.coverQuoteFont || 'font-cursive'} ${config.coverQuoteTextSize || config.coverQuoteSize || 'text-base sm:text-xl'}`}
+                          style={{ 
+                            color: config.coverQuoteTextColor || config.coverQuoteColor || '#ffffff',
+                            textAlign: (config.coverQuoteTextAlign || config.coverQuoteAlign) === 'left' ? 'left' : (config.coverQuoteTextAlign || config.coverQuoteAlign) === 'right' ? 'right' : 'center',
+                            opacity: (config.coverQuoteTextOpacity !== undefined ? config.coverQuoteTextOpacity : config.coverQuoteOpacity) !== undefined ? (config.coverQuoteTextOpacity !== undefined ? config.coverQuoteTextOpacity : config.coverQuoteOpacity) : 1,
+                            filter: (config.coverQuoteTextGlow !== undefined ? config.coverQuoteTextGlow : config.coverQuoteGlow) !== undefined ? `brightness(${config.coverQuoteTextGlow !== undefined ? config.coverQuoteTextGlow : config.coverQuoteGlow}%)` : undefined,
+                            transform: (config.coverQuoteTextYOffset || config.coverQuoteYOffset || config.introQuoteYOffset) ? `translateY(${config.coverQuoteTextYOffset || config.coverQuoteYOffset || config.introQuoteYOffset}px)` : undefined,
+                            fontSize: shouldScale ? getScaledFontSize(config.coverQuoteTextSize || config.coverQuoteSize, 18, 9.5, 2.2, contentScale) : undefined,
+                            marginBottom: shouldScale ? `clamp(2px, 0.8cqw, 16px)` : undefined,
+                            lineHeight: shouldScale ? 1.25 : undefined
+                          }}
+                          value={config.coverQuoteText ? `"${config.coverQuoteText}"` : (config.introQuote ? `"${config.introQuote}"` : "")}
+                        />
+                      </>
+                    )}
+
+                    {/* Action Button under Heading */}
+                    {!isPrintMode && config.showCoverRevealBtn !== false && (
+                      <div 
+                        className="mb-3"
+                        style={{
+                          marginBottom: shouldScale ? 'clamp(2px, 0.6cqw, 12px)' : undefined
+                        }}
+                      >
+                        <button
+                          onClick={() => {
+                            const el = document.getElementById('scratch-section');
+                            if (el) el.scrollIntoView({ behavior: 'smooth' });
+                          }}
+                          style={{
+                            ...customStyles.glassButton,
+                            color: config.coverRevealBtnTextColor || config.coverRevealBtnColor || config.glassBtnText || "#ffffff",
+                            opacity: config.coverRevealBtnTextOpacity !== undefined ? config.coverRevealBtnTextOpacity : 1,
+                            filter: config.coverRevealBtnTextGlow !== undefined ? `brightness(${config.coverRevealBtnTextGlow}%)` : undefined,
+                            transform: config.coverRevealBtnTextYOffset ? `translateY(${config.coverRevealBtnTextYOffset}px)` : undefined,
+                            fontSize: shouldScale ? getScaledFontSize(config.coverRevealBtnTextSize || config.coverRevealBtnSize, 11, 8, 1.4, contentScale) : undefined,
+                            padding: shouldScale ? 'clamp(3px, 0.7cqw, 10px) clamp(10px, 2cqw, 20px)' : undefined
+                          }}
+                          className={`glass-btn-hover px-6 py-3 rounded-xl uppercase tracking-widest font-semibold flex items-center space-x-2 mx-auto ${config.coverRevealBtnTextFont || config.coverRevealBtnFont || 'font-sans'} ${config.coverRevealBtnTextSize || config.coverRevealBtnSize || 'text-[10px]'}`}
+                        >
+                          <SvgSparkles 
+                            style={{
+                              width: shouldScale ? 'clamp(8px, 1.6cqw, 14px)' : '14px',
+                              height: shouldScale ? 'clamp(8px, 1.6cqw, 14px)' : '14px'
+                            }}
+                          />
+                          <span>{config.coverRevealBtnText || "Reveal Secret Save the Date"}</span>
+                        </button>
+                      </div>
+                    )}
+
+                    {config.showCoverBottomTagline !== false && (
+                      <EditableText config={config}
+                        as="p"
+                        isEditing={!!onChangeField}
+                        onChangeField={onChangeField}
+                        onSelect={onSelectElement}
+                        tabId="cover"
+                        field="coverBottomTaglineText"
+                        activeColorId={activeColorId}
+                        setActiveColorId={setActiveColorId}
+                        popoverId="coverBottomTagline"
+                        onChangeColor={(color) => onChangeField && onChangeField('coverBottomTaglineTextColor', color)}
+                        colorValue={config.coverBottomTaglineTextColor || config.coverBottomTaglineColor || config.accentGold || '#f59e0b'}
+                        className={`tracking-widest uppercase backdrop-blur-md px-6 py-2.5 rounded-full inline-block border border-white/10 italic ${config.coverBottomTaglineTextFont || config.coverBottomTaglineFont || 'font-sans'} ${config.coverBottomTaglineTextSize || config.coverBottomTaglineSize || 'text-[9px] sm:text-xs'}`}
+                        style={{ 
+                          color: config.coverBottomTaglineTextColor || config.coverBottomTaglineColor || config.accentGold || '#f59e0b',
+                          backgroundColor: config.coverBottomTaglineBg || 'rgba(0, 0, 0, 0.4)',
+                          textAlign: (config.coverBottomTaglineTextAlign || config.coverBottomTaglineAlign) === 'left' ? 'left' : (config.coverBottomTaglineTextAlign || config.coverBottomTaglineAlign) === 'right' ? 'right' : 'center',
+                          opacity: (config.coverBottomTaglineTextOpacity !== undefined ? config.coverBottomTaglineTextOpacity : config.coverBottomTaglineOpacity) !== undefined ? (config.coverBottomTaglineTextOpacity !== undefined ? config.coverBottomTaglineTextOpacity : config.coverBottomTaglineOpacity) : 1,
+                          filter: (config.coverBottomTaglineTextGlow !== undefined ? config.coverBottomTaglineTextGlow : config.coverBottomTaglineGlow) !== undefined ? `brightness(${config.coverBottomTaglineTextGlow !== undefined ? config.coverBottomTaglineTextGlow : config.coverBottomTaglineGlow}%)` : undefined,
+                          transform: (config.coverBottomTaglineTextYOffset || config.coverBottomTaglineYOffset) ? `translateY(${config.coverBottomTaglineTextYOffset || config.coverBottomTaglineYOffset}px)` : undefined,
+                          fontSize: shouldScale ? getScaledFontSize(config.coverBottomTaglineTextSize || config.coverBottomTaglineSize, 11, 7, 1.2, contentScale) : undefined,
+                          padding: shouldScale ? 'clamp(2px, 0.6cqw, 8px) clamp(8px, 1.8cqw, 18px)' : undefined
+                        }}
+                        value={config.coverBottomTaglineText !== undefined ? config.coverBottomTaglineText : "✦ A Sacred Promise of Eternal Love • Uncover Our Secret Date Below ✦"}
+                      />
+                    )}
+                  </div>
+                </section>
+              );
+            })()}
+          </Scroll3DContainer>
+        )}
 
         {/* 2. THE INTERACTIVE SCRATCH CARD REVEAL */}
         {config.showScratchSection !== false && (

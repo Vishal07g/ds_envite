@@ -50,7 +50,7 @@ export default function InvitationEditor() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [previewEnvelope, setPreviewEnvelope] = useState(false);
   const [isGeneratingImg, setIsGeneratingImg] = useState({ hero: false, story: false, scratch: false });
-  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [musicPlaying, setMusicPlaying] = useState(true);
 
   // Upper Toolbar Scroll State & Middle Mouse Wheel Controls
   const toolbarRef = useRef(null);
@@ -478,7 +478,13 @@ export default function InvitationEditor() {
               </button>
 
               <button
-                onClick={() => setPreviewEnvelope(!previewEnvelope)}
+                onClick={() => {
+                  const nextVal = !previewEnvelope;
+                  setPreviewEnvelope(nextVal);
+                  if (nextVal) {
+                    setMusicPlaying(true);
+                  }
+                }}
                 className={`editor-toolbar-btn editor-toolbar-btn-collapsible ${
                   previewEnvelope ? 'editor-toolbar-btn-active' : ''
                 }`}
