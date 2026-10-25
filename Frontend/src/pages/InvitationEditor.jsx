@@ -600,7 +600,6 @@ export default function InvitationEditor() {
 
           {/* Invitation View Layout */}
            <InvitationRenderer 
-            key={previewEnvelope ? 'with-envelope' : 'without-envelope'}
             config={config} 
             showEnvelopeFirst={previewEnvelope} // Toggle live envelope preview inside editor
             isPlayingMusic={musicPlaying}

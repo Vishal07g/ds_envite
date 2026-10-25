@@ -491,6 +491,26 @@ export default function InvitationRenderer({
     };
   }, [propConfig]);
 
+  const canvasRef = useRef(null);
+  const audioRef = useRef(null);
+  const startingAudioRef = useRef(null);
+  const mainAudioRef = useRef(null);
+  const widgetRef = useRef(null);
+  const isScratchingRef = useRef(false);
+  const lastScratchPosRef = useRef({ x: 0, y: 0 });
+
+  const rawStartingSongUrl = config.startingMusicUrl || (config.startingMusicEnabled !== false ? "/music_intro.mp3" : "");
+  const startingSongUrl = (rawStartingSongUrl && rawStartingSongUrl.includes("1ScEGe8HiEjdTdhbYh2R_6rTJMjHfsNu6"))
+    ? "https://drive.google.com/uc?export=download&id=1qKhE7CtMAbOVHZm507SxcCqCnBwA8E2-"
+    : rawStartingSongUrl;
+  const hasStartingSong = Boolean(config.startingMusicEnabled !== false && startingSongUrl);
+  const hasMainSong = Boolean(config.mainMusicEnabled !== false && config.musicUrl);
+  const [currentTrack, setCurrentTrack] = useState(() => {
+    const envelopeOpen = isPrintMode || config.showEnvelope === false ? true : !showEnvelopeFirst;
+    if (!envelopeOpen && hasStartingSong) return "starting";
+    return hasMainSong ? "main" : (hasStartingSong ? "starting" : "main");
+  });
+
   const [isEnvelopeOpened, setIsEnvelopeOpened] = useState(isPrintMode ? true : !showEnvelopeFirst);
   const [envelopeOpeningAnim, setEnvelopeOpeningAnim] = useState(false);
   const isEnvelopeOpenedRef = useRef(
@@ -499,6 +519,25 @@ export default function InvitationRenderer({
   useEffect(() => {
     isEnvelopeOpenedRef.current = isPrintMode || config.showEnvelope === false ? true : isEnvelopeOpened;
   }, [isEnvelopeOpened, isPrintMode, config.showEnvelope]);
+
+  // Dynamically sync envelope state when showEnvelopeFirst prop changes (e.g. editor envelope toggle)
+  useEffect(() => {
+    if (!isPrintMode) {
+      const shouldBeOpened = !showEnvelopeFirst || config.showEnvelope === false;
+      setIsEnvelopeOpened(shouldBeOpened);
+      isEnvelopeOpenedRef.current = shouldBeOpened;
+      setEnvelopeOpeningAnim(false);
+      if (!shouldBeOpened && hasStartingSong) {
+        setCurrentTrack("starting");
+        const startEl = startingAudioRef.current;
+        if (startEl && isPlayingMusic) {
+          startEl.muted = false;
+          startEl.volume = config.musicVolume !== undefined ? Number(config.musicVolume) : 0.8;
+          startEl.play().catch(() => {});
+        }
+      }
+    }
+  }, [showEnvelopeFirst, isPrintMode, config.showEnvelope, hasStartingSong, isPlayingMusic]);
   const [isScratchFinished, setIsScratchFinished] = useState(isPrintMode ? true : false);
   const [scratchedPercentage, setScratchedPercentage] = useState(isPrintMode ? 100 : 0);
   const [showGraffiti, setShowGraffiti] = useState(false);
@@ -525,23 +564,6 @@ export default function InvitationRenderer({
     setShowGraffiti(false);
     setPreviewCelebrationType(null);
   }, [config.revealEffect, config.scratchCardShape, isPrintMode]);
-  
-  const canvasRef = useRef(null);
-  const audioRef = useRef(null);
-  const startingAudioRef = useRef(null);
-  const mainAudioRef = useRef(null);
-  const widgetRef = useRef(null);
-  const isScratchingRef = useRef(false);
-  const lastScratchPosRef = useRef({ x: 0, y: 0 });
-
-  const startingSongUrl = config.startingMusicUrl || (config.startingMusicEnabled !== false ? "/music_intro.mp3" : "");
-  const hasStartingSong = Boolean(config.startingMusicEnabled !== false && startingSongUrl);
-  const hasMainSong = Boolean(config.mainMusicEnabled !== false && config.musicUrl);
-  const [currentTrack, setCurrentTrack] = useState(() => {
-    const envelopeOpen = isPrintMode || config.showEnvelope === false ? true : !showEnvelopeFirst;
-    if (!envelopeOpen && hasStartingSong) return "starting";
-    return hasMainSong ? "main" : (hasStartingSong ? "starting" : "main");
-  });
 
   // Guarantee that whenever envelope is closed, currentTrack is strictly "starting"
   useEffect(() => {
@@ -624,10 +646,10 @@ export default function InvitationRenderer({
       // If envelope is already opened and main song exists, do NOT play starting song!
       if (isEnvelopeOpenedRef.current && hasMainSong) {
         const mainEl = mainAudioRef.current || audioRef.current;
-        if (mainEl && mainEl.paused) {
+        if (mainEl && mainEl.paused && isPlayingMusic) {
           mainEl.play().catch(() => {});
         }
-        return;
+        return Promise.resolve(true);
       }
 
       // At the beginning, envelope is closed: strictly play Song 1
@@ -640,27 +662,38 @@ export default function InvitationRenderer({
         mainEl.currentTime = 0;
       }
 
-      if (hasStartingSong && startEl && startEl.paused) {
-        startEl.play().then(() => {
+      if (hasStartingSong && startEl && startEl.paused && isPlayingMusic) {
+        startEl.muted = false;
+        startEl.volume = config.musicVolume !== undefined ? Number(config.musicVolume) : 0.8;
+        return startEl.play().then(() => {
           if (onMusicToggle) onMusicToggle(true);
+          return true;
         }).catch(err => {
           console.log("Audio autoplay waiting for user activity:", err.name);
+          return false;
         });
       }
+      return Promise.resolve(false);
     };
 
     // 1. Try immediate autoplay right on page load
     playStartingSong();
 
-    // 2. Fallback on any initial activity/gesture (pointer, mouse, touch, scroll, focus, envelopeUserTapped)
-    const gestureEvents = ['pointerdown', 'touchstart', 'click', 'mousemove', 'scroll', 'keydown', 'envelopeUserTapped'];
+    // 2. Fallback on any initial real user interaction (pointerdown, click, touchstart, keydown)
+    const gestureEvents = ['pointerdown', 'touchstart', 'touchend', 'click', 'keydown'];
     const onFirstGesture = () => {
-      playStartingSong();
-      gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture, { capture: true }));
+      const res = playStartingSong();
+      if (res && res.then) {
+        res.then((success) => {
+          if (success) {
+            gestureEvents.forEach(evt => window.removeEventListener(evt, onFirstGesture, { capture: true }));
+          }
+        });
+      }
     };
 
     gestureEvents.forEach(evt => {
-      window.addEventListener(evt, onFirstGesture, { capture: true, once: true });
+      window.addEventListener(evt, onFirstGesture, { capture: true, passive: true });
     });
 
     // Also retry once audio element finishes buffering
@@ -677,7 +710,7 @@ export default function InvitationRenderer({
         startEl.removeEventListener('loadeddata', playStartingSong);
       }
     };
-  }, [hasStartingSong, startingSongUrl, hasMainSong, config.showMusic, onMusicToggle]);
+  }, [hasStartingSong, startingSongUrl, hasMainSong, config.showMusic, isPlayingMusic, onMusicToggle]);
 
   // Music Volume, Drag & Widget Toggle state
   const [audioVolume, setAudioVolume] = useState(config.musicVolume !== undefined ? Number(config.musicVolume) : 0.8);
@@ -1744,6 +1777,24 @@ export default function InvitationRenderer({
     }
   };
 
+  const triggerStartingSong = useCallback(() => {
+    if (isEnvelopeOpenedRef.current && hasMainSong) {
+      const mainEl = mainAudioRef.current || audioRef.current;
+      if (mainEl && mainEl.paused && isPlayingMusic) {
+        mainEl.play().catch(() => {});
+      }
+      return;
+    }
+    const startEl = startingAudioRef.current;
+    if (startEl && startEl.paused && isPlayingMusic) {
+      startEl.muted = false;
+      startEl.volume = config.musicVolume !== undefined ? Number(config.musicVolume) : 0.8;
+      startEl.play().then(() => {
+        if (onMusicToggle) onMusicToggle(true);
+      }).catch(err => console.log("Direct trigger play:", err));
+    }
+  }, [hasMainSong, isPlayingMusic, config.musicVolume, onMusicToggle]);
+
   return (
     <div 
       className={`invitation-render-root relative transition-colors duration-500 w-full ${!isEnvelopeOpened && config.showEnvelope !== false && !isPrintMode ? 'h-screen h-dvh max-h-screen overflow-hidden' : `min-h-screen overflow-x-hidden ${config.showGlobalBorder !== false && config.globalBorderImage ? 'pb-40 sm:pb-52' : 'pb-12'}`}`} 
@@ -1769,6 +1820,9 @@ export default function InvitationRenderer({
             onSelectElement={onSelectElement}
             activeColorId={activeColorId}
             setActiveColorId={setActiveColorId}
+            onPlayStartingMusic={triggerStartingSong}
+            isMusicPlaying={isPlayingMusic}
+            toggleMusic={toggleMusicPlayback}
           />
         </div>
       )}

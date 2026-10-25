@@ -64,7 +64,10 @@ export default function EnvelopeOpener({
   onChangeField,
   onSelectElement,
   activeColorId,
-  setActiveColorId
+  setActiveColorId,
+  onPlayStartingMusic,
+  isMusicPlaying,
+  toggleMusic
 }) {
   const accentGold = config.accentGold || "#d4af37";
   const lightBgColor = config.lightBgColor || "#faf6f0";
@@ -389,11 +392,15 @@ export default function EnvelopeOpener({
         overscrollBehavior: 'none',
       }}
       onClick={(e) => {
-        // Tapping background or envelope triggers starting song playback
-        window.dispatchEvent(new Event('envelopeUserTapped'));
+        // Tapping background or envelope triggers starting song playback directly in user gesture
+        if (onPlayStartingMusic) onPlayStartingMusic();
       }}
-      onPointerDown={() => window.dispatchEvent(new Event('envelopeUserTapped'))}
-      onTouchStart={() => window.dispatchEvent(new Event('envelopeUserTapped'))}
+      onPointerDown={() => {
+        if (onPlayStartingMusic) onPlayStartingMusic();
+      }}
+      onTouchStart={() => {
+        if (onPlayStartingMusic) onPlayStartingMusic();
+      }}
     >
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Alex+Brush&family=Cinzel:wght@400;600;700&family=Cinzel+Decorative:wght@400;700&family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300;1,600&family=Great+Vibes&family=Inter:wght@300;400;600&family=Italiana&family=Marcellus&family=Montserrat:wght@300;600&family=Pinyon+Script&family=Playball&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Rozha+One&family=Yatra+One&display=swap');
@@ -1431,6 +1438,7 @@ export default function EnvelopeOpener({
               activeColorId={activeColorId}
               setActiveColorId={setActiveColorId}
               getJustifyClass={getJustifyClass}
+              onPlayStartingMusic={onPlayStartingMusic}
             />
           </div>
         </div>
@@ -1458,7 +1466,8 @@ function DecoratedInvitationBox({
   onSelectElement,
   activeColorId,
   setActiveColorId,
-  getJustifyClass
+  getJustifyClass,
+  onPlayStartingMusic
 }) {
   return (
     <div 
@@ -1471,9 +1480,9 @@ function DecoratedInvitationBox({
         boxShadow: `0 16px 40px rgba(0, 0, 0, 0.75), inset 0 0 24px rgba(212, 175, 55, 0.12), 0 0 0 1px rgba(212, 175, 55, 0.35)`,
       }}
       onClick={(e) => {
-        // If user clicks on the box, allow opening unless clicking editable elements
+        // If user clicks on the box, ensure starting music is triggered without opening invitation
         if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
-          handleUserClickOpen();
+          if (onPlayStartingMusic) onPlayStartingMusic();
         }
       }}
     >
