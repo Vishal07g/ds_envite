@@ -1564,6 +1564,14 @@ function getDb() {
         wishes: (curr.wishes && curr.wishes.length > 0) ? curr.wishes : (primarySumanDef.wishes || []),
         rsvps: (curr.rsvps && curr.rsvps.length > 0) ? curr.rsvps : (primarySumanDef.rsvps || [])
       };
+    } else {
+      // Ensure starting and main music URLs are valid and not the stale 404 URL
+      if (!curr.config.startingMusicUrl || curr.config.startingMusicUrl.includes("1ScEGe8HiEjdTdhbYh2R_6rTJMjHfsNu6")) {
+        curr.config.startingMusicUrl = primarySumanDef.config.startingMusicUrl;
+      }
+      if (!curr.config.musicUrl) {
+        curr.config.musicUrl = primarySumanDef.config.musicUrl;
+      }
     }
   }
 

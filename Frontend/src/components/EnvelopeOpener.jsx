@@ -1438,6 +1438,7 @@ export default function EnvelopeOpener({
               activeColorId={activeColorId}
               setActiveColorId={setActiveColorId}
               getJustifyClass={getJustifyClass}
+              onPlayStartingMusic={onPlayStartingMusic}
             />
           </div>
         </div>
@@ -1465,7 +1466,8 @@ function DecoratedInvitationBox({
   onSelectElement,
   activeColorId,
   setActiveColorId,
-  getJustifyClass
+  getJustifyClass,
+  onPlayStartingMusic
 }) {
   return (
     <div 
@@ -1478,9 +1480,9 @@ function DecoratedInvitationBox({
         boxShadow: `0 16px 40px rgba(0, 0, 0, 0.75), inset 0 0 24px rgba(212, 175, 55, 0.12), 0 0 0 1px rgba(212, 175, 55, 0.35)`,
       }}
       onClick={(e) => {
-        // If user clicks on the box, allow opening unless clicking editable elements
+        // If user clicks on the box, ensure starting music is triggered without opening invitation
         if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
-          handleUserClickOpen();
+          if (onPlayStartingMusic) onPlayStartingMusic();
         }
       }}
     >

@@ -499,7 +499,10 @@ export default function InvitationRenderer({
   const isScratchingRef = useRef(false);
   const lastScratchPosRef = useRef({ x: 0, y: 0 });
 
-  const startingSongUrl = config.startingMusicUrl || (config.startingMusicEnabled !== false ? "/music_intro.mp3" : "");
+  const rawStartingSongUrl = config.startingMusicUrl || (config.startingMusicEnabled !== false ? "/music_intro.mp3" : "");
+  const startingSongUrl = (rawStartingSongUrl && rawStartingSongUrl.includes("1ScEGe8HiEjdTdhbYh2R_6rTJMjHfsNu6"))
+    ? "https://drive.google.com/uc?export=download&id=1qKhE7CtMAbOVHZm507SxcCqCnBwA8E2-"
+    : rawStartingSongUrl;
   const hasStartingSong = Boolean(config.startingMusicEnabled !== false && startingSongUrl);
   const hasMainSong = Boolean(config.mainMusicEnabled !== false && config.musicUrl);
   const [currentTrack, setCurrentTrack] = useState(() => {
