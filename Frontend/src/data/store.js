@@ -1120,7 +1120,7 @@ const INITIAL_INVITATIONS = [
     "startingMusicEnabled": true,
     "startingMusicLoop": true,
     "startingMusicTitle": "Vakratunda-Mahakaya-Ganesh-Mantr",
-    "startingMusicUrl": "https://drive.google.com/uc?export=download&id=1ScEGe8HiEjdTdhbYh2R_6rTJMjHfsNu6",
+    "startingMusicUrl": "https://drive.google.com/uc?export=download&id=1qKhE7CtMAbOVHZm507SxcCqCnBwA8E2-",
     "startingMusicVolume": 0.8,
     "storyBrideFamily": "Mr. Nagina Paswan & Mrs. Gyanti Devi",
     "storyBrideNameFont": "font-cinzel-dec",
