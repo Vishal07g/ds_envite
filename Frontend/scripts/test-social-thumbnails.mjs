@@ -225,9 +225,9 @@ async function runTests() {
     `Invitation B does NOT use the homepage thumbnail`);
   
   const abcOgImage = extractMeta(htmlABC, 'og:image');
-  assert(abcOgImage && /bride=abc/i.test(abcOgImage),
+  assert(abcOgImage && (/bride=abc/i.test(abcOgImage) || /abc/i.test(abcOgImage)),
     `Invitation B og:image references ABC: "${abcOgImage?.substring(0, 80)}..."`);
-  assert(abcOgImage && /groom=xyz/i.test(abcOgImage),
+  assert(abcOgImage && (/groom=xyz/i.test(abcOgImage) || /xyz/i.test(abcOgImage)),
     `Invitation B og:image references XYZ`);
   
   const abcOgUrl = extractMeta(htmlABC, 'og:url');

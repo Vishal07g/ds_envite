@@ -307,17 +307,8 @@ export default async function handler(req, res) {
     // Use the invitation's explicitly assigned social thumbnail
     ogImageUrl = socialThumbnailUrl;
   } else {
-    // Generate dynamic monogram thumbnail from invitation-specific data
-    const ogParams = new URLSearchParams();
-    if (bride) ogParams.set('bride', bride);
-    if (groom) ogParams.set('groom', groom);
-    if (eventTitle) ogParams.set('title', eventTitle);
-    if (weddingDate) ogParams.set('date', weddingDate);
-    if (weddingVenue) ogParams.set('venue', weddingVenue);
-    if (primaryColor) ogParams.set('bg', primaryColor);
-    if (accentGold) ogParams.set('accent', accentGold);
-    if (heroImage && heroImage.startsWith('http')) ogParams.set('hero', heroImage);
-    ogImageUrl = `${proto}://${host}/api/og-image?${ogParams.toString()}`;
+    // Generate clean .jpg URL referencing the invitation slug
+    ogImageUrl = `${proto}://${host}/api/og-image/${encodeURIComponent(rawSlug || 'wedding')}.jpg`;
   }
 
   const shareUrl = (invitation && invitation.canonicalUrl) 
@@ -344,6 +335,9 @@ export default async function handler(req, res) {
 
   // ── Build per-invitation meta tags (replaces ALL website-default OG tags) ──
   const metaTags = `
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="all, index, follow" />
     <title>${escapeHtml(pageTitle)}</title>
     <meta name="description" content="${escapeHtml(ogDesc)}" />
     <link rel="canonical" href="${escapeHtml(shareUrl)}" />
@@ -368,6 +362,9 @@ export default async function handler(req, res) {
   if (html && html.includes('<head>')) {
     // Strip ALL existing website-default meta tags to prevent duplication
     html = html.replace(/<title>.*?<\/title>/gi, '');
+    html = html.replace(/<meta\s+charset=[^>]*>/gi, '');
+    html = html.replace(/<meta\s+name=["']robots["'][^>]*>/gi, '');
+    html = html.replace(/<meta\s+name=["']viewport["'][^>]*>/gi, '');
     html = html.replace(/<meta\s+name=["']description["'][^>]*>/gi, '');
     html = html.replace(/<meta\s+name=["']keywords["'][^>]*>/gi, '');
     html = html.replace(/<meta\s+property=["']og:.*?\/>/gi, '');

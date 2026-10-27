@@ -48,6 +48,9 @@ export default async function handler(req, res) {
   }
 
   const metaTags = `
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="all, index, follow" />
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtml(description)}" />
     <link rel="canonical" href="${escapeHtml(canonicalUrl)}" />
@@ -71,6 +74,9 @@ export default async function handler(req, res) {
 
   if (html && html.includes('<head>')) {
     html = html.replace(/<title>.*?<\/title>/gi, '');
+    html = html.replace(/<meta\s+charset=[^>]*>/gi, '');
+    html = html.replace(/<meta\s+name=["']robots["'][^>]*>/gi, '');
+    html = html.replace(/<meta\s+name=["']viewport["'][^>]*>/gi, '');
     html = html.replace(/<meta\s+name=["']description["'][^>]*>/gi, '');
     html = html.replace(/<meta\s+name=["']keywords["'][^>]*>/gi, '');
     html = html.replace(/<meta\s+property=["']og:.*?\/>/gi, '');
