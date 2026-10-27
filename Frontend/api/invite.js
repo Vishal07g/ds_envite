@@ -417,7 +417,7 @@ export default async function handler(req, res) {
   const proto = req.headers['x-forwarded-proto'] || 'https';
   const cleanSlug = rawSlug.replace(/^invite-/, '').replace(/-\d{6,}$/, '') || couple.slug || 'wedding';
 
-  // Build OG image URL: Use stored social thumbnail if available, otherwise direct static thumbnail path
+  // Build OG image URL: Use stored social thumbnail if available, otherwise high-performance .jpg monogram
   let ogImageUrl = '';
   if (isUnpublished) {
     ogImageUrl = `${proto}://${host}/website_thumbnail.jpg`;
@@ -425,8 +425,8 @@ export default async function handler(req, res) {
     // Use the invitation's explicitly assigned social thumbnail
     ogImageUrl = socialThumbnailUrl;
   } else {
-    // Direct path to static thumbnail on CDN (fallback handled by Vercel rewrite to /api/og-image)
-    ogImageUrl = `${proto}://${host}/thumbnails/${encodeURIComponent(cleanSlug)}.jpg`;
+    // Reliable JPEG route guaranteed to return Content-Type: image/jpeg
+    ogImageUrl = `${proto}://${host}/api/og-image/${encodeURIComponent(cleanSlug)}.jpg`;
   }
 
   const shareUrl = `${proto}://${host}/invite/${cleanSlug}`;
