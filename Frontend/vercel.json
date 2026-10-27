@@ -1,8 +1,49 @@
 {
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "all, index, follow"
+        }
+      ]
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/api/home",
+      "destination": "/api/home"
+    },
     {
       "source": "/api/og-image",
       "destination": "/api/og-image"
+    },
+    {
+      "source": "/api/invite",
+      "destination": "/api/invite"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*([wW]hats[aA]pp|[fF]acebookexternalhit|[fF]acebot|[tT]witterbot|[tT]elegram[bB]ot|[lL]inked[iI]n[bB]ot|[sS]lackbot|[dD]iscordbot|[aA]pplebot|[gG]ooglebot|[gG]oogle-[iI]nspection[tT]ool|[bB]ingbot|[yY]ahoo|[iI]a_archiver|[eE]mbedly|[qQ]uora link preview|[oO]utbrain|[rR]ogerbot|[sS]howyoubot|[vV]k[sS]hare|[wW]3c_validator|[rR]edditbot|[iI]framely|developers\\.google\\.com|[sS]kype[uU]ri[pP]review|[vV]iber|[pP]interest).*"
+        }
+      ],
+      "destination": "/api/home"
+    },
+    {
+      "source": "/index.html",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*([wW]hats[aA]pp|[fF]acebookexternalhit|[fF]acebot|[tT]witterbot|[tT]elegram[bB]ot|[lL]inked[iI]n[bB]ot|[sS]lackbot|[dD]iscordbot|[aA]pplebot|[gG]ooglebot|[gG]oogle-[iI]nspection[tT]ool|[bB]ingbot|[yY]ahoo|[iI]a_archiver|[eE]mbedly|[qQ]uora link preview|[oO]utbrain|[rR]ogerbot|[sS]howyoubot|[vV]k[sS]hare|[wW]3c_validator|[rR]edditbot|[iI]framely|developers\\.google\\.com|[sS]kype[uU]ri[pP]review|[vV]iber|[pP]interest).*"
+        }
+      ],
+      "destination": "/api/home"
     },
     {
       "source": "/invite/:slug",
@@ -10,7 +51,18 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(?i).*(facebookexternalhit|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot|googlebot|google-inspectiontool|pinterest|skypeuripreview|viber|vkshare|embedly).*"
+          "value": ".*([wW]hats[aA]pp|[fF]acebookexternalhit|[fF]acebot|[tT]witterbot|[tT]elegram[bB]ot|[lL]inked[iI]n[bB]ot|[sS]lackbot|[dD]iscordbot|[aA]pplebot|[gG]ooglebot|[gG]oogle-[iI]nspection[tT]ool|[bB]ingbot|[yY]ahoo|[iI]a_archiver|[eE]mbedly|[qQ]uora link preview|[oO]utbrain|[rR]ogerbot|[sS]howyoubot|[vV]k[sS]hare|[wW]3c_validator|[rR]edditbot|[iI]framely|developers\\.google\\.com|[sS]kype[uU]ri[pP]review|[vV]iber|[pP]interest).*"
+        }
+      ],
+      "destination": "/api/invite?slug=:slug"
+    },
+    {
+      "source": "/invitation/:slug",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*([wW]hats[aA]pp|[fF]acebookexternalhit|[fF]acebot|[tT]witterbot|[tT]elegram[bB]ot|[lL]inked[iI]n[bB]ot|[sS]lackbot|[dD]iscordbot|[aA]pplebot|[gG]ooglebot|[gG]oogle-[iI]nspection[tT]ool|[bB]ingbot|[yY]ahoo|[iI]a_archiver|[eE]mbedly|[qQ]uora link preview|[oO]utbrain|[rR]ogerbot|[sS]howyoubot|[vV]k[sS]hare|[wW]3c_validator|[rR]edditbot|[iI]framely|developers\\.google\\.com|[sS]kype[uU]ri[pP]review|[vV]iber|[pP]interest).*"
         }
       ],
       "destination": "/api/invite?slug=:slug"

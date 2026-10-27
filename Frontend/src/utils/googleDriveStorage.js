@@ -1566,8 +1566,10 @@ export async function transferAllDatabaseImagesToDrive({ getDb, saveDb, onProgre
     bytesFreed: bytesFreed
   };
   saveDb(db);
-  window.dispatchEvent(new Event("db_synced"));
-  window.dispatchEvent(new CustomEvent("drive_images_migrated", { detail: { migratedCount, bytesFreed } }));
+  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+    window.dispatchEvent(new Event("db_synced"));
+    window.dispatchEvent(new CustomEvent("drive_images_migrated", { detail: { migratedCount, bytesFreed } }));
+  }
 
   if (onProgress) {
     onProgress({

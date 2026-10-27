@@ -205,8 +205,11 @@ export default function InvitationView() {
         title: title,
         weddingDate: invitation.config.weddingDate,
         weddingVenue: invitation.config.weddingVenue,
-        thumbnailUrl: thumbUrl,
-        shareUrl: shareUrl
+        thumbnailUrl: invitation.socialThumbnailUrl || thumbUrl,
+        shareUrl: shareUrl,
+        socialTitle: invitation.socialTitle,
+        socialDescription: invitation.socialDescription,
+        socialThumbnailUrl: invitation.socialThumbnailUrl
       });
     }
 

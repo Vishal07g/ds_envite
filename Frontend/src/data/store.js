@@ -1,7 +1,7 @@
 // LocalStorage CRUD Database Store for Wedding Invitation SaaS
 import { ref, set, get, onValue } from "firebase/database";
-import { database } from "../utils/firebase";
-import { DEFAULT_TIMELINE_CONFIG } from "./timelineDefaults";
+import { database } from "../utils/firebase.js";
+import { DEFAULT_TIMELINE_CONFIG } from "./timelineDefaults.js";
 import {
   formatDriveFolderName,
   syncDriveFolder,
@@ -11,11 +11,17 @@ import {
   transferAllDatabaseImagesToDrive,
   scanDatabaseForBase64Media,
   uploadBase64ToDriveStorage
-} from "../utils/googleDriveStorage";
+} from "../utils/googleDriveStorage.js";
 
 // Firebase Realtime Database sync status
 let isFirebaseSynced = false;
 let dbCache = null;
+
+function dispatchDbSynced() {
+  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") {
+    window.dispatchEvent(new Event("db_synced"));
+  }
+}
 
 const DEFAULT_HERO_IMAGE = "https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&q=80&w=1200";
 const DEFAULT_STORY_IMAGE = "https://images.unsplash.com/photo-1511285560929-80b456fea0bc?auto=format&fit=crop&q=80&w=1200";
@@ -1333,7 +1339,7 @@ if (typeof window !== "undefined") {
         isFirebaseSynced = true;
         
         // Dispatch custom event to notify React components that DB is loaded/synced
-        window.dispatchEvent(new Event("db_synced"));
+        dispatchDbSynced();
       } else {
         // If database is empty, seed it with initial local data
         const initialDb = {
@@ -1401,7 +1407,7 @@ if (typeof window !== "undefined") {
         localStorage.setItem("db_deleted_envelope_presets", JSON.stringify(deletedEnvelopePresetIds));
         localStorage.setItem("db_deleted_presets", JSON.stringify(deletedPresetIds));
         localStorage.setItem("db_initialized", "true");
-        window.dispatchEvent(new Event("db_synced"));
+        dispatchDbSynced();
       }
     });
   } catch (err) {
@@ -1652,7 +1658,7 @@ export const dbStore = {
 
     db.archive.unshift(archiveRecord);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return archiveRecord;
   },
   restoreArchivedItem(archiveId) {
@@ -1707,7 +1713,7 @@ export const dbStore = {
 
     db.archive.splice(recordIdx, 1);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
   permanentlyDeleteArchivedItem(archiveId) {
@@ -1715,14 +1721,14 @@ export const dbStore = {
     if (!db.archive) return false;
     db.archive = db.archive.filter(a => a.id !== archiveId);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
   clearArchive() {
     const db = getDb();
     db.archive = [];
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
 
@@ -1777,7 +1783,7 @@ export const dbStore = {
     db.invitations = db.invitations.filter(inv => inv.customerId !== id);
     db.orders = db.orders.filter(o => o.customerId !== id);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
 
@@ -1920,18 +1926,40 @@ export const dbStore = {
     const fullConfig = { ...DEFAULT_CONFIG, ...config };
     const folderName = customFolderName || formatDriveFolderName(fullConfig, title || (bride && groom ? `${bride} & ${groom}'s Wedding` : "New Invitation"));
 
+    // Auto-generate social metadata from the invitation's actual data
+    const autoTitle = (bride && groom) ? `${bride} & ${groom} — Wedding Invitation` : (title || 'Digital Invitation');
+    const autoDesc = (bride && groom)
+      ? `You are warmly invited to celebrate the wedding of ${bride} & ${groom}. Tap to view the interactive invitation, RSVP, and share blessings.`
+      : `You have received a special digital invitation. Tap to open the interactive invitation on DS Envite.`;
+
+    const heroNames = (bride && groom) ? [bride, groom] : (bride ? [bride] : (groom ? [groom] : [title || 'Couple']));
+    const themeId = config.themeId || config.presetId || 'royal-theme';
+    const canonicalUrl = `https://ds-envite.vercel.app/invite/${initialSlug}`;
+
     const newInv = {
       id: uniqueId,
       slug: initialSlug,
       customSlug: initialSlug,
       customerId,
+      themeId,
+      heroNames,
       title: title || `${bride} & ${groom}'s Wedding`,
+      description: autoDesc,
+      thumbnailUrl: '',
+      canonicalUrl,
       config: fullConfig,
       rsvps: [],
       wishes: [],
       isPaid,
       shareText: `We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - ${bride} & ${groom}`,
       status,
+      // Per-invitation social sharing metadata (independently configurable)
+      eventType: 'wedding',
+      socialTitle: autoTitle,
+      socialDescription: autoDesc,
+      socialThumbnailUrl: '',  // Will be populated by og-image API dynamically
+      imageAlt: (bride && groom) ? `${bride} & ${groom} Wedding Invitation Preview` : `${heroNames.join(' & ')} Invitation Preview`,
+      isSocialMetaManuallySet: false,
       driveStorage: {
         rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
         rootFolderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
@@ -1946,7 +1974,7 @@ export const dbStore = {
     };
     db.invitations.push(newInv);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
 
     // Asynchronously create and sync folder on Google Drive
     syncDriveFolder({ invitation: newInv, customFolderName: folderName }).then(driveRes => {
@@ -1956,7 +1984,7 @@ export const dbStore = {
         if (target) {
           target.driveStorage = { ...(target.driveStorage || {}), ...driveRes };
           saveDb(freshDb);
-          window.dispatchEvent(new Event("db_synced"));
+          dispatchDbSynced();
         }
       }
     }).catch(err => console.warn("Google Drive initial sync warning:", err));
@@ -2031,9 +2059,29 @@ export const dbStore = {
       }).catch(err => console.warn("Google Drive auto-sync warning:", err));
     }
 
+    // Auto-regenerate social metadata when bride/groom names change (only if not manually customized)
+    let socialUpdates = {};
+    if (updates.config && (updates.config.brideName !== undefined || updates.config.groomName !== undefined)) {
+      const updBride = (newConfig.brideName || newConfig.coverBrideText || '').trim();
+      const updGroom = (newConfig.groomName || newConfig.coverGroomText || '').trim();
+      // Only auto-update if the user hasn't manually set custom social metadata
+      if (!current.isSocialMetaManuallySet) {
+        socialUpdates.socialTitle = (updBride && updGroom)
+          ? `${updBride} & ${updGroom} — Wedding Invitation`
+          : (updates.title || current.title || 'Digital Invitation');
+        socialUpdates.socialDescription = (updBride && updGroom)
+          ? `You are warmly invited to celebrate the wedding of ${updBride} & ${updGroom}. Tap to view the interactive invitation, RSVP, and share blessings.`
+          : `You have received a special digital invitation. Tap to open the interactive invitation on DS Envite.`;
+        socialUpdates.imageAlt = (updBride && updGroom)
+          ? `${updBride} & ${updGroom} Wedding Invitation Preview`
+          : 'Digital Invitation Preview';
+      }
+    }
+
     db.invitations[idx] = {
       ...current,
       ...updates,
+      ...socialUpdates,
       isCustomSlugManuallySet: isManual,
       slug: newSlug,
       customSlug: newCustomSlug,
@@ -2041,7 +2089,7 @@ export const dbStore = {
       updatedAt: new Date().toISOString()
     };
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
 
     // Permanent Google Drive Sync: If any base64 media (images, audio, videos) is saved, migrate it to Google Drive in the background to free Firebase space
     if (updates.config) {
@@ -2098,7 +2146,7 @@ export const dbStore = {
 
           if (didMigrate) {
             saveDb(freshDb);
-            window.dispatchEvent(new Event("db_synced"));
+            dispatchDbSynced();
           }
         } catch(e) {
           console.warn("Background Drive migration notice:", e);
@@ -2125,7 +2173,7 @@ export const dbStore = {
     }
     db.invitations = db.invitations.filter(inv => inv.id !== id);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
   duplicateInvitation(id, customTitle = null, assignCustomerId = null, customFolderName = null) {
@@ -2146,6 +2194,13 @@ export const dbStore = {
     const newTitle = customTitle || `${source.title || (bride && groom ? `${bride} & ${groom}'s Wedding` : "Invitation")} (Copy)`;
     const newFolderName = customFolderName || formatDriveFolderName(cleanConfig, newTitle);
 
+    const dupBride = (cleanConfig.coverBrideText || cleanConfig.brideName || "").trim();
+    const dupGroom = (cleanConfig.coverGroomText || cleanConfig.groomName || "").trim();
+    const autoTitle = (dupBride && dupGroom) ? `${dupBride} & ${dupGroom} — Wedding Invitation` : `${newTitle}`;
+    const autoDesc = (dupBride && dupGroom)
+      ? `You are warmly invited to celebrate the wedding of ${dupBride} & ${dupGroom}. Tap to view the interactive invitation, RSVP, and share blessings.`
+      : `You have received a special digital invitation. Tap to open the interactive invitation on DS Envite.`;
+
     const duplicated = {
       ...JSON.parse(JSON.stringify(source)),
       id: newId,
@@ -2160,6 +2215,18 @@ export const dbStore = {
       guestList: Array.isArray(source.guestList) ? JSON.parse(JSON.stringify(source.guestList)) : [],
       isPaid: false,
       status: "draft",
+      // Independent social sharing metadata for duplicated invitation
+      themeId: source.themeId || cleanConfig.themeId || cleanConfig.presetId || 'royal-theme',
+      heroNames: (dupBride && dupGroom) ? [dupBride, dupGroom] : (dupBride ? [dupBride] : (dupGroom ? [dupGroom] : [newTitle])),
+      canonicalUrl: `https://ds-envite.vercel.app/invite/${newSlug}`,
+      description: autoDesc,
+      thumbnailUrl: '',
+      isSocialMetaManuallySet: false,
+      socialTitle: autoTitle,
+      socialDescription: autoDesc,
+      socialThumbnailUrl: '', // Reset to ensure no shared thumbnail references
+      imageAlt: (dupBride && dupGroom) ? `${dupBride} & ${dupGroom} Wedding Invitation Preview` : `${((dupBride && dupGroom) ? [dupBride, dupGroom] : [newTitle]).join(' & ')} Invitation Preview`,
+      eventType: source.eventType || 'wedding',
       driveStorage: {
         rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
         rootFolderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
@@ -2175,7 +2242,7 @@ export const dbStore = {
 
     db.invitations.unshift(duplicated);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
 
     // Sync newly duplicated invitation's unique folder
     syncDriveFolder({ invitation: duplicated, customFolderName: newFolderName }).then(driveRes => {
@@ -2185,7 +2252,7 @@ export const dbStore = {
         if (target) {
           target.driveStorage = { ...(target.driveStorage || {}), ...driveRes };
           saveDb(freshDb);
-          window.dispatchEvent(new Event("db_synced"));
+          dispatchDbSynced();
         }
       }
     }).catch(err => console.warn("Duplicate Drive sync warning:", err));
@@ -2301,7 +2368,7 @@ export const dbStore = {
     }
 
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return { success: true, updated, rsvps: db.invitations[idx].rsvps };
   },
   submitWish(invitationId, wish) {
@@ -2349,7 +2416,7 @@ export const dbStore = {
     db.invitations[idx].wishes = [newWish, ...db.invitations[idx].wishes];
 
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return { success: true, wishes: db.invitations[idx].wishes };
   },
 
@@ -2376,7 +2443,7 @@ export const dbStore = {
     };
     db.presets.push(newPreset);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return newPreset;
   },
   createPresetFromInvitation(configOrId, title) {
@@ -2397,7 +2464,7 @@ export const dbStore = {
     };
     db.presets.push(newPreset);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return newPreset;
   },
   deletePreset(id) {
@@ -2412,7 +2479,7 @@ export const dbStore = {
     }
     db.presets = (db.presets || []).filter(p => p.id !== id);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
   updatePreset(id, updates) {
@@ -2431,7 +2498,7 @@ export const dbStore = {
       config: mergedConfig
     };
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return db.presets[idx];
   },
 
@@ -2477,7 +2544,7 @@ export const dbStore = {
     }
     db.bgPresets = (db.bgPresets || []).filter(p => p.id !== id);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
 
@@ -2522,7 +2589,7 @@ export const dbStore = {
     };
     db.envelopePresets.push(newPreset);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return newPreset;
   },
   deleteEnvelopePreset(id) {
@@ -2537,7 +2604,7 @@ export const dbStore = {
     }
     db.envelopePresets = (db.envelopePresets || []).filter(p => p.id !== id);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
 
@@ -2562,7 +2629,7 @@ export const dbStore = {
     };
     db.envelopeTextures.push(newTex);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return newTex;
   },
   deleteEnvelopeTexture(id) {
@@ -2574,7 +2641,7 @@ export const dbStore = {
     }
     db.envelopeTextures = db.envelopeTextures.filter(t => t.id !== id);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
 
@@ -2601,7 +2668,7 @@ export const dbStore = {
     };
     db.musicPresets.push(newTrack);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return newTrack;
   },
   deleteMusicPreset(id) {
@@ -2613,7 +2680,7 @@ export const dbStore = {
     }
     db.musicPresets = db.musicPresets.filter(m => m.id !== id);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
 
@@ -2676,7 +2743,7 @@ export const dbStore = {
       }
     };
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return db.orders[idx];
   },
   markOrderAsPaid(idOrOrderObj, paymentInfo = {}) {
@@ -2706,7 +2773,7 @@ export const dbStore = {
     }
 
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
   markOrderAsUnpaid(targetId) {
@@ -2722,7 +2789,7 @@ export const dbStore = {
       if (db.invitations[invIdx].config) db.invitations[invIdx].config.isPaid = false;
     }
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
   updateOrderPricing(id, price, discountPercent) {
@@ -2739,7 +2806,7 @@ export const dbStore = {
       db.invitations[invIdx].config.discountPercent = Number(discountPercent);
     }
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
   cancelOrder(id) {
@@ -2769,7 +2836,7 @@ export const dbStore = {
     }
     db.orders = db.orders.filter(o => o.id !== id);
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return true;
   },
 
@@ -2810,7 +2877,7 @@ export const dbStore = {
       ...settings
     };
     saveDb(db);
-    window.dispatchEvent(new Event("db_synced"));
+    dispatchDbSynced();
     return db.brandSettings;
   },
 

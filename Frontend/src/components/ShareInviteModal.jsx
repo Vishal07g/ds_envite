@@ -17,6 +17,7 @@ export default function ShareInviteModal({
   const [isEditingSlug, setIsEditingSlug] = useState(false);
   const [customSlugInput, setCustomSlugInput] = useState("");
   const [monogramDataUrl, setMonogramDataUrl] = useState(null);
+  const [isEditingMeta, setIsEditingMeta] = useState(false);
 
   const invObj = invitation || (invitationId ? dbStore.getInvitationById(invitationId) : null);
   const targetId = invObj?.id || invitationId;
@@ -30,6 +31,11 @@ export default function ShareInviteModal({
     ? `${brideName.charAt(0)} & ${groomName.charAt(0)}` 
     : (invitationTitle ? invitationTitle.slice(0, 2).toUpperCase() : "DS");
 
+  const defaultSocialTitle = invObj?.socialTitle || ((brideName && groomName) ? `${brideName} & ${groomName} — Wedding Invitation` : (invitationTitle || "Digital Invitation"));
+  const defaultSocialDesc = invObj?.socialDescription || "Tap to open our interactive digital invitation card, music, timeline & RSVP.";
+  const [socialTitleInput, setSocialTitleInput] = useState(defaultSocialTitle);
+  const [socialDescInput, setSocialDescInput] = useState(defaultSocialDesc);
+
   const autoSlug = dbStore.getInvitationShareSlug(invObj || { id: targetId }, currentConfig);
   const isManuallySet = Boolean(invObj?.isCustomSlugManuallySet && invObj?.customSlug && !invObj.customSlug.startsWith("ananya-aarav"));
   const activeSlug = isManuallySet ? invObj.customSlug : autoSlug;
@@ -38,6 +44,9 @@ export default function ShareInviteModal({
     if (isOpen) {
       setCustomSlugInput(activeSlug);
       setIsEditingSlug(false);
+      setIsEditingMeta(false);
+      setSocialTitleInput(invObj?.socialTitle || defaultSocialTitle);
+      setSocialDescInput(invObj?.socialDescription || defaultSocialDesc);
       try {
         const url = getMonogramThumbnailDataUrl({
           brideName,
@@ -52,7 +61,7 @@ export default function ShareInviteModal({
         console.warn("Could not generate monogram:", e);
       }
     }
-  }, [isOpen, activeSlug, brideName, groomName, invitationTitle, currentConfig.weddingDate]);
+  }, [isOpen, activeSlug, brideName, groomName, invitationTitle, currentConfig.weddingDate, invObj?.socialTitle, invObj?.socialDescription]);
 
   if (!isOpen) return null;
 
@@ -94,6 +103,41 @@ export default function ShareInviteModal({
       if (showToast) showToast("Sharing link reset to couple name!", "success");
     }
     setIsEditingSlug(false);
+  };
+
+  const handleSaveSocialMeta = () => {
+    const trimmedTitle = socialTitleInput.trim();
+    if (!trimmedTitle) {
+      if (showToast) showToast("Preview title cannot be empty", "error");
+      return;
+    }
+    if (targetId) {
+      dbStore.updateInvitation(targetId, {
+        socialTitle: trimmedTitle,
+        socialDescription: socialDescInput.trim(),
+        isSocialMetaManuallySet: true
+      });
+      window.dispatchEvent(new Event("db_synced"));
+      if (showToast) showToast("Custom preview title and description saved!", "success");
+    }
+    setIsEditingMeta(false);
+  };
+
+  const handleResetSocialMeta = () => {
+    const autoTitle = (brideName && groomName) ? `${brideName} & ${groomName} — Wedding Invitation` : (invitationTitle || "Digital Invitation");
+    const autoDesc = "Tap to open our interactive digital invitation card, music, timeline & RSVP.";
+    setSocialTitleInput(autoTitle);
+    setSocialDescInput(autoDesc);
+    if (targetId) {
+      dbStore.updateInvitation(targetId, {
+        socialTitle: autoTitle,
+        socialDescription: autoDesc,
+        isSocialMetaManuallySet: false
+      });
+      window.dispatchEvent(new Event("db_synced"));
+      if (showToast) showToast("Social preview reset to auto-generated details!", "success");
+    }
+    setIsEditingMeta(false);
   };
 
   const handleWhatsAppShare = () => {
@@ -298,12 +342,83 @@ export default function ShareInviteModal({
                   <span>{origin ? origin.replace(/^https?:\/\//, '') : 'ds-envite.vercel.app'}</span>
                 </div>
                 <h4 className="font-cinzel text-xs font-bold text-amber-100 truncate">
-                  {brideName} &amp; {groomName} — Royal Wedding Invitation
+                  {socialTitleInput || defaultSocialTitle}
                 </h4>
                 <p className="text-[10px] text-slate-300 line-clamp-1">
-                  Tap to open our interactive digital invitation card, music, timeline &amp; RSVP.
+                  {socialDescInput || defaultSocialDesc}
                 </p>
               </div>
+            </div>
+
+            {/* Custom Preview Editor Toggle */}
+            <div className="pt-1">
+              {!isEditingMeta ? (
+                <div className="flex items-center justify-between text-[11px] text-amber-200/80 bg-amber-500/5 border border-amber-500/20 rounded-xl px-3 py-2">
+                  <span>Custom Title &amp; Description</span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingMeta(true)}
+                    className="text-[10px] font-bold uppercase tracking-wider text-amber-300 hover:text-amber-100 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 px-2.5 py-0.5 rounded-lg transition cursor-pointer"
+                  >
+                    ✎ Customize Preview Text
+                  </button>
+                </div>
+              ) : (
+                <div className="p-3 rounded-xl bg-slate-950/90 border border-amber-500/40 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-amber-300">
+                      Customize Social Preview Details
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingMeta(false)}
+                      className="text-[10px] text-slate-400 hover:text-white transition cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-300 block mb-1">
+                      Preview Heading (og:title)
+                    </label>
+                    <input
+                      type="text"
+                      value={socialTitleInput}
+                      onChange={(e) => setSocialTitleInput(e.target.value)}
+                      placeholder="e.g. Suman &amp; Vishal — Wedding Invitation"
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-amber-500/40 text-xs text-amber-100 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-semibold text-slate-300 block mb-1">
+                      Preview Subtitle / Description (og:description)
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={socialDescInput}
+                      onChange={(e) => setSocialDescInput(e.target.value)}
+                      placeholder="e.g. We cordially invite you to celebrate our sacred wedding union..."
+                      className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-amber-500/40 text-xs text-amber-100 focus:outline-none focus:border-amber-400 resize-none"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleResetSocialMeta}
+                      className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-slate-300 text-[10px] font-bold uppercase transition cursor-pointer"
+                    >
+                      Reset to Auto
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveSocialMeta}
+                      className="px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-[10px] font-bold uppercase transition shadow cursor-pointer"
+                    >
+                      Save Preview
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-start space-x-2">
