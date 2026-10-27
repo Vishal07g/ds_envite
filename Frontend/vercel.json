@@ -1,5 +1,20 @@
 {
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "all, index, follow"
+        }
+      ]
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/api/home",
+      "destination": "/api/home"
+    },
     {
       "source": "/api/og-image",
       "destination": "/api/og-image"
@@ -7,6 +22,28 @@
     {
       "source": "/api/invite",
       "destination": "/api/invite"
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot|googlebot|google-inspectiontool|bingbot|yahoo|ia_archiver|embedly|quora link preview|outbrain|rogerbot|showyoubot|vkshare|w3c_validator|redditbot|iframely|developers.google.com/\\+/web/snippet|skypeuripreview|viber|pinterest).*"
+        }
+      ],
+      "destination": "/api/home"
+    },
+    {
+      "source": "/index.html",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": "(?i).*(facebookexternalhit|facebot|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot|googlebot|google-inspectiontool|bingbot|yahoo|ia_archiver|embedly|quora link preview|outbrain|rogerbot|showyoubot|vkshare|w3c_validator|redditbot|iframely|developers.google.com/\\+/web/snippet|skypeuripreview|viber|pinterest).*"
+        }
+      ],
+      "destination": "/api/home"
     },
     {
       "source": "/invite/:slug",

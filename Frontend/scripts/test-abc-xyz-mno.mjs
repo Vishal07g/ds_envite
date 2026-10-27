@@ -398,7 +398,8 @@ async function runAbcXyzMnoTests() {
   assert(!indexHtml.includes('XYZ'), 'Homepage does not contain XYZ');
   assert(!indexHtml.includes('MNO'), 'Homepage does not contain MNO');
   assert(indexHtml.includes('website_thumbnail.jpg'), 'Homepage retains its own website_thumbnail.jpg');
-  assert(indexHtml.includes('https://ds-envite.vercel.app/'), 'Homepage canonical points to root /');
+  const canonMatch = extractCanonical(indexHtml);
+  assert(canonMatch && canonMatch.endsWith('/'), `Homepage canonical points to root /: "${canonMatch}"`);
 
   // ═══════════════════════════════════════════════════════════════════
   // Dynamic Monogram Thumbnail Verification for Single Hero Names

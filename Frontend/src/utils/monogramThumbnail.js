@@ -301,7 +301,7 @@ export function resetWebsiteSocialMetaTags() {
 
   const origin = (typeof window !== 'undefined' && window.location?.origin) || 'https://ds-envite.vercel.app';
   const siteTitle = "DS Envite — Luxury Digital Invitations & Wedding Websites";
-  const siteDesc = "Create, customize, and share interactive digital invitations with live music, RSVP tracking, scratch-to-reveal cards, and custom countdowns on DS Envite.";
+  const siteDesc = "Create beautiful, personalized digital wedding invitations with elegant designs, stunning themes, and memorable ways to share your special moments.";
   const siteBanner = `${origin}/website_thumbnail.jpg`;
 
   document.title = siteTitle;

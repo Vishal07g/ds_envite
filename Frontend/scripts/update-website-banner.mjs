@@ -7,10 +7,10 @@ const publicDir = path.resolve('public');
 const logoPath = path.join(publicDir, 'favicon.png');
 
 async function updateBanner() {
-  console.log('Regenerating website_thumbnail.jpg with the new official logo...');
+  console.log('Regenerating website_thumbnail.jpg with luxury brand presentation...');
 
   const logoBuffer = await sharp(logoPath)
-    .resize(160, 160)
+    .resize(170, 170)
     .png()
     .toBuffer();
 
@@ -19,35 +19,38 @@ async function updateBanner() {
   const bannerSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
     <!-- Background Radial Gradient -->
-    <radialGradient id="mainBg" cx="50%" cy="40%" r="85%">
-      <stop offset="0%" stop-color="#1f0910" />
-      <stop offset="35%" stop-color="#120408" />
-      <stop offset="70%" stop-color="#080204" />
+    <radialGradient id="mainBg" cx="50%" cy="38%" r="85%">
+      <stop offset="0%" stop-color="#240a12" />
+      <stop offset="35%" stop-color="#140308" />
+      <stop offset="70%" stop-color="#090104" />
       <stop offset="100%" stop-color="#030002" />
     </radialGradient>
 
-    <!-- Metallic Gold Gradient -->
+    <!-- Metallic Royal Gold Gradient -->
     <linearGradient id="goldText" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#FFF0BE" />
-      <stop offset="25%" stop-color="#E5C158" />
-      <stop offset="50%" stop-color="#C59B27" />
-      <stop offset="75%" stop-color="#F5DB88" />
-      <stop offset="100%" stop-color="#A57A16" />
+      <stop offset="0%" stop-color="#FFF2CA" />
+      <stop offset="20%" stop-color="#F2D16B" />
+      <stop offset="50%" stop-color="#CFA430" />
+      <stop offset="80%" stop-color="#F8E39D" />
+      <stop offset="100%" stop-color="#AF851C" />
     </linearGradient>
 
+    <!-- Card Border Gradient -->
     <linearGradient id="cardBorder" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#E5C158" stop-opacity="0.8" />
-      <stop offset="100%" stop-color="#805c10" stop-opacity="0.2" />
+      <stop offset="0%" stop-color="#F2D16B" stop-opacity="0.85" />
+      <stop offset="50%" stop-color="#805c10" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#F2D16B" stop-opacity="0.75" />
     </linearGradient>
 
-    <radialGradient id="ambientGlow" cx="50%" cy="30%" r="50%">
-      <stop offset="0%" stop-color="#d4af37" stop-opacity="0.22" />
-      <stop offset="50%" stop-color="#800f23" stop-opacity="0.10" />
+    <!-- Ambient Gold Glow -->
+    <radialGradient id="ambientGlow" cx="50%" cy="28%" r="48%">
+      <stop offset="0%" stop-color="#d4af37" stop-opacity="0.25" />
+      <stop offset="45%" stop-color="#800f23" stop-opacity="0.12" />
       <stop offset="100%" stop-color="#000000" stop-opacity="0" />
     </radialGradient>
 
     <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feGaussianBlur stdDeviation="6" result="blur" />
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
   </defs>
@@ -56,85 +59,90 @@ async function updateBanner() {
   <rect width="1200" height="630" fill="url(#mainBg)" />
   <rect width="1200" height="630" fill="url(#ambientGlow)" />
 
-  <!-- Elegant Outer Gold Filigree Borders -->
-  <rect x="28" y="28" width="1144" height="574" fill="none" stroke="url(#goldText)" stroke-width="2.5" rx="10" />
-  <rect x="38" y="38" width="1124" height="554" fill="none" stroke="url(#goldText)" stroke-width="1" opacity="0.35" rx="6" />
+  <!-- Outer Filigree Gold Borders -->
+  <rect x="26" y="26" width="1148" height="578" fill="none" stroke="url(#goldText)" stroke-width="2.5" rx="12" />
+  <rect x="36" y="36" width="1128" height="558" fill="none" stroke="url(#goldText)" stroke-width="1" opacity="0.4" rx="8" />
 
-  <!-- Ornate Corner Accents -->
+  <!-- Classical Ornate Corner Accents -->
   <g stroke="url(#goldText)" stroke-width="2" fill="none">
-    <path d="M 40 75 L 40 40 L 75 40" />
-    <circle cx="48" cy="48" r="3" fill="#E5C158" />
-    <path d="M 1160 75 L 1160 40 L 1125 40" />
-    <circle cx="1152" cy="48" r="3" fill="#E5C158" />
-    <path d="M 40 555 L 40 590 L 75 590" />
-    <circle cx="48" cy="582" r="3" fill="#E5C158" />
-    <path d="M 1160 555 L 1160 590 L 1125 590" />
-    <circle cx="1152" cy="582" r="3" fill="#E5C158" />
+    <path d="M 40 80 L 40 40 L 80 40" />
+    <circle cx="48" cy="48" r="3.5" fill="#F2D16B" />
+    <path d="M 1160 80 L 1160 40 L 1120 40" />
+    <circle cx="1152" cy="48" r="3.5" fill="#F2D16B" />
+    <path d="M 40 550 L 40 590 L 80 590" />
+    <circle cx="48" cy="582" r="3.5" fill="#F2D16B" />
+    <path d="M 1160 550 L 1160 590 L 1120 590" />
+    <circle cx="1152" cy="582" r="3.5" fill="#F2D16B" />
   </g>
 
-  <!-- Official Brand Favicon / Logo (Embedded Centered) -->
-  <g transform="translate(520, 50)" filter="url(#softGlow)">
-    <image href="data:image/png;base64,${logoBase64}" width="160" height="160" />
+  <!-- Official Royal Crest / Monogram (Centered) -->
+  <g transform="translate(515, 46)" filter="url(#softGlow)">
+    <image href="data:image/png;base64,${logoBase64}" width="170" height="170" />
   </g>
 
-  <!-- Big Brand Heading: DS ENVITE -->
-  <text x="600" y="260" text-anchor="middle" font-family="Georgia, 'Cinzel', serif" font-size="64" font-weight="bold" fill="url(#goldText)" letter-spacing="8" filter="url(#softGlow)">
+  <!-- Main Brand Title: DS ENVITE -->
+  <text x="600" y="262" text-anchor="middle" font-family="Georgia, 'Cinzel', serif" font-size="64" font-weight="bold" fill="url(#goldText)" letter-spacing="9" filter="url(#softGlow)">
     DS  ENVITE
   </text>
 
   <!-- Tagline / Subtitle -->
-  <text x="600" y="306" text-anchor="middle" font-family="'Playfair Display', Georgia, serif" font-style="italic" font-size="22" fill="#F5E4C3" opacity="0.94">
-    The Premier Platform for Bespoke Digital Wedding &amp; Event Invitations
+  <text x="600" y="306" text-anchor="middle" font-family="'Playfair Display', Georgia, serif" font-style="italic" font-size="22" fill="#F6E7CA" opacity="0.95">
+    Luxury Digital Wedding Invitations &amp; Bespoke Event Websites
   </text>
 
-  <!-- Divider Ribbon -->
-  <g transform="translate(600, 340)">
-    <line x1="-160" y1="0" x2="-25" y2="0" stroke="url(#goldText)" stroke-width="1.5" opacity="0.6" />
-    <polygon points="0,-6 6,0 0,6 -6,0" fill="url(#goldText)" />
-    <circle cx="-14" cy="0" r="2" fill="url(#goldText)" />
-    <circle cx="14" cy="0" r="2" fill="url(#goldText)" />
-    <line x1="25" y1="0" x2="160" y2="0" stroke="url(#goldText)" stroke-width="1.5" opacity="0.6" />
+  <!-- Elegant Gold Divider Ribbon -->
+  <g transform="translate(600, 338)">
+    <line x1="-180" y1="0" x2="-25" y2="0" stroke="url(#goldText)" stroke-width="1.5" opacity="0.65" />
+    <polygon points="0,-7 7,0 0,7 -7,0" fill="url(#goldText)" />
+    <circle cx="-14" cy="0" r="2.5" fill="url(#goldText)" />
+    <circle cx="14" cy="0" r="2.5" fill="url(#goldText)" />
+    <line x1="25" y1="0" x2="180" y2="0" stroke="url(#goldText)" stroke-width="1.5" opacity="0.65" />
   </g>
 
-  <!-- 4 Premium Feature Pillars -->
-  <g transform="translate(130, 375)">
-    <rect width="210" height="92" rx="12" fill="#1b080d" stroke="url(#cardBorder)" stroke-width="1.2" />
-    <text x="105" y="32" text-anchor="middle" font-size="22">💌</text>
-    <text x="105" y="56" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="12" font-weight="700" fill="#FDF3CE">Interactive Reveal</text>
-    <text x="105" y="74" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="10" fill="#A89474">Wax Seal &amp; 3D Envelope</text>
+  <!-- 4 Feature Pillars -->
+  <!-- Pillar 1: Interactive Reveal -->
+  <g transform="translate(130, 372)">
+    <rect width="210" height="96" rx="14" fill="#1c070e" stroke="url(#cardBorder)" stroke-width="1.4" />
+    <text x="105" y="33" text-anchor="middle" font-size="24">💌</text>
+    <text x="105" y="58" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="12.5" font-weight="700" fill="#FFF2CB">Interactive Reveal</text>
+    <text x="105" y="78" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="10.5" fill="#B29E7D">3D Envelope &amp; Wax Seal</text>
   </g>
 
-  <g transform="translate(370, 375)">
-    <rect width="210" height="92" rx="12" fill="#1b080d" stroke="url(#cardBorder)" stroke-width="1.2" />
-    <text x="105" y="32" text-anchor="middle" font-size="22">🎵</text>
-    <text x="105" y="56" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="12" font-weight="700" fill="#FDF3CE">Dual Song Audio</text>
-    <text x="105" y="74" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="10" fill="#A89474">Intro Blessing &amp; Theme Song</text>
+  <!-- Pillar 2: Dual Music & Audio -->
+  <g transform="translate(370, 372)">
+    <rect width="210" height="96" rx="14" fill="#1c070e" stroke="url(#cardBorder)" stroke-width="1.4" />
+    <text x="105" y="33" text-anchor="middle" font-size="24">🎵</text>
+    <text x="105" y="58" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="12.5" font-weight="700" fill="#FFF2CB">Dual Song Audio</text>
+    <text x="105" y="78" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="10.5" fill="#B29E7D">Intro Blessing &amp; Theme Song</text>
   </g>
 
-  <g transform="translate(610, 375)">
-    <rect width="210" height="92" rx="12" fill="#1b080d" stroke="url(#cardBorder)" stroke-width="1.2" />
-    <text x="105" y="32" text-anchor="middle" font-size="22">⚡</text>
-    <text x="105" y="56" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="12" font-weight="700" fill="#FDF3CE">Instant RSVP &amp; Wishes</text>
-    <text x="105" y="74" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="10" fill="#A89474">Guest Tracking &amp; Headcount</text>
+  <!-- Pillar 3: Realtime RSVP -->
+  <g transform="translate(610, 372)">
+    <rect width="210" height="96" rx="14" fill="#1c070e" stroke="url(#cardBorder)" stroke-width="1.4" />
+    <text x="105" y="33" text-anchor="middle" font-size="24">⚡</text>
+    <text x="105" y="58" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="12.5" font-weight="700" fill="#FFF2CB">Instant RSVP &amp; Wishes</text>
+    <text x="105" y="78" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="10.5" fill="#B29E7D">Live Guest Tracking</text>
   </g>
 
-  <g transform="translate(850, 375)">
-    <rect width="210" height="92" rx="12" fill="#1b080d" stroke="url(#cardBorder)" stroke-width="1.2" />
-    <text x="105" y="32" text-anchor="middle" font-size="22">👑</text>
-    <text x="105" y="56" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="12" font-weight="700" fill="#FDF3CE">Unique Monograms</text>
-    <text x="105" y="74" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="10" fill="#A89474">Tailored to Each Invite</text>
+  <!-- Pillar 4: Tailored Monograms -->
+  <g transform="translate(850, 372)">
+    <rect width="210" height="96" rx="14" fill="#1c070e" stroke="url(#cardBorder)" stroke-width="1.4" />
+    <text x="105" y="33" text-anchor="middle" font-size="24">👑</text>
+    <text x="105" y="58" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="12.5" font-weight="700" fill="#FFF2CB">Unique Monograms</text>
+    <text x="105" y="78" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="10.5" fill="#B29E7D">Tailored Social Preview</text>
   </g>
 
-  <!-- Bottom Brand Footnote / URL -->
-  <g transform="translate(600, 528)">
-    <rect x="-170" y="-18" width="340" height="34" rx="17" fill="#2d0b13" stroke="url(#goldText)" stroke-width="1.2" />
-    <text x="0" y="4" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="12" font-weight="700" fill="#FFF2C6" letter-spacing="3">
-      ds-envite.vercel.app
+  <!-- Bottom Brand Value Badge (No technical hosting URLs!) -->
+  <g transform="translate(600, 526)">
+    <rect x="-190" y="-18" width="380" height="36" rx="18" fill="#320b15" stroke="url(#goldText)" stroke-width="1.4" />
+    <text x="0" y="5" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="12.5" font-weight="800" fill="#FFF5CE" letter-spacing="3.5">
+      PREMIER DIGITAL INVITATION PLATFORM
     </text>
   </g>
 
-  <text x="600" y="575" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="11" fill="#8E7860" letter-spacing="1.5">
-    Luxury Digital Invitations • Zero App Download • Instant Social Sharing
+  <!-- Bottom Tagline -->
+  <text x="600" y="575" text-anchor="middle" font-family="'Montserrat', sans-serif" font-size="11.5" fill="#9C856C" letter-spacing="2">
+    Create • Personalize • Share Instantly on WhatsApp &amp; Social Media
   </text>
 </svg>`;
 
@@ -146,10 +154,10 @@ async function updateBanner() {
     .toFile(path.join(publicDir, 'website_thumbnail.png'));
 
   await sharp(rawBannerPng)
-    .jpeg({ quality: 84, progressive: true, mozjpeg: true })
+    .jpeg({ quality: 86, progressive: true, mozjpeg: true })
     .toFile(path.join(publicDir, 'website_thumbnail.jpg'));
 
-  console.log('✓ website_thumbnail.jpg and website_thumbnail.png updated with official brand icon!');
+  console.log('✓ website_thumbnail.jpg and website_thumbnail.png updated with luxury brand presentation!');
 }
 
 updateBanner().catch(console.error);
