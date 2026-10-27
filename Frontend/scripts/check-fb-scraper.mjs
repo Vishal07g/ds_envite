@@ -1,5 +1,5 @@
 async function checkFacebookScraper() {
-  const target = 'https://ds-envite-cbn70mmpf-vishal-g1.vercel.app/invite/vishal-suman-1792995422776';
+  const target = 'https://ds-envite.vercel.app/invite/vishal-suman';
   const apiUrl = `https://graph.facebook.com/?id=${encodeURIComponent(target)}&scrape=true`;
   console.log('Querying Facebook Graph Scraper API...');
   try {
