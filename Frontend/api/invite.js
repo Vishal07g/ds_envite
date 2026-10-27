@@ -412,7 +412,8 @@ export default async function handler(req, res) {
 
   // ── Build URLs ───────────────────────────────────────────────────────
   const rawHost = req.headers['x-forwarded-host'] || req.headers.host || 'ds-envite.vercel.app';
-  const host = rawHost.endsWith('.vercel.app') ? 'ds-envite.vercel.app' : rawHost;
+  const isBranchPreview = rawHost.includes('-git-') || rawHost.includes('localhost');
+  const host = isBranchPreview ? rawHost : (rawHost.endsWith('.vercel.app') ? 'ds-envite.vercel.app' : rawHost);
   const proto = req.headers['x-forwarded-proto'] || 'https';
   const cleanSlug = rawSlug.replace(/^invite-/, '').replace(/-\d{6,}$/, '') || couple.slug || 'wedding';
 
