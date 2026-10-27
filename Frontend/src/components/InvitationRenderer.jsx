@@ -3259,54 +3259,6 @@ export default function InvitationRenderer({
                       />
                     )}
 
-                    {/* Editor Floating Toggle for Center Shield Black Box & Text */}
-                    {!isPrintMode && (isModerator || Boolean(onSelectElement)) && (
-                      <div 
-                        className="absolute top-2.5 right-2.5 z-30 flex items-center select-none"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {config.scratchShieldBadgeEnabled !== false ? (
-                          <div className="flex items-center gap-1.5 bg-slate-950/90 backdrop-blur-md px-2.5 py-1 rounded-xl border border-amber-500/50 shadow-xl">
-                            <button
-                              type="button"
-                              id="scratchCardEditShieldBtn"
-                              onClick={() => {
-                                onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchShieldBadgeTitle' });
-                              }}
-                              className="text-[9.5px] font-extrabold uppercase text-amber-300 hover:text-amber-100 flex items-center gap-1 cursor-pointer transition active:scale-95"
-                              title="Edit Black Box & Text in Sidebar"
-                            >
-                              <span>✏️ Edit Black Box</span>
-                            </button>
-                            <span className="text-white/20 text-xs">|</span>
-                            <button
-                              type="button"
-                              id="scratchCardToggleShieldBtn"
-                              onClick={() => {
-                                onChangeField && onChangeField('scratchShieldBadgeEnabled', false);
-                              }}
-                              className="text-[9.5px] font-extrabold uppercase text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer transition active:scale-95"
-                              title="Turn OFF this whole black box along with text"
-                            >
-                              <span>✕ Turn OFF</span>
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            id="scratchCardToggleShieldBtn"
-                            onClick={() => {
-                              onChangeField && onChangeField('scratchShieldBadgeEnabled', true);
-                            }}
-                            className="px-2.5 py-1 rounded-xl bg-slate-950/80 hover:bg-slate-900 backdrop-blur-md border border-amber-500/60 hover:border-amber-400 text-amber-300 hover:text-amber-100 text-[9.5px] font-extrabold uppercase tracking-wide transition shadow-lg flex items-center gap-1.5 cursor-pointer active:scale-95"
-                            title="Black Box & Text is currently OFF. Click to turn ON."
-                          >
-                            <span>✦ Black Box: OFF (Click to Turn ON)</span>
-                          </button>
-                        )}
-                      </div>
-                    )}
-
                     {/* Alternative 14 Reveal Effects Overlays — Clipped to Save The Date Card Dimensions */}
                     {!isPrintMode && config.revealEffect && config.revealEffect !== 'scratch' && !isScratchFinished && (
                       <RevealEffectsOverlay

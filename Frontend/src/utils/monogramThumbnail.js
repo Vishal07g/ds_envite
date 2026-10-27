@@ -198,7 +198,10 @@ export function updateSocialMetaTags({
   weddingVenue = "",
   introQuote = "",
   thumbnailUrl = null,
-  shareUrl = null
+  shareUrl = null,
+  socialTitle = "",
+  socialDescription = "",
+  socialThumbnailUrl = ""
 }) {
   if (typeof document === 'undefined') return;
 
@@ -206,15 +209,36 @@ export function updateSocialMetaTags({
   let pageDesc = "Design, customize, and share interactive invitations with RSVP tracking, live music, countdown timers, and blessings.";
   let ogTitle = "Luxury Digital Invitation — DS Envite";
 
-  if (brideName && groomName) {
-    pageTitle = `${brideName} & ${groomName} — Wedding Invitation | DS Envite`;
-    ogTitle = `${brideName} & ${groomName} — Wedding Invitation`;
-    const venueText = weddingVenue ? ` at ${weddingVenue}` : '';
-    pageDesc = `We cordially invite you to celebrate the wedding union of ${brideName} & ${groomName}${venueText}. Tap to view interactive invitation, music, and RSVP.`;
-  } else if (title) {
-    pageTitle = `${title} | DS Envite`;
-    ogTitle = title;
-    pageDesc = `You are cordially invited to ${title}. Tap to view the interactive invitation, music, and RSVP on DS Envite.`;
+  // Priority 1: Use stored social metadata
+  if (socialTitle) {
+    ogTitle = socialTitle;
+    pageTitle = `${socialTitle} | DS Envite`;
+  }
+  if (socialDescription) {
+    pageDesc = socialDescription;
+  }
+  if (socialThumbnailUrl && socialThumbnailUrl.startsWith('http')) {
+    thumbnailUrl = socialThumbnailUrl;
+  }
+
+  // Priority 2: Auto-generate if no custom social metadata
+  if (!socialTitle) {
+    if (brideName && groomName) {
+      pageTitle = `${brideName} & ${groomName} — Wedding Invitation | DS Envite`;
+      ogTitle = `${brideName} & ${groomName} — Wedding Invitation`;
+    } else if (title) {
+      pageTitle = `${title} | DS Envite`;
+      ogTitle = title;
+    }
+  }
+
+  if (!socialDescription) {
+    if (brideName && groomName) {
+      const venueText = weddingVenue ? ` at ${weddingVenue}` : '';
+      pageDesc = `We cordially invite you to celebrate the wedding union of ${brideName} & ${groomName}${venueText}. Tap to view interactive invitation, music, and RSVP.`;
+    } else if (title) {
+      pageDesc = `You are cordially invited to ${title}. Tap to view the interactive invitation, music, and RSVP on DS Envite.`;
+    }
   }
   
   document.title = pageTitle;
@@ -230,11 +254,25 @@ export function updateSocialMetaTags({
     el.setAttribute("content", content);
   };
 
+  const setCanonical = (url) => {
+    if (!url) return;
+    let el = document.querySelector('link[rel="canonical"]');
+    if (!el) {
+      el = document.createElement("link");
+      el.setAttribute("rel", "canonical");
+      document.head.appendChild(el);
+    }
+    el.setAttribute("href", url);
+  };
+
   setMeta("property", "og:title", ogTitle);
   setMeta("property", "og:description", pageDesc);
   setMeta("property", "og:type", "website");
   setMeta("property", "og:site_name", "DS Envite");
-  if (shareUrl) setMeta("property", "og:url", shareUrl);
+  if (shareUrl) {
+    setMeta("property", "og:url", shareUrl);
+    setCanonical(shareUrl);
+  }
   
   if (thumbnailUrl) {
     setMeta("property", "og:image", thumbnailUrl);
@@ -242,6 +280,10 @@ export function updateSocialMetaTags({
     setMeta("property", "og:image:type", "image/jpeg");
     setMeta("property", "og:image:width", "1200");
     setMeta("property", "og:image:height", "630");
+    const altText = (brideName && groomName) 
+      ? `${brideName} & ${groomName} Wedding Invitation Preview`
+      : (title || 'Digital Invitation Preview');
+    setMeta("property", "og:image:alt", altText);
     setMeta("name", "twitter:image", thumbnailUrl);
   }
 
@@ -257,7 +299,7 @@ export function updateSocialMetaTags({
 export function resetWebsiteSocialMetaTags() {
   if (typeof document === 'undefined') return;
 
-  const origin = window.location.origin || 'https://ds-envite.vercel.app';
+  const origin = (typeof window !== 'undefined' && window.location?.origin) || 'https://ds-envite.vercel.app';
   const siteTitle = "DS Envite — Luxury Digital Invitations & Wedding Websites";
   const siteDesc = "Create, customize, and share interactive digital invitations with live music, RSVP tracking, scratch-to-reveal cards, and custom countdowns on DS Envite.";
   const siteBanner = `${origin}/website_thumbnail.jpg`;
@@ -280,8 +322,18 @@ export function resetWebsiteSocialMetaTags() {
   setMeta("property", "og:image", siteBanner);
   setMeta("property", "og:image:secure_url", siteBanner);
   setMeta("property", "og:url", origin);
+  setMeta("property", "og:image:alt", "DS Envite Luxury Digital Invitations Platform");
   setMeta("name", "description", siteDesc);
   setMeta("name", "twitter:title", siteTitle);
   setMeta("name", "twitter:description", siteDesc);
   setMeta("name", "twitter:image", siteBanner);
+
+  // Reset canonical URL to homepage
+  let canonical = document.querySelector('link[rel="canonical"]');
+  if (!canonical) {
+    canonical = document.createElement("link");
+    canonical.setAttribute("rel", "canonical");
+    document.head.appendChild(canonical);
+  }
+  canonical.setAttribute("href", origin);
 }

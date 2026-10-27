@@ -254,6 +254,7 @@ export default function App() {
 
             {/* Shared Client Facing Invitation Link View */}
             <Route path="/invite/:id" element={<InvitationView />} />
+            <Route path="/invitation/:id" element={<InvitationView />} />
 
             {/* Printable PDF Live Design View */}
             <Route path="/print" element={<PrintInvitationView />} />
