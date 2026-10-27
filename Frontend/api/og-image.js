@@ -52,14 +52,36 @@ function getCenteredPathData(font, text, centerX, centerY, fontSize) {
 export default async function handler(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const bride = url.searchParams.get('bride') || 'Bride';
-    const groom = url.searchParams.get('groom') || 'Groom';
-    const date = url.searchParams.get('date') || '';
+    const bride = (url.searchParams.get('bride') || '').trim();
+    const groom = (url.searchParams.get('groom') || '').trim();
+    const title = (url.searchParams.get('title') || '').trim();
+    const date = (url.searchParams.get('date') || '').trim();
+    const venue = (url.searchParams.get('venue') || '').trim();
+    const bgParam = (url.searchParams.get('bg') || '').trim();
+    const accentParam = (url.searchParams.get('accent') || '').trim();
 
-    const brideInitial = (bride.trim().charAt(0) || 'B').toUpperCase();
-    const groomInitial = (groom.trim().charAt(0) || 'G').toUpperCase();
-    const initials = `${brideInitial} & ${groomInitial}`;
-    const coupleNames = `${bride.trim().toUpperCase()}  &  ${groom.trim().toUpperCase()}`;
+    let initials = '';
+    let mainHeading = '';
+
+    if (bride && groom) {
+      const bInit = (bride.charAt(0) || 'B').toUpperCase();
+      const gInit = (groom.charAt(0) || 'G').toUpperCase();
+      initials = `${bInit} & ${gInit}`;
+      mainHeading = `${bride.toUpperCase()}  &  ${groom.toUpperCase()}`;
+    } else if (bride || groom) {
+      const name = bride || groom;
+      initials = (name.charAt(0) || 'D').toUpperCase();
+      mainHeading = name.toUpperCase();
+    } else if (title) {
+      const words = title.split(/\s+/).filter(Boolean);
+      initials = words.length >= 2 
+        ? `${words[0].charAt(0).toUpperCase()} & ${words[1].charAt(0).toUpperCase()}`
+        : (words[0]?.charAt(0) || 'DS').toUpperCase();
+      mainHeading = title.toUpperCase();
+    } else {
+      initials = 'DS';
+      mainHeading = 'ROYAL INVITATION';
+    }
 
     let dateText = 'CORDIALLY INVITED';
     if (date) {
@@ -71,51 +93,60 @@ export default async function handler(req, res) {
       } catch {}
     }
 
+    let venueText = '';
+    if (venue) {
+      venueText = venue.length > 48 ? venue.slice(0, 46).toUpperCase() + '...' : venue.toUpperCase();
+    }
+
+    // Dynamic Color Palette
+    const primaryBg = bgParam && bgParam.startsWith('#') ? bgParam : '#4a121d';
+    const accentGold = accentParam && accentParam.startsWith('#') ? accentParam : '#D4AF37';
+
     const font = getFont();
 
     let typographySvg = '';
     if (font) {
-      const initialsPath = getCenteredPathData(font, initials, 600, 255, 68);
-      const coupleNamesPath = getCenteredPathData(font, coupleNames, 600, 440, 32);
+      const initialsPath = getCenteredPathData(font, initials, 600, 255, initials.length > 3 ? 56 : 68);
+      const coupleNamesPath = getCenteredPathData(font, mainHeading, 600, 440, mainHeading.length > 28 ? 24 : 32);
       const subtitlePath = getCenteredPathData(font, 'W E D D I N G   I N V I T A T I O N', 600, 488, 14);
-      const datePath = getCenteredPathData(font, dateText, 600, 530, 13);
+      const datePath = getCenteredPathData(font, venueText ? `${dateText} • ${venueText}` : dateText, 600, 530, 12);
 
       typographySvg = `
   <g transform="scale(1, -1)">
     <path d="${initialsPath}" fill="url(#gold)"/>
     <path d="${coupleNamesPath}" fill="#FFFFFF"/>
-    <path d="${subtitlePath}" fill="#D4AF37"/>
-    <path d="${datePath}" fill="#D4AF37" opacity="0.9"/>
+    <path d="${subtitlePath}" fill="url(#gold)"/>
+    <path d="${datePath}" fill="#F5DA88" opacity="0.95"/>
   </g>`;
     } else {
       // Fallback text if font object unavailable
       typographySvg = `
-  <text x="600" y="255" text-anchor="middle" dominant-baseline="central" font-family="Georgia, serif" font-weight="bold" font-size="68" fill="url(#gold)">${escapeXml(initials)}</text>
-  <text x="600" y="440" text-anchor="middle" font-family="Georgia, serif" font-weight="bold" font-size="32" fill="#FFFFFF">${escapeXml(coupleNames)}</text>
-  <text x="600" y="488" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="#D4AF37">W E D D I N G   I N V I T A T I O N</text>
-  <text x="600" y="530" text-anchor="middle" font-family="Georgia, serif" font-size="13" fill="#D4AF37" opacity="0.9">${escapeXml(dateText)}</text>`;
+  <text x="600" y="255" text-anchor="middle" dominant-baseline="central" font-family="Georgia, serif" font-weight="bold" font-size="${initials.length > 3 ? 56 : 68}" fill="url(#gold)">${escapeXml(initials)}</text>
+  <text x="600" y="440" text-anchor="middle" font-family="Georgia, serif" font-weight="bold" font-size="${mainHeading.length > 28 ? 24 : 32}" fill="#FFFFFF">${escapeXml(mainHeading)}</text>
+  <text x="600" y="488" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="url(#gold)">W E D D I N G   I N V I T A T I O N</text>
+  <text x="600" y="530" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="#F5DA88" opacity="0.95">${escapeXml(venueText ? `${dateText} • ${venueText}` : dateText)}</text>`;
     }
 
     const svg = `
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
     <radialGradient id="bg" cx="50%" cy="50%" r="75%">
-      <stop offset="0%" stop-color="#4a121d"/>
-      <stop offset="50%" stop-color="#2a0810"/>
-      <stop offset="100%" stop-color="#120205"/>
+      <stop offset="0%" stop-color="${primaryBg}"/>
+      <stop offset="60%" stop-color="#18040a"/>
+      <stop offset="100%" stop-color="#0a0103"/>
     </radialGradient>
     <linearGradient id="gold" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#FBF0B9"/>
-      <stop offset="25%" stop-color="#D4AF37"/>
+      <stop offset="25%" stop-color="${accentGold}"/>
       <stop offset="50%" stop-color="#AA821C"/>
       <stop offset="75%" stop-color="#F5DA88"/>
-      <stop offset="100%" stop-color="#D4AF37"/>
+      <stop offset="100%" stop-color="${accentGold}"/>
     </linearGradient>
   </defs>
 
-  <!-- Luxury Burgundy Background -->
+  <!-- Luxury Background with Theme Color Gradient -->
   <rect width="1200" height="630" fill="url(#bg)"/>
-  <rect width="1200" height="630" fill="rgba(0,0,0,0.15)"/>
+  <rect width="1200" height="630" fill="rgba(0,0,0,0.2)"/>
 
   <!-- Ornate Golden Outer Frames -->
   <rect x="36" y="36" width="1128" height="558" fill="none" stroke="url(#gold)" stroke-width="3" rx="6"/>
@@ -124,13 +155,13 @@ export default async function handler(req, res) {
   <!-- Corner Brackets -->
   <g stroke="url(#gold)" stroke-width="2.5" fill="none">
     <path d="M 48 88 L 48 48 L 88 48"/>
-    <circle cx="56" cy="56" r="3" fill="#D4AF37"/>
+    <circle cx="56" cy="56" r="3" fill="${accentGold}"/>
     <path d="M 1152 88 L 1152 48 L 1112 48"/>
-    <circle cx="1144" cy="56" r="3" fill="#D4AF37"/>
+    <circle cx="1144" cy="56" r="3" fill="${accentGold}"/>
     <path d="M 48 542 L 48 582 L 88 582"/>
-    <circle cx="56" cy="574" r="3" fill="#D4AF37"/>
+    <circle cx="56" cy="574" r="3" fill="${accentGold}"/>
     <path d="M 1152 542 L 1152 582 L 1112 582"/>
-    <circle cx="1144" cy="574" r="3" fill="#D4AF37"/>
+    <circle cx="1144" cy="574" r="3" fill="${accentGold}"/>
   </g>
 
   <!-- Central Crest Rings -->
@@ -157,7 +188,6 @@ export default async function handler(req, res) {
       .jpeg({ quality: 82, progressive: true, mozjpeg: true })
       .toBuffer();
 
-    // If somehow larger than 48KB, reduce quality slightly to stay strictly under 50KB
     if (outputBuffer.length > 49152) {
       outputBuffer = await sharp(rawPng)
         .jpeg({ quality: 74, progressive: true, mozjpeg: true })
@@ -171,7 +201,33 @@ export default async function handler(req, res) {
     res.status(200).send(outputBuffer);
   } catch (error) {
     console.error('Error generating OG image:', error);
-    res.redirect(302, '/wedding_monogram_thumbnail.jpg');
+    // On unexpected error, return a dynamic SVG fallback rather than redirecting to a static couple monogram
+    try {
+      const fallbackUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+      const bride = fallbackUrl.searchParams.get('bride') || '';
+      const groom = fallbackUrl.searchParams.get('groom') || '';
+      const title = fallbackUrl.searchParams.get('title') || 'Special Invitation';
+      const label = bride && groom ? `${bride} & ${groom}` : title;
+      const bInit = bride ? bride.charAt(0).toUpperCase() : '';
+      const gInit = groom ? groom.charAt(0).toUpperCase() : '';
+      const fallbackInitials = bInit && gInit ? `${bInit} & ${gInit}` : (label.charAt(0) || 'DS').toUpperCase();
+
+      const fallbackSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+        <rect width="1200" height="630" fill="#2d0812"/>
+        <rect x="40" y="40" width="1120" height="550" fill="none" stroke="#D4AF37" stroke-width="2" rx="8"/>
+        <circle cx="600" cy="270" r="120" fill="none" stroke="#D4AF37" stroke-width="3"/>
+        <text x="600" y="280" text-anchor="middle" font-family="Georgia, serif" font-weight="bold" font-size="70" fill="#D4AF37">${escapeXml(fallbackInitials)}</text>
+        <text x="600" y="450" text-anchor="middle" font-family="Georgia, serif" font-weight="bold" font-size="34" fill="#FFFFFF">${escapeXml(label.toUpperCase())}</text>
+        <text x="600" y="495" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#D4AF37" letter-spacing="4">WEDDING INVITATION</text>
+      </svg>`;
+      const fallbackBuffer = await sharp(Buffer.from(fallbackSvg))
+        .jpeg({ quality: 80 })
+        .toBuffer();
+      res.setHeader('Content-Type', 'image/jpeg');
+      return res.status(200).send(fallbackBuffer);
+    } catch {
+      return res.status(500).send('Error generating thumbnail');
+    }
   }
 }
 

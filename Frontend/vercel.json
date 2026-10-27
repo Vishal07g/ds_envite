@@ -10,7 +10,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(?i).*(facebookexternalhit|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot).*"
+          "value": "(?i).*(facebookexternalhit|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot|googlebot|google-inspectiontool|pinterest|skypeuripreview|viber|vkshare|embedly).*"
         }
       ],
       "destination": "/api/invite?slug=:slug"

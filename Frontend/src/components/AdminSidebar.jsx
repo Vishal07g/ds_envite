@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { hexToRgb, rgbToHex, compressImage, parseColor, rgbaToCss } from '../utils/helpers';
+import { hexToRgb, rgbToHex, compressImage, parseColor, rgbaToCss, isVideoUrl } from '../utils/helpers';
 import dbStore, { CURATED_MUSIC_PRESETS, CURATED_CLIPARTS } from '../data/store';
 import CustomDialog from './CustomDialog';
 import TimelineEditorDrawer from './TimelineEditorDrawer';
@@ -19,6 +19,8 @@ import {
   transferInvitationToGoogleDriveOAuth,
   deleteDriveFileOAuth,
   cleanUnusedDriveFilesOAuth,
+  syncDriveFolder,
+  getDriveWebhookUrl,
   GOOGLE_DRIVE_ROOT_FOLDER_URL,
   GOOGLE_DRIVE_ROOT_FOLDER_ID
 } from '../utils/googleDriveStorage';
@@ -573,7 +575,9 @@ export default function AdminSidebar({
   status,
   onChangeStatus,
   isAdmin = true,
-  onSave
+  onSave,
+  mobilePanelMode = "split",
+  onToggleMobileHeight = null
 }) {
   const [activeTab, setActiveTab] = useState("cover");
   const [isScrollLocked, setIsScrollLocked] = useState(false);
@@ -645,6 +649,58 @@ export default function AdminSidebar({
       setDriveUploading(false);
     }
   };
+
+  const handleRenameDriveFolder = () => {
+    const currentName = invitation?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation");
+    triggerDialog({
+      type: 'prompt',
+      title: 'Rename Google Drive Folder',
+      message: 'Enter the new directory name for this invitation inside DS_Envite_DataCentre:',
+      defaultValue: currentName,
+      placeholder: 'e.g. Suman & Vishal Wedding',
+      confirmText: 'Save & Rename',
+      onConfirm: async (newName) => {
+        const trimmed = (newName || '').trim();
+        if (!trimmed || trimmed === currentName) return;
+        setDriveUploading(true);
+        setUploadStatusText(`Renaming Drive folder to "${trimmed}"...`);
+        try {
+          const oldName = currentName;
+          const targetInv = invitation || { config };
+          let token = getStoredOAuthToken();
+          if (!token && !getDriveWebhookUrl()) {
+            token = await requestGoogleDriveAuth();
+          }
+          const res = await syncDriveFolder({
+            invitation: targetInv,
+            oldFolderName: oldName,
+            customFolderName: trimmed,
+            token
+          });
+          const updatedStorage = {
+            ...(targetInv.driveStorage || {}),
+            ...(res || {}),
+            folderName: trimmed,
+            folderUrl: res?.folderUrl || targetInv.driveStorage?.folderUrl || (res?.folderId ? `https://drive.google.com/drive/folders/${res.folderId}` : undefined),
+            lastSyncedAt: new Date().toISOString()
+          };
+          onChangeField('driveStorage', updatedStorage);
+          if (targetInv.id) {
+            dbStore.updateInvitation(targetInv.id, { driveStorage: updatedStorage });
+          }
+          setUploadStatusText(`Drive folder renamed to "${trimmed}"!`);
+          setTimeout(() => setUploadStatusText(''), 4000);
+        } catch (err) {
+          console.error('Rename Drive folder error:', err);
+          setUploadStatusText('Error renaming Drive folder');
+          setTimeout(() => setUploadStatusText(''), 3000);
+        } finally {
+          setDriveUploading(false);
+        }
+      }
+    });
+  };
+
   const [isTabDropdownOpen, setIsTabDropdownOpen] = useState(false);
   const [activeElementField, setActiveElementField] = useState(null);
   const dropdownRef = React.useRef(null);
@@ -969,30 +1025,38 @@ export default function AdminSidebar({
     const file = e.target.files && e.target.files[0];
     if (!file) return;
 
-    const isAudio = Boolean(file.type && (file.type.startsWith("audio/") || file.type.includes("mpeg") || file.type.includes("mp3")));
-    const isVideo = Boolean(file.type && (file.type.startsWith("video/") || file.type.includes("mp4") || file.type.includes("webm")));
+    const isVideo = Boolean(
+      (file.type && (
+        file.type.startsWith("video/") || 
+        file.type.includes("mp4") || 
+        file.type.includes("webm") || 
+        file.type.includes("quicktime")
+      )) || /\.(mp4|webm|mov|m4v|mkv|ogv)$/i.test(file.name || "")
+    );
+    const isAudio = Boolean(
+      !isVideo && (
+        (file.type && (
+          file.type.startsWith("audio/") || 
+          file.type.includes("mpeg") || 
+          file.type.includes("mp3") ||
+          file.type.includes("wav") ||
+          file.type.includes("ogg")
+        )) || /\.(mp3|wav|ogg|m4a|aac)$/i.test(file.name || "")
+      )
+    );
 
     try {
       setDriveUploading(true);
-      setUploadStatusText("Processing media...");
+      setUploadStatusText(isVideo ? "Processing HD video..." : isAudio ? "Processing audio..." : "Processing media...");
 
-      // 1. Process HD image data locally
-      let localHdData = null;
-      if (file.type?.startsWith("image/")) {
-        try {
-          localHdData = await compressImage(file, 3840, 3840, 0.98, true);
-        } catch (e) {
-          localHdData = await new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
+      // 1. Process HD media data locally for instant responsive preview (using createObjectURL to avoid crashing localStorage)
+      let localPreview = null;
+      try {
+        localPreview = URL.createObjectURL(file);
+        if (localPreview) {
+          onChangeField(field, localPreview);
         }
-        if (localHdData) {
-          onChangeField(field, localHdData);
-        }
-      }
+      } catch (previewErr) {}
 
       // 2. Upload to Google Drive if authorized (and auto-delete previous file)
       const uploadRes = await uploadInvitationFileToDrive({
@@ -1002,7 +1066,10 @@ export default function AdminSidebar({
         previousUrl: config[field]
       });
 
-      if (isAudio || isVideo) {
+      if (isVideo) {
+        const resolvedUrl = formatDriveDirectUrl(uploadRes.url, "video");
+        onChangeField(field, resolvedUrl);
+      } else if (isAudio) {
         const resolvedUrl = formatDriveDirectUrl(uploadRes.url, "audio");
         onChangeField(field, resolvedUrl);
       } else {
@@ -1019,7 +1086,11 @@ export default function AdminSidebar({
           lastSyncedAt: new Date().toISOString()
         });
       }
-      setUploadStatusText(uploadRes.driveFileId ? "Saved & Synced to Google Drive!" : "HD Media saved!");
+      setUploadStatusText(
+        uploadRes.driveFileId
+          ? (isVideo ? "HD Video saved & synced to Google Drive!" : "Saved & Synced to Google Drive!")
+          : (isVideo ? "HD Video saved!" : "HD Media saved!")
+      );
       setTimeout(() => setUploadStatusText(""), 3000);
     } catch (err) {
       console.error("Error uploading to Drive, fallback to local:", err);
@@ -1490,48 +1561,89 @@ export default function AdminSidebar({
           )}
         </div>
 
-        {/* Image Upload Button */}
+        {/* Media Type Toggle: Image vs Video */}
+        <div>
+          <div className="grid grid-cols-2 gap-1 p-0.5 bg-slate-950 rounded-lg border border-slate-800 mb-2">
+            <button
+              type="button"
+              onClick={() => {
+                onChangeField(`${imageKey}MediaType`, "image");
+                if (imgUrl && imgUrl.includes("#type=video")) {
+                  onChangeField(imageKey, imgUrl.replace("#type=video", ""));
+                }
+              }}
+              className={`py-1 px-2 rounded text-[8.5px] font-bold transition flex items-center justify-center space-x-1 cursor-pointer ${
+                (config[`${imageKey}MediaType`] || (isVideoUrl(imgUrl) ? "video" : "image")) === "image"
+                  ? "bg-amber-500 text-slate-950 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <span>🖼️ HD Image</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onChangeField(`${imageKey}MediaType`, "video");
+                if (imgUrl && !imgUrl.includes("#type=video") && !isVideoUrl(imgUrl)) {
+                  onChangeField(imageKey, formatDriveDirectUrl(imgUrl, "video"));
+                }
+              }}
+              className={`py-1 px-2 rounded text-[8.5px] font-bold transition flex items-center justify-center space-x-1 cursor-pointer ${
+                (config[`${imageKey}MediaType`] || (isVideoUrl(imgUrl) ? "video" : "image")) === "video"
+                  ? "bg-amber-500 text-slate-950 shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <span>🎬 HD Video</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Media Upload Button (Image or Video) */}
         <div>
           <label className="text-[9px] uppercase text-amber-300 font-extrabold block mb-1 tracking-wider">
-            {imgUrl ? "Replace HD Image" : "Upload HD Image"}
+            {imgUrl ? (isVideoUrl(imgUrl) ? "Replace HD Video / Image" : "Replace HD Image / Video") : "Upload HD Image or Video"}
           </label>
           <input 
             type="file" 
-            accept="image/*"
+            accept="image/*,video/mp4,video/webm,video/quicktime,video/*"
             onChange={async (e) => {
               const file = e.target.files && e.target.files[0];
               if (file) {
+                const isVideo = Boolean(
+                  (file.type && (
+                    file.type.startsWith("video/") || 
+                    file.type.includes("mp4") || 
+                    file.type.includes("webm") || 
+                    file.type.includes("quicktime")
+                  )) || /\.(mp4|webm|mov|m4v|mkv|ogv)$/i.test(file.name || "")
+                );
+
                 try {
                   setDriveUploading(true);
-                  setUploadStatusText("Uploading HD Image...");
+                  setUploadStatusText(isVideo ? "Uploading HD Video to Drive..." : "Uploading HD Image...");
                   
-                  // 1. Process HD Image locally
+                  // 1. Process HD media locally for instantaneous 0ms feedback without base64 localStorage bloating
                   let instantPreview = null;
                   try {
-                    instantPreview = await compressImage(file, 3840, 3840, 0.98, true);
-                    onChangeField(imageKey, instantPreview);
-                  } catch (e) {
-                    try {
-                      instantPreview = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(reader.result);
-                        reader.onerror = reject;
-                        reader.readAsDataURL(file);
-                      });
+                    instantPreview = URL.createObjectURL(file);
+                    if (instantPreview) {
                       onChangeField(imageKey, instantPreview);
-                    } catch (readErr) {}
-                  }
+                    }
+                  } catch (readErr) {}
 
-                  // 2. Drive upload (and automatically delete previous HD image from Drive)
+                  // 2. Drive & Firebase Storage upload
                   const uploadRes = await uploadInvitationFileToDrive({
                     file,
                     invitation: invitation || { config },
                     category: imageKey,
                     previousUrl: imgUrl
                   });
-                  const finalImgUrl = uploadRes.driveDirectUrl || uploadRes.url || instantPreview;
-                  if (finalImgUrl) {
-                    onChangeField(imageKey, finalImgUrl);
+                  const finalMediaUrl = isVideo 
+                    ? formatDriveDirectUrl(uploadRes.url, "video")
+                    : (uploadRes.driveDirectUrl || uploadRes.url || instantPreview);
+                  if (finalMediaUrl) {
+                    onChangeField(imageKey, finalMediaUrl);
                   }
                   if (uploadRes.folderId && (!config.driveStorage?.folderId || config.driveStorage?.folderId !== uploadRes.folderId)) {
                     onChangeField("driveStorage", {
@@ -1542,14 +1654,14 @@ export default function AdminSidebar({
                       lastSync: new Date().toISOString()
                     });
                   }
-                  setUploadStatusText(uploadRes.driveFileId ? "HD Image saved in Google Drive!" : "HD Image saved!");
+                  setUploadStatusText(
+                    uploadRes.driveFileId 
+                      ? (isVideo ? "HD Video saved in Google Drive!" : "HD Image saved in Google Drive!") 
+                      : (isVideo ? "HD Video saved!" : "HD Image saved!")
+                  );
                   setTimeout(() => setUploadStatusText(""), 3000);
                 } catch (err) {
-                  console.error("Error uploading HD image to Drive:", err);
-                  try {
-                    const hdCompressed = await compressImage(file, 3840, 3840, 0.98, true);
-                    onChangeField(imageKey, hdCompressed);
-                  } catch (e) {}
+                  console.error("Error uploading media to Drive:", err);
                 } finally {
                   setDriveUploading(false);
                   if (e.target) e.target.value = "";
@@ -1560,14 +1672,54 @@ export default function AdminSidebar({
           />
         </div>
 
-        {/* Image Thumbnail Preview & Settings Controls */}
+        {/* Direct Link Input */}
+        <div>
+          <label className="text-[8px] uppercase text-slate-400 block mb-0.5">Or Paste Drive Link / Media URL</label>
+          <input 
+            type="text" 
+            value={imgUrl || ""} 
+            onChange={(e) => {
+              const val = e.target.value;
+              const isVid = (config[`${imageKey}MediaType`] === "video") || isVideoUrl(val);
+              onChangeField(imageKey, formatDriveDirectUrl(val, isVid ? "video" : "image"));
+            }}
+            className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs focus:outline-none focus:border-amber-500 text-slate-100"
+            placeholder="https://drive.google.com/file/d/... or direct URL"
+          />
+        </div>
+
+        {/* Media Thumbnail Preview & Settings Controls */}
         {imgUrl && (
           <div className="space-y-2.5 pt-2 border-t border-white/10">
             <div className="flex items-center space-x-3 bg-slate-950/80 p-2 rounded-lg border border-white/10">
-              <img src={imgUrl} alt={label} className="w-12 h-12 object-cover rounded-lg border border-amber-500/30" />
+              {isVideoUrl(imgUrl) ? (
+                extractDriveFileId(imgUrl) ? (
+                  <div className="w-12 h-12 rounded-lg overflow-hidden border border-amber-500/30 shrink-0 bg-black relative">
+                    <iframe 
+                      src={`https://drive.google.com/file/d/${extractDriveFileId(imgUrl)}/preview`} 
+                      className="w-full h-full border-0 pointer-events-none scale-125" 
+                    />
+                  </div>
+                ) : (
+                  <video 
+                    src={formatDriveDirectUrl(imgUrl, "video")} 
+                    autoPlay 
+                    loop 
+                    muted 
+                    playsInline 
+                    className="w-12 h-12 object-cover rounded-lg border border-amber-500/30 shrink-0" 
+                  />
+                )
+              ) : (
+                <img src={imgUrl} alt={label} className="w-12 h-12 object-cover rounded-lg border border-amber-500/30 shrink-0" />
+              )}
               <div className="flex-1 min-w-0">
-                <span className="text-[9px] text-slate-100 font-bold block truncate">HD Image Loaded</span>
-                <span className="text-[8px] text-emerald-400 font-mono font-bold">Pixel-Perfect Resolution</span>
+                <span className="text-[9px] text-slate-100 font-bold block truncate">
+                  {isVideoUrl(imgUrl) ? "HD Video Loaded" : "HD Image Loaded"}
+                </span>
+                <span className="text-[8px] text-emerald-400 font-mono font-bold block">
+                  {isVideoUrl(imgUrl) ? "Seamless Looping Stream" : "Pixel-Perfect Resolution"}
+                </span>
               </div>
             </div>
 
@@ -2092,7 +2244,7 @@ export default function AdminSidebar({
     <div 
       id="admin-sidebar-root"
       style={styleVariables}
-      className="admin-sidebar w-full h-full backdrop-blur-xl flex flex-col border-r border-white/10 shadow-2xl relative text-slate-100"
+      className="admin-sidebar w-full h-full max-h-full backdrop-blur-xl flex flex-col min-h-0 overflow-hidden border-r border-white/10 shadow-2xl relative text-slate-100"
     >
       <style>{`
         /* Sidebar Scrollbar */
@@ -2149,10 +2301,14 @@ export default function AdminSidebar({
           transform: translateY(0px) !important;
         }
 
-        /* Scrollable sidebar body custom wrapper */
-        .flex-1.overflow-y-auto {
+        /* Scrollable sidebar body custom wrapper with smooth touch scrolling */
+        .flex-1.overflow-y-auto,
+        #admin-sidebar-root .overflow-y-auto {
           scrollbar-width: thin;
           scrollbar-color: rgba(214, 173, 97, 0.4) #F7EFE5;
+          -webkit-overflow-scrolling: touch !important;
+          touch-action: pan-y !important;
+          overscroll-behavior-y: contain !important;
         }
 
         .admin-panel-title {
@@ -2162,19 +2318,19 @@ export default function AdminSidebar({
         }
       `}</style>
       {/* Header */}
-      <div className="p-4 border-b border-[#E9DCCB] flex items-center justify-between bg-[#F7EFE5]">
-        <div className="flex items-center space-x-2.5">
-          <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/25 flex items-center justify-center shadow-xs">
+      <div className="p-3 sm:p-4 border-b border-[#E9DCCB] flex items-center justify-between bg-[#F7EFE5] shrink-0">
+        <div className="flex items-center space-x-2 sm:space-x-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/25 flex items-center justify-center shadow-xs shrink-0">
             <SvgSettings className="w-4 h-4 text-blue-600 animate-spin-slow" />
           </div>
           <span 
-            className="admin-panel-title font-extrabold tracking-wider font-sans text-sm uppercase"
+            className="admin-panel-title font-extrabold tracking-wider font-sans text-xs sm:text-sm uppercase truncate"
             style={{ color: '#b45309' }}
           >
             CUSTOMIZATION CONTROL
           </span>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
           <button
             onClick={() => onChangeField("syncColorThemeWithEnvelope", !config.syncColorThemeWithEnvelope)}
             className={`admin-top-btn cursor-pointer ${
@@ -2214,6 +2370,16 @@ export default function AdminSidebar({
               </svg>
             )}
           </button>
+          {onToggleMobileHeight && (
+            <button
+              type="button"
+              onClick={onToggleMobileHeight}
+              className="md:hidden admin-top-btn cursor-pointer px-2 py-0.5 text-[10px] font-extrabold flex items-center space-x-1"
+              title={mobilePanelMode === 'expanded' ? "Switch to Split Screen View" : "Expand Control Panel View"}
+            >
+              <span>{mobilePanelMode === 'expanded' ? '🗗 Split' : '⤢ Full'}</span>
+            </button>
+          )}
           {onClose && (
             <button onClick={onClose} className="admin-top-btn close-btn cursor-pointer">
               <SvgX className="w-5 h-5" />
@@ -2235,12 +2401,22 @@ export default function AdminSidebar({
                 <span className="inline-flex items-center px-1.5 py-0.2 bg-amber-500/20 text-amber-800 text-[8.5px] font-extrabold rounded">READY</span>
               )}
             </div>
-            <p 
-              className="text-[10.5px] font-bold text-[#513321] truncate max-w-[210px]" 
-              title={invitation?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation")}
-            >
-              📁 {invitation?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation")}
-            </p>
+            <div className="flex items-center space-x-1.5">
+              <p 
+                className="text-[10.5px] font-bold text-[#513321] truncate max-w-[150px]" 
+                title={invitation?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation")}
+              >
+                📁 {invitation?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation")}
+              </p>
+              <button
+                type="button"
+                onClick={handleRenameDriveFolder}
+                className="text-[9.5px] text-amber-900 bg-amber-200/70 hover:bg-amber-300/80 px-1.5 py-0.2 rounded font-extrabold transition cursor-pointer shrink-0"
+                title="Name or rename unique Google Drive folder for this invitation"
+              >
+                ✏️ Rename
+              </button>
+            </div>
           </div>
         </div>
         <div className="flex items-center space-x-1.5 shrink-0">
@@ -2263,16 +2439,27 @@ export default function AdminSidebar({
               <span>🧹 Clean Space</span>
             </button>
           )}
-          <a
-            href={invitation?.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-2 py-0.5 bg-emerald-100/70 hover:bg-emerald-200/80 border border-emerald-400/50 text-emerald-900 rounded-md text-[9.5px] font-extrabold flex items-center space-x-1 transition shadow-xs"
-            title="Open this invitation's folder in Google Drive"
-          >
-            <span>Open</span>
-            <span>↗</span>
-          </a>
+          {invitation?.driveStorage?.folderId ? (
+            <a
+              href={invitation.driveStorage.folderUrl || `https://drive.google.com/drive/folders/${invitation.driveStorage.folderId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2 py-0.5 bg-emerald-100/70 hover:bg-emerald-200/80 border border-emerald-400/50 text-emerald-900 rounded-md text-[9.5px] font-extrabold flex items-center space-x-1 transition shadow-xs"
+              title={`Open Google Drive Folder: ${invitation.driveStorage.folderName || 'Unique Folder'}`}
+            >
+              <span>Open</span>
+              <span>↗</span>
+            </a>
+          ) : (
+            <button
+              type="button"
+              onClick={handleRenameDriveFolder}
+              className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 rounded-md text-[9.5px] font-extrabold flex items-center space-x-1 transition shadow-xs cursor-pointer"
+              title="Click to create & sync unique Google Drive folder"
+            >
+              <span>Create 📁</span>
+            </button>
+          )}
         </div>
       </div>
       {uploadStatusText && (
@@ -2366,7 +2553,14 @@ export default function AdminSidebar({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-5 custom-scrollbar">
+      <div 
+        className="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-4 space-y-5 custom-scrollbar touch-pan-y overscroll-contain"
+        style={{
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          overscrollBehaviorY: 'contain'
+        }}
+      >
         {/* Active Section Master Banner */}
         {activeTabObj.toggleKey && (
           <div className={`p-2.5 rounded-xl border flex items-center justify-between transition-all shadow-sm ${
@@ -3051,33 +3245,261 @@ export default function AdminSidebar({
               )
             })}
 
-            {/* BRIDE DETAILS SECTION */}
-            {renderPartCard({
-              title: "1. Bride Typography & Details",
-              toggleKey: "showBrideDetails",
-              children: (
-                <div className="space-y-3">
-                  {renderCategorizedElementTool("Bride Card Title", "storyBrideTitle", config.storyBrideTitle || "The Beautiful Bride")}
-                  {renderCategorizedElementTool("Bride Name Text", "storyBrideName", config.brideName || "Ananya")}
-                  {renderCategorizedElementTool("Bride Parent Label", "storyBrideParentLabel", config.storyBrideParentLabel || "Daughter of")}
-                  {renderCategorizedElementTool("Bride Family Text", "storyBrideFamily", config.brideFamily || "Daughter of Mr. & Mrs. Rajesh Sharma")}
+            {/* CARDS ARRANGEMENT & POSITION CONTROLS */}
+            <div className="p-3.5 bg-[#FFFEFB] rounded-xl border border-[#E9DCCB] space-y-3.5 shadow-sm">
+              <div className="flex items-center justify-between border-b border-[#E9DCCB]/60 pb-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-base">⇄</span>
+                  <div>
+                    <h4 className="text-[11px] font-extrabold text-[#513321] uppercase tracking-wider">
+                      Bride &amp; Groom Cards Arrangement
+                    </h4>
+                    <p className="text-[9px] text-[#8C6D52]">
+                      Swap positions (Left/Right or Up/Down) &amp; customize card layout
+                    </p>
+                  </div>
                 </div>
-              )
-            })}
+              </div>
 
-            {/* GROOM DETAILS SECTION */}
-            {renderPartCard({
-              title: "2. Groom Typography & Details",
-              toggleKey: "showGroomDetails",
-              children: (
-                <div className="space-y-3">
-                  {renderCategorizedElementTool("Groom Card Title", "storyGroomTitle", config.storyGroomTitle || "The Noble Groom")}
-                  {renderCategorizedElementTool("Groom Name Text", "storyGroomName", config.groomName || "Aarav")}
-                  {renderCategorizedElementTool("Groom Parent Label", "storyGroomParentLabel", config.storyGroomParentLabel || "Son of")}
-                  {renderCategorizedElementTool("Groom Family Text", "storyGroomFamily", config.groomFamily || "Son of Mr. & Mrs. Vijay Patel")}
+              {/* 1. LAYOUT DIRECTION: SIDE-BY-SIDE vs STACKED */}
+              <div>
+                <label className="text-[9.5px] uppercase font-extrabold text-[#745037] block mb-1.5 tracking-wider">
+                  Layout Orientation
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onChangeField("coupleCardsLayout", "sideBySide")}
+                    className={`py-2 px-2.5 rounded-lg border text-[10.5px] font-bold flex items-center justify-center space-x-1.5 transition cursor-pointer ${
+                      (config.coupleCardsLayout || "sideBySide") === "sideBySide"
+                        ? "bg-[#D6AD61] text-slate-950 border-[#B89254] shadow-xs"
+                        : "bg-[#FFF9F2] text-[#513321] border-[#E9DCCB] hover:bg-[#F5ECE0]"
+                    }`}
+                  >
+                    <span>↔ Side by Side</span>
+                    <span className="text-[8.5px] opacity-80">(Left &amp; Right)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => onChangeField("coupleCardsLayout", "stacked")}
+                    className={`py-2 px-2.5 rounded-lg border text-[10.5px] font-bold flex items-center justify-center space-x-1.5 transition cursor-pointer ${
+                      config.coupleCardsLayout === "stacked"
+                        ? "bg-[#D6AD61] text-slate-950 border-[#B89254] shadow-xs"
+                        : "bg-[#FFF9F2] text-[#513321] border-[#E9DCCB] hover:bg-[#F5ECE0]"
+                    }`}
+                  >
+                    <span>↕ Stacked</span>
+                    <span className="text-[8.5px] opacity-80">(Up &amp; Down)</span>
+                  </button>
                 </div>
-              )
-            })}
+              </div>
+
+              {/* 2. SWAP ORDER BUTTON (LEFT/RIGHT or UP/DOWN) */}
+              <div>
+                <label className="text-[9.5px] uppercase font-extrabold text-[#745037] block mb-1.5 tracking-wider">
+                  Position Order: {config.coupleCardsOrder === "groomFirst" ? "Groom First" : "Bride First"}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextOrder = config.coupleCardsOrder === "groomFirst" ? "brideFirst" : "groomFirst";
+                    onChangeField("coupleCardsOrder", nextOrder);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-extrabold text-[11px] shadow-sm flex items-center justify-between transition cursor-pointer"
+                  title="Click to swap the left/right or top/bottom position of Bride and Groom cards"
+                >
+                  <span className="flex items-center space-x-1.5">
+                    <span className="text-base">⇄</span>
+                    <span>
+                      Swap Position (
+                      {config.coupleCardsLayout === "stacked"
+                        ? (config.coupleCardsOrder === "groomFirst" ? "Groom Top ↕ Bride Bottom" : "Bride Top ↕ Groom Bottom")
+                        : (config.coupleCardsOrder === "groomFirst" ? "Groom Left ↔ Bride Right" : "Bride Left ↔ Groom Right")
+                      })
+                    </span>
+                  </span>
+                  <span className="text-[9px] px-2 py-0.5 bg-black/25 text-white rounded font-mono uppercase tracking-wide">
+                    Click to Swap
+                  </span>
+                </button>
+
+                {/* Visual Order Flow Pill */}
+                <div className="mt-2 p-2 bg-[#FFF9F2] border border-[#E9DCCB] rounded-lg flex items-center justify-center space-x-2 text-[9.5px] font-bold text-[#513321]">
+                  {config.coupleCardsOrder === "groomFirst" ? (
+                    <>
+                      <span className="px-2 py-0.5 bg-sky-100 text-sky-900 border border-sky-300 rounded font-extrabold">
+                        1. {config.groomName || "Groom"} ({config.coupleCardsLayout === "stacked" ? "Top" : "Left"})
+                      </span>
+                      <span className="text-amber-600 font-bold text-xs">
+                        {config.coupleCardsLayout === "stacked" ? "↓" : "→"}
+                      </span>
+                      <span className="px-2 py-0.5 bg-rose-100 text-rose-900 border border-rose-300 rounded font-extrabold">
+                        2. {config.brideName || "Bride"} ({config.coupleCardsLayout === "stacked" ? "Bottom" : "Right"})
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="px-2 py-0.5 bg-rose-100 text-rose-900 border border-rose-300 rounded font-extrabold">
+                        1. {config.brideName || "Bride"} ({config.coupleCardsLayout === "stacked" ? "Top" : "Left"})
+                      </span>
+                      <span className="text-amber-600 font-bold text-xs">
+                        {config.coupleCardsLayout === "stacked" ? "↓" : "→"}
+                      </span>
+                      <span className="px-2 py-0.5 bg-sky-100 text-sky-900 border border-sky-300 rounded font-extrabold">
+                        2. {config.groomName || "Groom"} ({config.coupleCardsLayout === "stacked" ? "Bottom" : "Right"})
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. CARD SPACING (GAP) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[9.5px] uppercase font-extrabold text-[#745037] tracking-wider">
+                    Cards Spacing (Gap)
+                  </label>
+                  <span className="text-[10px] font-mono font-bold text-[#8C6D52]">
+                    {config.coupleCardsGap !== undefined ? config.coupleCardsGap : 12}px
+                  </span>
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[6, 12, 16, 24].map((gapVal) => {
+                    const isSelected = (config.coupleCardsGap !== undefined ? config.coupleCardsGap : 12) === gapVal;
+                    return (
+                      <button
+                        key={gapVal}
+                        type="button"
+                        onClick={() => onChangeField("coupleCardsGap", gapVal)}
+                        className={`py-1 rounded text-[9.5px] font-bold border transition cursor-pointer ${
+                          isSelected
+                            ? "bg-[#D6AD61] text-slate-950 border-[#B89254]"
+                            : "bg-[#FFF9F2] text-[#513321] border-[#E9DCCB] hover:bg-[#F5ECE0]"
+                        }`}
+                      >
+                        {gapVal === 6 ? "Tight (6px)" : gapVal === 12 ? "Default (12px)" : gapVal === 16 ? "Wide (16px)" : "Extra (24px)"}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 4. CARD CORNER RADIUS */}
+              <div>
+                <label className="text-[9.5px] uppercase font-extrabold text-[#745037] block mb-1 tracking-wider">
+                  Card Border Shape
+                </label>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {[
+                    { label: "Subtle", val: "rounded-lg" },
+                    { label: "Rounded", val: "rounded-xl" },
+                    { label: "Curved", val: "rounded-2xl" },
+                    { label: "Pill", val: "rounded-3xl" }
+                  ].map((item) => {
+                    const isSelected = (config.coupleCardsBorderRadius || "rounded-xl") === item.val;
+                    return (
+                      <button
+                        key={item.val}
+                        type="button"
+                        onClick={() => onChangeField("coupleCardsBorderRadius", item.val)}
+                        className={`py-1 rounded text-[9.5px] font-bold border transition cursor-pointer ${
+                          isSelected
+                            ? "bg-[#D6AD61] text-slate-950 border-[#B89254]"
+                            : "bg-[#FFF9F2] text-[#513321] border-[#E9DCCB] hover:bg-[#F5ECE0]"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 5. DIRECT DATA SWAP OPTION */}
+              <div className="pt-2 border-t border-[#E9DCCB]/60">
+                <button
+                  type="button"
+                  onClick={() => {
+                    triggerDialog({
+                      type: 'confirm',
+                      title: 'Swap Bride & Groom Text Values',
+                      message: `Do you want to swap the names, titles, and family text between ${config.brideName || 'Bride'} and ${config.groomName || 'Groom'}?`,
+                      confirmText: 'Yes, Swap Text Values',
+                      onConfirm: () => {
+                        const tempBrideName = config.brideName;
+                        const tempGroomName = config.groomName;
+                        const tempBrideTitle = config.storyBrideTitle || "The Beautiful Bride";
+                        const tempGroomTitle = config.storyGroomTitle || "The Noble Groom";
+                        const tempBrideParent = config.storyBrideParentLabel || "Daughter of";
+                        const tempGroomParent = config.storyGroomParentLabel || "Son of";
+                        const tempBrideFamily = config.brideFamily;
+                        const tempGroomFamily = config.groomFamily;
+
+                        onChangeField("brideName", tempGroomName);
+                        onChangeField("groomName", tempBrideName);
+                        onChangeField("storyBrideTitle", tempGroomTitle);
+                        onChangeField("storyGroomTitle", tempBrideTitle);
+                        onChangeField("storyBrideParentLabel", tempGroomParent);
+                        onChangeField("storyGroomParentLabel", tempBrideParent);
+                        onChangeField("brideFamily", tempGroomFamily);
+                        onChangeField("groomFamily", tempBrideFamily);
+                      }
+                    });
+                  }}
+                  className="w-full py-1.5 px-2.5 rounded bg-[#FFF9F2] hover:bg-[#F5ECE0] border border-[#E9DCCB] text-[#513321] text-[9.5px] font-bold flex items-center justify-center space-x-1.5 transition cursor-pointer"
+                  title="Directly swap the written text (names, parent labels, families) between Bride and Groom"
+                >
+                  <span>🔄</span>
+                  <span>Swap Text Values Directly</span>
+                </button>
+              </div>
+            </div>
+
+            {/* BRIDE & GROOM TYPOGRAPHY SECTIONS (ORDERED MATCHING POSITION) */}
+            {(() => {
+              const brideDetailsSection = renderPartCard({
+                title: config.coupleCardsOrder === "groomFirst" 
+                  ? `2. Bride Details (${config.coupleCardsLayout === "stacked" ? "Bottom" : "Right"})` 
+                  : `1. Bride Details (${config.coupleCardsLayout === "stacked" ? "Top" : "Left"})`,
+                toggleKey: "showBrideDetails",
+                children: (
+                  <div className="space-y-3">
+                    {renderCategorizedElementTool("Bride Card Title", "storyBrideTitle", config.storyBrideTitle || "The Beautiful Bride")}
+                    {renderCategorizedElementTool("Bride Name Text", "storyBrideName", config.brideName || "Ananya")}
+                    {renderCategorizedElementTool("Bride Parent Label", "storyBrideParentLabel", config.storyBrideParentLabel || "Daughter of")}
+                    {renderCategorizedElementTool("Bride Family Text", "storyBrideFamily", config.brideFamily || "Daughter of Mr. & Mrs. Rajesh Sharma")}
+                  </div>
+                )
+              });
+
+              const groomDetailsSection = renderPartCard({
+                title: config.coupleCardsOrder === "groomFirst" 
+                  ? `1. Groom Details (${config.coupleCardsLayout === "stacked" ? "Top" : "Left"})` 
+                  : `2. Groom Details (${config.coupleCardsLayout === "stacked" ? "Bottom" : "Right"})`,
+                toggleKey: "showGroomDetails",
+                children: (
+                  <div className="space-y-3">
+                    {renderCategorizedElementTool("Groom Card Title", "storyGroomTitle", config.storyGroomTitle || "The Noble Groom")}
+                    {renderCategorizedElementTool("Groom Name Text", "storyGroomName", config.groomName || "Aarav")}
+                    {renderCategorizedElementTool("Groom Parent Label", "storyGroomParentLabel", config.storyGroomParentLabel || "Son of")}
+                    {renderCategorizedElementTool("Groom Family Text", "storyGroomFamily", config.groomFamily || "Son of Mr. & Mrs. Vijay Patel")}
+                  </div>
+                )
+              });
+
+              return config.coupleCardsOrder === "groomFirst" ? (
+                <>
+                  {groomDetailsSection}
+                  {brideDetailsSection}
+                </>
+              ) : (
+                <>
+                  {brideDetailsSection}
+                  {groomDetailsSection}
+                </>
+              );
+            })()}
 
             {/* STORY DETAILS SECTION */}
             {renderPartCard({
@@ -4951,29 +5373,83 @@ export default function AdminSidebar({
                 </div>
               </div>
 
-              {/* Background Image Upload & Scaling/Crop */}
+              {/* Background Image/Video Upload & Scaling/Crop */}
               <div className="space-y-3 border-b border-slate-800 pb-3">
-                <span className="text-[9px] font-bold text-slate-350 block uppercase tracking-wide">Cover Background Image</span>
+                <span className="text-[9px] font-bold text-slate-350 block uppercase tracking-wide">Cover Background Image or Video (HD)</span>
                 
+                {/* Media Type Toggle: Image vs Video */}
+                <div className="grid grid-cols-2 gap-1.5 p-0.5 bg-slate-950 rounded-lg border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChangeField("heroMediaType", "image");
+                      if (config.heroImage && config.heroImage.includes("#type=video")) {
+                        onChangeField("heroImage", config.heroImage.replace("#type=video", ""));
+                      }
+                    }}
+                    className={`py-1.5 px-2 rounded-md text-[9px] font-bold transition flex items-center justify-center space-x-1 cursor-pointer ${
+                      (config.heroMediaType || (isVideoUrl(config.heroImage) ? "video" : "image")) === "image"
+                        ? "bg-amber-500 text-slate-950 shadow-sm"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <span>🖼️ HD Image</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChangeField("heroMediaType", "video");
+                      if (config.heroImage && !config.heroImage.includes("#type=video") && !isVideoUrl(config.heroImage)) {
+                        onChangeField("heroImage", formatDriveDirectUrl(config.heroImage, "video"));
+                      }
+                    }}
+                    className={`py-1.5 px-2 rounded-md text-[9px] font-bold transition flex items-center justify-center space-x-1 cursor-pointer ${
+                      (config.heroMediaType || (isVideoUrl(config.heroImage) ? "video" : "image")) === "video"
+                        ? "bg-amber-500 text-slate-950 shadow-sm"
+                        : "text-slate-400 hover:text-slate-200"
+                    }`}
+                  >
+                    <span>🎬 HD Video</span>
+                  </button>
+                </div>
+
                 {config.heroImage ? (
                   <div className="p-2 bg-slate-950/80 rounded-xl border border-amber-500/30 flex items-center space-x-3 shadow-md relative overflow-hidden group">
                     <div className="relative w-12 h-16 rounded-lg overflow-hidden border border-slate-800 shrink-0 bg-slate-900 flex items-center justify-center">
-                      <img 
-                        src={formatDriveDirectUrl(config.heroImage, "image")} 
-                        alt="Cover BG Preview" 
-                        className="w-full h-full object-cover" 
-                        onError={(e) => {
-                          if (!e.currentTarget.src.includes('cover_suman_vishal_1k.jpg')) {
-                            e.currentTarget.src = '/cover_suman_vishal_1k.jpg';
-                          }
-                        }}
-                      />
+                      {isVideoUrl(config.heroImage) ? (
+                        extractDriveFileId(config.heroImage) ? (
+                          <iframe 
+                            src={`https://drive.google.com/file/d/${extractDriveFileId(config.heroImage)}/preview`} 
+                            className="w-full h-full border-0 pointer-events-none scale-125" 
+                          />
+                        ) : (
+                          <video 
+                            src={formatDriveDirectUrl(config.heroImage, "video")} 
+                            autoPlay 
+                            loop 
+                            muted 
+                            playsInline 
+                            className="w-full h-full object-cover" 
+                          />
+                        )
+                      ) : (
+                        <img 
+                          src={formatDriveDirectUrl(config.heroImage, "image")} 
+                          alt="Cover BG Preview" 
+                          className="w-full h-full object-cover" 
+                          onError={(e) => {
+                            if (!e.currentTarget.src.includes('cover_suman_vishal_1k.jpg')) {
+                              e.currentTarget.src = '/cover_suman_vishal_1k.jpg';
+                            }
+                          }}
+                        />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0 space-y-1">
                       <span className="text-[8px] uppercase tracking-wider text-slate-400 font-bold block">Active Background</span>
                       <span className="text-[10px] text-slate-100 font-bold truncate block">
                         {config.heroImage.startsWith('data:') 
-                          ? 'Custom Uploaded UHD Image' 
+                          ? (isVideoUrl(config.heroImage) ? 'Custom Uploaded HD Video' : 'Custom Uploaded UHD Image') 
                           : config.heroImage.includes('drive.google.com') || config.heroImage.includes('googleusercontent.com')
                           ? `Google Drive Asset (${extractDriveFileId(config.heroImage) ? extractDriveFileId(config.heroImage).slice(0, 8) + '...' : 'Linked'})`
                           : config.heroImage.split('/').pop()}
@@ -4987,7 +5463,7 @@ export default function AdminSidebar({
                           }}
                           className="px-2 py-0.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded text-[8.5px] font-bold uppercase transition cursor-pointer"
                         >
-                          Replace Image
+                          {isVideoUrl(config.heroImage) ? "Replace Video" : "Replace Media"}
                         </button>
                         <button 
                           type="button"
@@ -5000,7 +5476,7 @@ export default function AdminSidebar({
                       <input 
                         type="file" 
                         id="heroImageReplaceInput"
-                        accept="image/*"
+                        accept="image/*,video/mp4,video/webm,video/quicktime,video/*"
                         onChange={(e) => handleFileChange("heroImage", e)}
                         className="hidden"
                       />
@@ -5008,7 +5484,7 @@ export default function AdminSidebar({
                   </div>
                 ) : (
                   <div className="p-3 bg-slate-950/40 rounded-xl border border-dashed border-slate-800 text-center space-y-2">
-                    <span className="text-[8.5px] text-slate-400 block font-semibold">No background image active</span>
+                    <span className="text-[8.5px] text-slate-400 block font-semibold">No background image or video active</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -5017,12 +5493,12 @@ export default function AdminSidebar({
                       }}
                       className="px-3 py-1 bg-amber-500 text-slate-950 rounded-lg text-[9px] font-bold uppercase hover:bg-amber-600 transition cursor-pointer"
                     >
-                      Upload Background
+                      Upload HD Image / Video
                     </button>
                     <input 
                       type="file" 
                       id="heroImageUploadInput"
-                      accept="image/*"
+                      accept="image/*,video/mp4,video/webm,video/quicktime,video/*"
                       onChange={(e) => handleFileChange("heroImage", e)}
                       className="hidden"
                     />
@@ -5030,13 +5506,17 @@ export default function AdminSidebar({
                 )}
 
                 <div>
-                  <label className="text-[8px] uppercase text-slate-400 block mb-0.5">Or Enter Hero Image URL</label>
+                  <label className="text-[8px] uppercase text-slate-400 block mb-0.5">Or Enter Hero Image/Video URL</label>
                   <input 
                     type="text" 
                     value={config.heroImage || ""} 
-                    onChange={(e) => onChangeField("heroImage", formatDriveDirectUrl(e.target.value, "image"))}
-                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded text-xs focus:outline-none focus:border-amber-500"
-                    placeholder="https://example.com/background.jpg"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      const isVid = (config.heroMediaType === "video") || isVideoUrl(val);
+                      onChangeField("heroImage", formatDriveDirectUrl(val, isVid ? "video" : "image"));
+                    }}
+                    className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-850 rounded text-xs focus:outline-none focus:border-amber-500 text-slate-100"
+                    placeholder="https://example.com/video.mp4 or Drive link"
                   />
                 </div>
 
@@ -6539,6 +7019,219 @@ export default function AdminSidebar({
               </div>
 
               {renderImageToolControl("Scratch Card Cover Image", "scratchImage")}
+            </div>
+
+            {/* Center Shield Black Box & Text Customization with Toggle Switch */}
+            <div id="element-tool-scratchShieldBadgeTitle">
+              {renderPartCard({
+                title: "Center Shield Black Box & Text",
+                subtitle: "Toggle ON/OFF this whole black box along with text",
+                toggleKey: "scratchShieldBadgeEnabled",
+                icon: <span className="text-amber-500 font-bold">✦</span>,
+                children: (
+                  <div className="space-y-3 pt-1">
+                    {/* Button Title Text */}
+                    <div>
+                      <label className="text-[8.5px] uppercase tracking-wider text-slate-350 font-bold block mb-1">
+                        Main Title Text
+                      </label>
+                      <input
+                        type="text"
+                        id="scratchShieldBadgeTitleInput"
+                        value={config.scratchShieldBadgeTitle ?? ""}
+                        onChange={(e) => onChangeField("scratchShieldBadgeTitle", e.target.value)}
+                        placeholder={isVideoUrl(config.scratchImage) ? "✦ SCRATCH TO REVEAL VIDEO ✦" : "✦ SCRATCH TO REVEAL DATE ✦"}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    {/* Button Subtitle Text */}
+                    <div>
+                      <label className="text-[8.5px] uppercase tracking-wider text-slate-350 font-bold block mb-1">
+                        Subtitle Countdown Text
+                      </label>
+                      <input
+                        type="text"
+                        id="scratchShieldBadgeSubtitleInput"
+                        value={config.scratchShieldBadgeSubtitle ?? ""}
+                        onChange={(e) => onChangeField("scratchShieldBadgeSubtitle", e.target.value)}
+                        placeholder={isVideoUrl(config.scratchImage) ? "Wipe gold shield to reveal romantic video & date" : "Wipe gold shield to reveal wedding date & countdown"}
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    {/* Color Controls Grid */}
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      {/* Title Text Color */}
+                      <div>
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Title Color</label>
+                        <div className="flex items-center space-x-1.5">
+                          <input
+                            type="color"
+                            value={config.scratchShieldBadgeTextColor || "#ffffff"}
+                            onChange={(e) => onChangeField("scratchShieldBadgeTextColor", e.target.value)}
+                            className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            id="scratchShieldBadgeTextColorInput"
+                            value={config.scratchShieldBadgeTextColor || "#ffffff"}
+                            onChange={(e) => onChangeField("scratchShieldBadgeTextColor", e.target.value)}
+                            className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Subtitle Text Color */}
+                      <div>
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Subtitle Color</label>
+                        <div className="flex items-center space-x-1.5">
+                          <input
+                            type="color"
+                            value={config.scratchShieldBadgeSubtextColor || config.accentGold || "#f59e0b"}
+                            onChange={(e) => onChangeField("scratchShieldBadgeSubtextColor", e.target.value)}
+                            className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            id="scratchShieldBadgeSubtextColorInput"
+                            value={config.scratchShieldBadgeSubtextColor || config.accentGold || "#f59e0b"}
+                            onChange={(e) => onChangeField("scratchShieldBadgeSubtextColor", e.target.value)}
+                            className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Box Background Color */}
+                      <div>
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Box Background</label>
+                        <div className="flex items-center space-x-1.5">
+                          <input
+                            type="color"
+                            value={config.scratchShieldBadgeBg && config.scratchShieldBadgeBg.startsWith('#') ? config.scratchShieldBadgeBg : "#090e1a"}
+                            onChange={(e) => onChangeField("scratchShieldBadgeBg", e.target.value)}
+                            className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            id="scratchShieldBadgeBgInput"
+                            value={config.scratchShieldBadgeBg || "rgba(9, 14, 26, 0.82)"}
+                            onChange={(e) => onChangeField("scratchShieldBadgeBg", e.target.value)}
+                            className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Box Border Color */}
+                      <div>
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Box Border</label>
+                        <div className="flex items-center space-x-1.5">
+                          <input
+                            type="color"
+                            value={config.scratchShieldBadgeBorderColor || config.accentGold || "#f59e0b"}
+                            onChange={(e) => onChangeField("scratchShieldBadgeBorderColor", e.target.value)}
+                            className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            id="scratchShieldBadgeBorderColorInput"
+                            value={config.scratchShieldBadgeBorderColor || config.accentGold || "#f59e0b"}
+                            onChange={(e) => onChangeField("scratchShieldBadgeBorderColor", e.target.value)}
+                            className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sizing & Shape Sliders */}
+                    <div className="space-y-2 pt-1 border-t border-white/5">
+                      <span className="text-[8.5px] uppercase tracking-wider text-slate-400 font-bold block">
+                        Box Dimensions &amp; Rounding
+                      </span>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        {/* Width */}
+                        <div>
+                          <div className="flex justify-between items-center mb-0.5">
+                            <label className="text-[7.5px] uppercase text-slate-400 font-bold">Width</label>
+                            <span className="text-[8px] text-amber-400 font-mono font-bold">
+                              {config.scratchShieldBadgeWidth || 340}px
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="200"
+                            max="440"
+                            step="5"
+                            value={config.scratchShieldBadgeWidth || 340}
+                            onChange={(e) => onChangeField("scratchShieldBadgeWidth", parseInt(e.target.value))}
+                            className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                          />
+                        </div>
+
+                        {/* Height */}
+                        <div>
+                          <div className="flex justify-between items-center mb-0.5">
+                            <label className="text-[7.5px] uppercase text-slate-400 font-bold">Height</label>
+                            <span className="text-[8px] text-amber-400 font-mono font-bold">
+                              {config.scratchShieldBadgeHeight || 82}px
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="50"
+                            max="130"
+                            step="2"
+                            value={config.scratchShieldBadgeHeight || 82}
+                            onChange={(e) => onChangeField("scratchShieldBadgeHeight", parseInt(e.target.value))}
+                            className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                          />
+                        </div>
+
+                        {/* Corner Radius */}
+                        <div>
+                          <div className="flex justify-between items-center mb-0.5">
+                            <label className="text-[7.5px] uppercase text-slate-400 font-bold">Corners</label>
+                            <span className="text-[8px] text-amber-400 font-mono font-bold">
+                              {config.scratchShieldBadgeRadius !== undefined ? config.scratchShieldBadgeRadius : 16}px
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="45"
+                            step="1"
+                            value={config.scratchShieldBadgeRadius !== undefined ? config.scratchShieldBadgeRadius : 16}
+                            onChange={(e) => onChangeField("scratchShieldBadgeRadius", parseInt(e.target.value))}
+                            className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Quick Reset to Defaults Button */}
+                    <div className="pt-1 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onChangeField("scratchShieldBadgeTitle", undefined);
+                          onChangeField("scratchShieldBadgeSubtitle", undefined);
+                          onChangeField("scratchShieldBadgeTextColor", undefined);
+                          onChangeField("scratchShieldBadgeSubtextColor", undefined);
+                          onChangeField("scratchShieldBadgeBg", undefined);
+                          onChangeField("scratchShieldBadgeBorderColor", undefined);
+                          onChangeField("scratchShieldBadgeWidth", undefined);
+                          onChangeField("scratchShieldBadgeHeight", undefined);
+                          onChangeField("scratchShieldBadgeRadius", undefined);
+                        }}
+                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-slate-100 rounded text-[8px] uppercase font-bold transition cursor-pointer"
+                      >
+                        ↺ Reset Box Colors, Text &amp; Size
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
 
             {/* Additional Background Images & Overlay Controls */}

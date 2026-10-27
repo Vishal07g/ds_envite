@@ -22,6 +22,9 @@ import {
   syncDriveFolder,
   syncInvitationMediaFromDrive,
   requestGoogleDriveAuth,
+  getStoredOAuthToken,
+  deleteDriveFolder,
+  ensureInvitationDriveFolder,
   transferInvitationToGoogleDriveOAuth,
   GOOGLE_APPS_SCRIPT_TEMPLATE
 } from '../utils/googleDriveStorage';
@@ -1179,27 +1182,104 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteInvitation = (id) => {
+    const inv = dbStore.getInvitationById(id);
+    const folderInfo = inv?.driveStorage?.folderName ? ` and its linked Google Drive folder "${inv.driveStorage.folderName}"` : '';
+
     triggerDialog({
       type: 'confirm',
-      title: 'Move Invitation to Archive',
-      message: 'Are you sure you want to delete this invitation? It will be safely held in the Archive for 2 days. Admin can recover it within 2 days before permanent deletion from the database.',
-      confirmText: 'Move to Archive',
-      onConfirm: () => {
+      title: 'Move Invitation to Archive & Trash Drive Folder',
+      message: `Are you sure you want to delete this invitation? It will be safely held in the Archive for 2 days${folderInfo} will be automatically moved to Google Drive trash.`,
+      confirmText: 'Delete Invitation & Drive Folder',
+      onConfirm: async () => {
         dbStore.deleteInvitation(id);
-        showToast("Invitation moved to Archive (Retained for 2 days)", "success");
+        showToast("Invitation deleted & linked Drive folder moved to trash", "success");
         setTick(t => t + 1);
       }
     });
   };
 
   const handleDuplicateInvitation = (id) => {
-    const duplicated = dbStore.duplicateInvitation(id);
-    if (duplicated) {
-      showToast(`Invitation successfully duplicated as "${duplicated.title}"!`, "success");
-      setTick(t => t + 1);
-    } else {
-      showToast("Failed to duplicate invitation", "error");
-    }
+    const inv = dbStore.getInvitationById(id);
+    const defaultFolder = inv 
+      ? formatDriveFolderName(inv.config, `${inv.title || 'Invitation'} (Copy)`) 
+      : "New Invitation (Copy)";
+
+    triggerDialog({
+      type: 'prompt',
+      title: 'Duplicate Invitation & Create Drive Folder',
+      message: 'Enter title & Google Drive folder name for the new copy:',
+      defaultValue: defaultFolder,
+      placeholder: 'Folder name...',
+      confirmText: 'Duplicate & Sync Drive',
+      onConfirm: async (customName) => {
+        const folderName = (customName || "").trim() || defaultFolder;
+        const duplicated = dbStore.duplicateInvitation(id, folderName, null, folderName);
+        if (duplicated) {
+          showToast(`Invitation duplicated! Creating unique Drive folder "${folderName}"...`, "info");
+          setTick(t => t + 1);
+
+          try {
+            let token = getStoredOAuthToken();
+            if (!token && !getDriveWebhookUrl()) {
+              token = await requestGoogleDriveAuth();
+            }
+            const res = await syncDriveFolder({ invitation: duplicated, customFolderName: folderName, token });
+            if (res && res.folderId) {
+              dbStore.updateInvitation(duplicated.id, {
+                driveStorage: { ...(duplicated.driveStorage || {}), ...res }
+              });
+              showToast(`Google Drive folder "${folderName}" created and linked!`, "success");
+              setTick(t => t + 1);
+            }
+          } catch (e) {
+            console.warn("Drive sync after duplicate skipped or failed:", e);
+          }
+        } else {
+          showToast("Failed to duplicate invitation", "error");
+        }
+      }
+    });
+  };
+
+  const handleSyncSingleDrive = (inv) => {
+    const currentName = inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title);
+    triggerDialog({
+      type: 'prompt',
+      title: 'Create / Sync Unique Google Drive Folder',
+      message: `Enter Google Drive folder name for "${inv.title || 'this invitation'}" inside DS_Envite_DataCentre:`,
+      defaultValue: currentName,
+      placeholder: 'e.g. Suman & Vishal (Neamatpur)',
+      confirmText: 'Create / Sync in Drive',
+      onConfirm: async (customName) => {
+        const folderName = (customName || "").trim() || currentName;
+        showToast(`Syncing folder "${folderName}" with Google Drive...`, "info");
+        try {
+          let token = getStoredOAuthToken();
+          if (!token && !getDriveWebhookUrl()) {
+            token = await requestGoogleDriveAuth();
+          }
+          const res = await syncDriveFolder({ invitation: inv, customFolderName: folderName, token });
+          if (res && res.folderId) {
+            dbStore.updateInvitation(inv.id, {
+              driveStorage: {
+                ...(inv.driveStorage || {}),
+                folderId: res.folderId,
+                folderName: res.folderName || folderName,
+                folderUrl: res.folderUrl,
+                status: "live_synced",
+                lastSyncedAt: new Date().toISOString()
+              }
+            });
+            showToast(`Google Drive folder "${folderName}" successfully created & linked!`, "success");
+            setTick(t => t + 1);
+          } else {
+            showToast("Failed to create folder on Google Drive. Please ensure Google Drive is authorized.", "error");
+          }
+        } catch (err) {
+          showToast(`Drive sync error: ${err.message}`, "error");
+        }
+      }
+    });
   };
 
   const handleAcceptOrder = (order) => {
@@ -1507,15 +1587,26 @@ export default function AdminDashboard() {
                             >
                               <span>🌐 HTML</span>
                             </button>
-                            <a
-                              href={inv.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="p-2 rounded bg-slate-900 border border-emerald-500/30 text-emerald-400 hover:text-emerald-300 hover:border-emerald-400 transition inline-flex items-center"
-                              title={`Open Google Drive Folder: ${inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title)}`}
-                            >
-                              <span className="text-xs">📁</span>
-                            </a>
+                            {inv.driveStorage?.folderId ? (
+                              <a
+                                href={inv.driveStorage.folderUrl || `https://drive.google.com/drive/folders/${inv.driveStorage.folderId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded bg-slate-900 border border-emerald-500/40 text-emerald-400 hover:text-emerald-300 hover:border-emerald-400 transition inline-flex items-center"
+                                title={`Open Google Drive Folder: ${inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title)}`}
+                              >
+                                <span className="text-xs">📁</span>
+                              </a>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleSyncSingleDrive(inv)}
+                                className="p-2 rounded bg-slate-900 border border-amber-500/40 text-amber-400 hover:text-amber-300 hover:border-amber-400 transition inline-flex items-center cursor-pointer"
+                                title="No Google Drive folder linked yet! Click to name & create folder in Drive"
+                              >
+                                <span className="text-xs font-bold">📁+</span>
+                              </button>
+                            )}
                             <Link
                               to={`/invite/${dbStore.getInvitationShareSlug(inv)}`}
                               target="_blank"

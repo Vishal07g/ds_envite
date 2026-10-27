@@ -23,9 +23,12 @@ export default function ShareInviteModal({
   const currentConfig = { ...(invObj?.config || {}), ...(config || {}) };
   const effectivePaid = invObj ? (invObj.isPaid || false) : isPaid;
 
-  const brideName = currentConfig.coverBrideText || currentConfig.brideName || "Suman";
-  const groomName = currentConfig.coverGroomText || currentConfig.groomName || "Vishal";
-  const coupleInitials = `${brideName.charAt(0)} & ${groomName.charAt(0)}`;
+  const brideName = (currentConfig.coverBrideText || currentConfig.brideName || "").trim();
+  const groomName = (currentConfig.coverGroomText || currentConfig.groomName || "").trim();
+  const invitationTitle = (invObj?.title || "").trim();
+  const coupleInitials = brideName && groomName 
+    ? `${brideName.charAt(0)} & ${groomName.charAt(0)}` 
+    : (invitationTitle ? invitationTitle.slice(0, 2).toUpperCase() : "DS");
 
   const autoSlug = dbStore.getInvitationShareSlug(invObj || { id: targetId }, currentConfig);
   const isManuallySet = Boolean(invObj?.isCustomSlugManuallySet && invObj?.customSlug && !invObj.customSlug.startsWith("ananya-aarav"));
@@ -39,6 +42,7 @@ export default function ShareInviteModal({
         const url = getMonogramThumbnailDataUrl({
           brideName,
           groomName,
+          title: invitationTitle,
           weddingDate: currentConfig.weddingDate,
           primaryColor: currentConfig.primaryColor || "#400d18",
           accentGold: currentConfig.accentGold || "#d4af37"
@@ -48,14 +52,15 @@ export default function ShareInviteModal({
         console.warn("Could not generate monogram:", e);
       }
     }
-  }, [isOpen, activeSlug, brideName, groomName, currentConfig.weddingDate]);
+  }, [isOpen, activeSlug, brideName, groomName, invitationTitle, currentConfig.weddingDate]);
 
   if (!isOpen) return null;
 
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   const shareUrl = `${origin}/invite/${activeSlug}`;
 
-  const defaultWhatsappMsg = `💍 *WEDDING INVITATION* 💍\n✨ *${coupleInitials}* ✨\n\n*${brideName} & ${groomName}*\n\nWe warmly invite you to celebrate our sacred wedding union! Tap to view our interactive invitation, music, and RSVP:\n${shareUrl}`;
+  const displayName = brideName && groomName ? `${brideName} & ${groomName}` : (invitationTitle || "Wedding Celebration");
+  const defaultWhatsappMsg = `💍 *WEDDING INVITATION* 💍\n✨ *${coupleInitials}* ✨\n\n*${displayName}*\n\nWe warmly invite you to celebrate our sacred wedding union! Tap to view our interactive invitation, music, and RSVP:\n${shareUrl}`;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -98,8 +103,11 @@ export default function ShareInviteModal({
 
   const handleDownloadMonogram = () => {
     const link = document.createElement("a");
-    link.download = `${dbStore.slugify(brideName)}-${dbStore.slugify(groomName)}-monogram-thumbnail.png`;
-    link.href = monogramDataUrl || "/wedding_monogram_thumbnail.jpg";
+    const safeName = brideName && groomName 
+      ? `${dbStore.slugify(brideName)}-${dbStore.slugify(groomName)}` 
+      : dbStore.slugify(invitationTitle || 'invitation');
+    link.download = `${safeName}-monogram-thumbnail.png`;
+    link.href = monogramDataUrl || `/api/og-image?bride=${encodeURIComponent(brideName)}&groom=${encodeURIComponent(groomName)}&title=${encodeURIComponent(invitationTitle)}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -272,9 +280,12 @@ export default function ShareInviteModal({
             <div className="rounded-xl overflow-hidden border border-amber-500/40 bg-[#0d141e] shadow-lg max-w-md mx-auto">
               <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
                 <img
-                  src={monogramDataUrl || "/wedding_monogram_thumbnail.jpg"}
-                  alt={`${brideName} & ${groomName} Monogram Thumbnail`}
+                  src={monogramDataUrl || `/api/og-image?bride=${encodeURIComponent(brideName)}&groom=${encodeURIComponent(groomName)}&title=${encodeURIComponent(invitationTitle)}`}
+                  alt={`${displayName} Monogram Thumbnail`}
                   className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.src = "/website_thumbnail.jpg";
+                  }}
                 />
                 <div className="absolute top-2 right-2 bg-emerald-950/80 backdrop-blur-xs px-2 py-0.5 rounded text-[9px] font-mono text-emerald-300 border border-emerald-500/40 flex items-center space-x-1">
                   <span>✓</span>

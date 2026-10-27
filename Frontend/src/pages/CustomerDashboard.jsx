@@ -542,7 +542,7 @@ export default function CustomerDashboard() {
                               </div>
                             </div>
                             <a
-                              href={inv.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
+                              href={inv.driveStorage?.folderUrl || (inv.driveStorage?.folderId ? `https://drive.google.com/drive/folders/${inv.driveStorage.folderId}` : GOOGLE_DRIVE_ROOT_FOLDER_URL)}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="shrink-0 px-2 py-0.5 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-400/40 text-emerald-300 rounded text-[9.5px] font-bold transition flex items-center space-x-1"
@@ -807,27 +807,45 @@ export default function CustomerDashboard() {
                 Craft a beautiful message to go along with your digital invitation card. You can share it directly onto social media.
               </p>
 
-              {/* Monogram Thumbnail Showcase */}
+              {/* Unique Invitation Thumbnail Showcase */}
               <div className="rounded-xl overflow-hidden border border-amber-500/30 bg-slate-950/70 p-3 space-y-2">
-                <div className="flex items-center justify-between text-[10px]">
-                  <span className="font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1">
-                    <span>👑</span>
-                    <span>Initials Thumbnail Preview</span>
-                  </span>
-                  <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-extrabold border border-amber-500/40">
-                    Initials: {getCoupleInitials(activeShareInvite.config?.brideName || "Bride", activeShareInvite.config?.groomName || "Groom")}
-                  </span>
-                </div>
-                <div className="relative aspect-[16/9] w-full rounded-lg overflow-hidden border border-amber-500/20">
-                  <img
-                    src="/wedding_monogram_thumbnail.jpg"
-                    alt="Wedding Initial Monogram Thumbnail"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute bottom-1 right-1 bg-slate-950/80 px-1.5 py-0.5 rounded text-[8px] font-mono text-amber-300">
-                    WhatsApp Link Preview
-                  </div>
-                </div>
+                {(() => {
+                  const bName = (activeShareInvite.config?.coverBrideText || activeShareInvite.config?.brideName || "").trim();
+                  const gName = (activeShareInvite.config?.coverGroomText || activeShareInvite.config?.groomName || "").trim();
+                  const title = (activeShareInvite.title || "").trim();
+                  const dateParam = activeShareInvite.config?.weddingDate ? `&date=${encodeURIComponent(activeShareInvite.config.weddingDate)}` : '';
+                  const venueParam = activeShareInvite.config?.weddingVenue ? `&venue=${encodeURIComponent(activeShareInvite.config.weddingVenue)}` : '';
+                  const bgParam = activeShareInvite.config?.primaryColor ? `&bg=${encodeURIComponent(activeShareInvite.config.primaryColor)}` : '';
+                  const accentParam = activeShareInvite.config?.accentGold ? `&accent=${encodeURIComponent(activeShareInvite.config.accentGold)}` : '';
+                  const thumbUrl = `/api/og-image?bride=${encodeURIComponent(bName)}&groom=${encodeURIComponent(gName)}&title=${encodeURIComponent(title)}${dateParam}${venueParam}${bgParam}${accentParam}`;
+
+                  return (
+                    <>
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="font-bold text-amber-300 uppercase tracking-wider flex items-center gap-1">
+                          <span>👑</span>
+                          <span>Invitation Thumbnail Preview</span>
+                        </span>
+                        <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-extrabold border border-amber-500/40">
+                          {bName && gName ? `Initials: ${getCoupleInitials(bName, gName)}` : (title || "Custom Invite")}
+                        </span>
+                      </div>
+                      <div className="relative aspect-[16/9] w-full rounded-lg overflow-hidden border border-amber-500/20 bg-slate-950">
+                        <img
+                          src={thumbUrl}
+                          alt={`${bName || title} Invitation Thumbnail`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = "/website_thumbnail.jpg";
+                          }}
+                        />
+                        <div className="absolute bottom-1 right-1 bg-slate-950/80 px-1.5 py-0.5 rounded text-[8px] font-mono text-amber-300">
+                          WhatsApp Link Preview
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
 
               <div>

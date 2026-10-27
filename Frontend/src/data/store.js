@@ -5,6 +5,7 @@ import { DEFAULT_TIMELINE_CONFIG } from "./timelineDefaults";
 import {
   formatDriveFolderName,
   syncDriveFolder,
+  deleteDriveFolder,
   GOOGLE_DRIVE_ROOT_FOLDER_ID,
   GOOGLE_DRIVE_ROOT_FOLDER_URL,
   transferAllDatabaseImagesToDrive,
@@ -194,6 +195,10 @@ const DEFAULT_CONFIG = {
   storyBrideParentLabel: "Daughter of",
   storyGroomParentLabel: "Son of",
   storyPathTitle: "Our Path of Serendipity",
+  coupleCardsOrder: "brideFirst",
+  coupleCardsLayout: "sideBySide",
+  coupleCardsGap: 12,
+  coupleCardsBorderRadius: "rounded-xl",
   scratchSecretMessage: "We have booked a private stargazing toast after the reception! Make sure to grab a custom lantern at the main exit.",
   religionKey: "secular",
   customSacredVerse: "“And now these three remain: faith, hope and love. But the greatest of these is love.” - 1 Corinthians 13:13",
@@ -1468,8 +1473,8 @@ function getDb() {
           ? { ...inv.config, scratchImage: "" }
           : { ...(inv.config || {}) };
 
-        const brideName = updatedConfig.coverBrideText || updatedConfig.brideName || "Suman";
-        const groomName = updatedConfig.coverGroomText || updatedConfig.groomName || "Vishal";
+        const brideName = (updatedConfig.coverBrideText || updatedConfig.brideName || "").trim();
+        const groomName = (updatedConfig.coverGroomText || updatedConfig.groomName || "").trim();
         const defaultNameSlug = ((brideName && groomName) ? `${brideName}-${groomName}` : (inv.title || "wedding"))
           .toLowerCase()
           .replace(/&/g, "and")
@@ -1903,16 +1908,17 @@ export const dbStore = {
 
     return null;
   },
-  createInvitation(customerId, title, config = DEFAULT_CONFIG, isPaid = false, status = "draft") {
+  createInvitation(customerId, title, config = DEFAULT_CONFIG, isPaid = false, status = "draft", customFolderName = null) {
     const db = getDb();
     const timestamp = Date.now();
-    const bride = config.coverBrideText || config.brideName || "Suman";
-    const groom = config.coverGroomText || config.groomName || "Vishal";
-    const nameSlug = this.slugify(`${bride}-${groom}`) || "wedding";
+    const bride = (config.coverBrideText || config.brideName || "").trim();
+    const groom = (config.coverGroomText || config.groomName || "").trim();
+    const namePart = (bride && groom) ? `${bride}-${groom}` : (title ? this.slugify(title) : "wedding");
+    const nameSlug = this.slugify(namePart) || "wedding";
     const uniqueId = `invite-${timestamp}`;
     const initialSlug = `${nameSlug}-${timestamp}`;
     const fullConfig = { ...DEFAULT_CONFIG, ...config };
-    const folderName = formatDriveFolderName(fullConfig, title || `${bride} & ${groom}'s Wedding`);
+    const folderName = customFolderName || formatDriveFolderName(fullConfig, title || (bride && groom ? `${bride} & ${groom}'s Wedding` : "New Invitation"));
 
     const newInv = {
       id: uniqueId,
@@ -1940,15 +1946,17 @@ export const dbStore = {
     };
     db.invitations.push(newInv);
     saveDb(db);
+    window.dispatchEvent(new Event("db_synced"));
 
     // Asynchronously create and sync folder on Google Drive
-    syncDriveFolder({ invitation: newInv }).then(driveRes => {
+    syncDriveFolder({ invitation: newInv, customFolderName: folderName }).then(driveRes => {
       if (driveRes && driveRes.folderId) {
         const freshDb = getDb();
         const target = freshDb.invitations.find(i => i.id === uniqueId);
         if (target) {
           target.driveStorage = { ...(target.driveStorage || {}), ...driveRes };
           saveDb(freshDb);
+          window.dispatchEvent(new Event("db_synced"));
         }
       }
     }).catch(err => console.warn("Google Drive initial sync warning:", err));
@@ -2105,13 +2113,22 @@ export const dbStore = {
     const inv = db.invitations.find(i => i.id === id);
     if (inv) {
       this.archiveItem('invitation', inv, inv.title || 'Invitation');
+      // Automatically delete linked Google Drive folder
+      const folderId = inv.driveStorage?.folderId;
+      if (folderId) {
+        deleteDriveFolder(folderId).then(res => {
+          console.log(`[Google Drive] Deleted linked folder for invitation ${id}:`, res);
+        }).catch(err => {
+          console.warn(`[Google Drive] Failed to delete linked folder for invitation ${id}:`, err);
+        });
+      }
     }
     db.invitations = db.invitations.filter(inv => inv.id !== id);
     saveDb(db);
     window.dispatchEvent(new Event("db_synced"));
     return true;
   },
-  duplicateInvitation(id, customTitle = null, assignCustomerId = null) {
+  duplicateInvitation(id, customTitle = null, assignCustomerId = null, customFolderName = null) {
     const db = getDb();
     const source = this.getInvitationById(id);
     if (!source) return null;
@@ -2120,13 +2137,14 @@ export const dbStore = {
     const newId = `invite-${timestamp}`;
     const cleanConfig = JSON.parse(JSON.stringify(source.config || DEFAULT_CONFIG));
 
-    const bride = cleanConfig.coverBrideText || cleanConfig.brideName || "Suman";
-    const groom = cleanConfig.coverGroomText || cleanConfig.groomName || "Vishal";
-    const nameSlug = this.slugify(`${bride}-${groom}`) || "wedding";
+    const bride = (cleanConfig.coverBrideText || cleanConfig.brideName || "").trim();
+    const groom = (cleanConfig.coverGroomText || cleanConfig.groomName || "").trim();
+    const namePart = (bride && groom) ? `${bride}-${groom}` : (source.title ? this.slugify(source.title) : "wedding");
+    const nameSlug = this.slugify(namePart) || "wedding";
     const newSlug = `${nameSlug}-${timestamp}`;
 
-    const newTitle = customTitle || `${source.title || `${bride} & ${groom}'s Wedding`} (Copy)`;
-    const newFolderName = formatDriveFolderName(cleanConfig, newTitle);
+    const newTitle = customTitle || `${source.title || (bride && groom ? `${bride} & ${groom}'s Wedding` : "Invitation")} (Copy)`;
+    const newFolderName = customFolderName || formatDriveFolderName(cleanConfig, newTitle);
 
     const duplicated = {
       ...JSON.parse(JSON.stringify(source)),
@@ -2159,8 +2177,18 @@ export const dbStore = {
     saveDb(db);
     window.dispatchEvent(new Event("db_synced"));
 
-    // Sync newly duplicated invitation's folder
-    syncDriveFolder({ invitation: duplicated }).catch(err => console.warn("Duplicate Drive sync warning:", err));
+    // Sync newly duplicated invitation's unique folder
+    syncDriveFolder({ invitation: duplicated, customFolderName: newFolderName }).then(driveRes => {
+      if (driveRes && driveRes.folderId) {
+        const freshDb = getDb();
+        const target = freshDb.invitations.find(i => i.id === newId);
+        if (target) {
+          target.driveStorage = { ...(target.driveStorage || {}), ...driveRes };
+          saveDb(freshDb);
+          window.dispatchEvent(new Event("db_synced"));
+        }
+      }
+    }).catch(err => console.warn("Duplicate Drive sync warning:", err));
 
     return duplicated;
   },
