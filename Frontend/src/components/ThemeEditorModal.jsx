@@ -1331,7 +1331,7 @@ export default function ThemeEditorModal({ isOpen, preset, onClose, onSave, show
                   </label>
                   <label className="text-[10px] text-amber-400 hover:underline cursor-pointer font-semibold">
                     <span>Upload File</span>
-                    <input type="file" accept="image/*" onChange={(e) => handleFileUpload("heroImage", e)} className="hidden" />
+                    <input type="file" accept="image/*,video/mp4,video/webm,video/quicktime,video/*" onChange={(e) => handleFileUpload("heroImage", e)} className="hidden" />
                   </label>
                 </div>
                 <input
@@ -1382,7 +1382,7 @@ export default function ThemeEditorModal({ isOpen, preset, onClose, onSave, show
                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Scratch Card Cover</label>
                     <label className="text-[10px] text-amber-400 hover:underline cursor-pointer">
                       <span>Upload</span>
-                      <input type="file" accept="image/*" onChange={(e) => handleFileUpload("scratchImage", e)} className="hidden" />
+                      <input type="file" accept="image/*,video/mp4,video/webm,video/quicktime,video/*" onChange={(e) => handleFileUpload("scratchImage", e)} className="hidden" />
                     </label>
                   </div>
                   <input

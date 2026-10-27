@@ -9,7 +9,7 @@ import Watermark from '../components/Watermark';
 import PaymentModal from '../components/PaymentModal';
 import Toast from '../components/Toast';
 import PrivacyShield from '../components/PrivacyShield';
-import { updateSocialMetaTags } from '../utils/monogramThumbnail';
+import { updateSocialMetaTags, resetWebsiteSocialMetaTags } from '../utils/monogramThumbnail';
 import { useAuth } from '../context/AuthContext';
 import { SvgEdit, SvgSparkles, SvgCheck, SvgAward, SvgHeart } from '../components/icons';
 
@@ -182,22 +182,37 @@ export default function InvitationView() {
 
   useEffect(() => {
     if (invitation?.config) {
-      const bride = invitation.config.coverBrideText || invitation.config.brideName || "Suman";
-      const groom = invitation.config.coverGroomText || invitation.config.groomName || "Vishal";
+      const bride = (invitation.config.coverBrideText || invitation.config.brideName || "").trim();
+      const groom = (invitation.config.coverGroomText || invitation.config.groomName || "").trim();
+      const title = (invitation.title || "").trim();
       const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ds-envite.vercel.app';
       const cleanSlug = dbStore.getInvitationShareSlug(invitation);
       const shareUrl = `${origin}/invite/${cleanSlug}`;
-      const dateParam = invitation.config.weddingDate ? `&date=${encodeURIComponent(invitation.config.weddingDate)}` : '';
-      const thumbUrl = `${origin}/api/og-image?bride=${encodeURIComponent(bride)}&groom=${encodeURIComponent(groom)}${dateParam}`;
+
+      const params = new URLSearchParams();
+      if (bride) params.set('bride', bride);
+      if (groom) params.set('groom', groom);
+      if (title) params.set('title', title);
+      if (invitation.config.weddingDate) params.set('date', invitation.config.weddingDate);
+      if (invitation.config.weddingVenue) params.set('venue', invitation.config.weddingVenue);
+      if (invitation.config.primaryColor) params.set('bg', invitation.config.primaryColor);
+      if (invitation.config.accentGold) params.set('accent', invitation.config.accentGold);
+      const thumbUrl = `${origin}/api/og-image?${params.toString()}`;
 
       updateSocialMetaTags({
         brideName: bride,
         groomName: groom,
+        title: title,
         weddingDate: invitation.config.weddingDate,
+        weddingVenue: invitation.config.weddingVenue,
         thumbnailUrl: thumbUrl,
         shareUrl: shareUrl
       });
     }
+
+    return () => {
+      resetWebsiteSocialMetaTags();
+    };
   }, [invitation]);
 
   const handleRsvpSubmit = async (form) => {

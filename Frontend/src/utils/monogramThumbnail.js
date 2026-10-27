@@ -11,9 +11,10 @@ export function getCoupleInitials(brideName = "Bride", groomName = "Groom") {
 }
 
 export function generateMonogramCanvas({
-  brideName = "Suman",
-  groomName = "Vishal",
-  weddingDate = "2026-11-21",
+  brideName = "",
+  groomName = "",
+  title = "",
+  weddingDate = "",
   primaryColor = "#400d18",
   accentGold = "#d4af37",
   width = 1200,
@@ -24,9 +25,19 @@ export function generateMonogramCanvas({
   canvas.height = height;
   const ctx = canvas.getContext("2d");
 
+  const cleanBride = (brideName || "").trim();
+  const cleanGroom = (groomName || "").trim();
+  const initials = (cleanBride && cleanGroom) 
+    ? getCoupleInitials(cleanBride, cleanGroom) 
+    : (title ? title.slice(0, 2).toUpperCase() : "DS");
+
+  const mainHeading = (cleanBride && cleanGroom)
+    ? `${cleanBride.toUpperCase()}  &  ${cleanGroom.toUpperCase()}`
+    : (title || cleanBride || cleanGroom || "ROYAL INVITATION").toUpperCase();
+
   // 1. Rich Royal Background Gradient
   const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 80, width / 2, height / 2, width / 1.3);
-  bgGrad.addColorStop(0, "#4a121d");
+  bgGrad.addColorStop(0, primaryColor || "#4a121d");
   bgGrad.addColorStop(0.5, "#2f0810");
   bgGrad.addColorStop(1, "#120205");
   ctx.fillStyle = bgGrad;
@@ -102,8 +113,7 @@ export function generateMonogramCanvas({
   ctx.font = "bold 32px serif";
   ctx.fillText("👑", centerX, centerY - crestRadius + 4);
 
-  // 6. Bride & Groom Initials (Big Luxurious Gold Monogram)
-  const initials = getCoupleInitials(brideName, groomName);
+  // 6. Initials (Big Luxurious Gold Monogram)
   ctx.save();
   ctx.font = "bold 88px 'Cinzel', 'Playfair Display', 'Georgia', serif";
   
@@ -125,19 +135,17 @@ export function generateMonogramCanvas({
   ctx.font = "18px serif";
   ctx.fillText("❦  ❖  ❦", centerX, centerY + 62);
 
-  // 7. Full Couple Names
-  const cleanBride = brideName.trim().toUpperCase();
-  const cleanGroom = groomName.trim().toUpperCase();
+  // 7. Full Names / Title
   ctx.save();
   ctx.font = "bold 34px 'Cinzel', 'Playfair Display', 'Georgia', serif";
   ctx.fillStyle = "#FFFFFF";
   ctx.shadowColor = "rgba(0, 0, 0, 0.9)";
   ctx.shadowBlur = 10;
   ctx.letterSpacing = "4px";
-  ctx.fillText(`${cleanBride}  &  ${cleanGroom}`, centerX, height - 165);
+  ctx.fillText(mainHeading, centerX, height - 165);
   ctx.restore();
 
-  // 8. "WEDDING INVITATION" Subtitle
+  // 8. Subtitle
   ctx.save();
   ctx.font = "600 16px 'Montserrat', sans-serif";
   ctx.fillStyle = accentGold;
@@ -169,7 +177,7 @@ export function generateMonogramCanvas({
 /**
  * Returns a data URL of the monogram image
  */
-export function getMonogramThumbnailDataUrl(options) {
+export function getMonogramThumbnailDataUrl(options = {}) {
   try {
     const canvas = generateMonogramCanvas(options);
     return canvas.toDataURL("image/jpeg", 0.85);
@@ -183,16 +191,31 @@ export function getMonogramThumbnailDataUrl(options) {
  * Dynamically updates document OpenGraph and Meta tags for social previews
  */
 export function updateSocialMetaTags({
-  brideName = "Suman",
-  groomName = "Vishal",
-  weddingDate = "2026-11-21",
+  brideName = "",
+  groomName = "",
+  title = "",
+  weddingDate = "",
+  weddingVenue = "",
+  introQuote = "",
   thumbnailUrl = null,
   shareUrl = null
 }) {
   if (typeof document === 'undefined') return;
 
-  const pageTitle = `${brideName} & ${groomName} | Wedding Invitation — DS Envite`;
-  const pageDesc = `We cordially invite you to celebrate the wedding union of ${brideName} & ${groomName}. Tap to view our interactive invitation, music, and RSVP.`;
+  let pageTitle = "DS Envite — Luxury Digital Invitations";
+  let pageDesc = "Design, customize, and share interactive invitations with RSVP tracking, live music, countdown timers, and blessings.";
+  let ogTitle = "Luxury Digital Invitation — DS Envite";
+
+  if (brideName && groomName) {
+    pageTitle = `${brideName} & ${groomName} — Wedding Invitation | DS Envite`;
+    ogTitle = `${brideName} & ${groomName} — Wedding Invitation`;
+    const venueText = weddingVenue ? ` at ${weddingVenue}` : '';
+    pageDesc = `We cordially invite you to celebrate the wedding union of ${brideName} & ${groomName}${venueText}. Tap to view interactive invitation, music, and RSVP.`;
+  } else if (title) {
+    pageTitle = `${title} | DS Envite`;
+    ogTitle = title;
+    pageDesc = `You are cordially invited to ${title}. Tap to view the interactive invitation, music, and RSVP on DS Envite.`;
+  }
   
   document.title = pageTitle;
 
@@ -207,7 +230,7 @@ export function updateSocialMetaTags({
     el.setAttribute("content", content);
   };
 
-  setMeta("property", "og:title", `${brideName} & ${groomName} — Wedding Invitation`);
+  setMeta("property", "og:title", ogTitle);
   setMeta("property", "og:description", pageDesc);
   setMeta("property", "og:type", "website");
   setMeta("property", "og:site_name", "DS Envite");
@@ -222,7 +245,43 @@ export function updateSocialMetaTags({
     setMeta("name", "twitter:image", thumbnailUrl);
   }
 
+  setMeta("name", "description", pageDesc);
   setMeta("name", "twitter:card", "summary_large_image");
-  setMeta("name", "twitter:title", `${brideName} & ${groomName} — Wedding Invitation`);
+  setMeta("name", "twitter:title", ogTitle);
   setMeta("name", "twitter:description", pageDesc);
+}
+
+/**
+ * Resets document title and social meta tags to DS Envite website defaults
+ */
+export function resetWebsiteSocialMetaTags() {
+  if (typeof document === 'undefined') return;
+
+  const origin = window.location.origin || 'https://ds-envite.vercel.app';
+  const siteTitle = "DS Envite — Luxury Digital Invitations & Wedding Websites";
+  const siteDesc = "Create, customize, and share interactive digital invitations with live music, RSVP tracking, scratch-to-reveal cards, and custom countdowns on DS Envite.";
+  const siteBanner = `${origin}/website_thumbnail.jpg`;
+
+  document.title = siteTitle;
+
+  const setMeta = (attr, key, content) => {
+    if (!content) return;
+    let el = document.querySelector(`meta[${attr}="${key}"]`);
+    if (!el) {
+      el = document.createElement("meta");
+      el.setAttribute(attr, key);
+      document.head.appendChild(el);
+    }
+    el.setAttribute("content", content);
+  };
+
+  setMeta("property", "og:title", siteTitle);
+  setMeta("property", "og:description", siteDesc);
+  setMeta("property", "og:image", siteBanner);
+  setMeta("property", "og:image:secure_url", siteBanner);
+  setMeta("property", "og:url", origin);
+  setMeta("name", "description", siteDesc);
+  setMeta("name", "twitter:title", siteTitle);
+  setMeta("name", "twitter:description", siteDesc);
+  setMeta("name", "twitter:image", siteBanner);
 }

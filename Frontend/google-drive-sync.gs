@@ -91,6 +91,44 @@ function doPost(e) {
       });
     }
     
+    // ACTION 3: Delete folder when invitation is deleted
+    if (action === "deleteFolder") {
+      var folderId = contents.folderId;
+      if (folderId) {
+        try {
+          var targetFolder = DriveApp.getFolderById(folderId);
+          targetFolder.setTrashed(true);
+          return responseJSON({
+            status: "success",
+            message: "Folder moved to trash",
+            folderId: folderId
+          });
+        } catch(err) {
+          return responseJSON({ status: "error", message: err.toString() });
+        }
+      }
+      return responseJSON({ status: "error", message: "Missing folderId" });
+    }
+
+    // ACTION 4: Delete file when asset is removed
+    if (action === "deleteFile") {
+      var fileId = contents.fileId;
+      if (fileId) {
+        try {
+          var targetFile = DriveApp.getFileById(fileId);
+          targetFile.setTrashed(true);
+          return responseJSON({
+            status: "success",
+            message: "File moved to trash",
+            fileId: fileId
+          });
+        } catch(err) {
+          return responseJSON({ status: "error", message: err.toString() });
+        }
+      }
+      return responseJSON({ status: "error", message: "Missing fileId" });
+    }
+    
     return responseJSON({ status: "error", message: "Unknown action" });
   } catch (error) {
     return responseJSON({ status: "error", message: error.toString() });

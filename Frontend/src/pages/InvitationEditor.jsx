@@ -11,8 +11,16 @@ import PaymentModal from '../components/PaymentModal';
 import AiAssistantModal from '../components/AiAssistantModal';
 import GuestManagerModal from '../components/GuestManagerModal';
 import ShareInviteModal from '../components/ShareInviteModal';
+import CustomDialog from '../components/CustomDialog';
 import { downloadPrintablePdfCard, downloadInvitationImage, downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
-import { formatDriveFolderName, GOOGLE_DRIVE_ROOT_FOLDER_URL } from '../utils/googleDriveStorage';
+import {
+  formatDriveFolderName,
+  GOOGLE_DRIVE_ROOT_FOLDER_URL,
+  syncDriveFolder,
+  getStoredOAuthToken,
+  requestGoogleDriveAuth,
+  getDriveWebhookUrl
+} from '../utils/googleDriveStorage';
 
 export default function InvitationEditor() {
   const { id } = useParams();
@@ -21,6 +29,28 @@ export default function InvitationEditor() {
   const { currentUser } = useAuth();
   const isAdmin = currentUser?.role === 'admin';
   const [toast, setToast] = useState({ show: false, message: "", type: "info" });
+  const [dialog, setDialog] = useState({ show: false, type: 'alert', message: '', onConfirm: null, onCancel: null });
+
+  const triggerDialog = (options) => {
+    setDialog({
+      show: true,
+      type: options.type || 'alert',
+      title: options.title || 'System Message',
+      message: options.message || '',
+      inputValue: options.defaultValue || '',
+      inputPlaceholder: options.placeholder || 'Type here...',
+      confirmText: options.confirmText || 'OK',
+      cancelText: options.cancelText || 'Cancel',
+      onConfirm: (val) => {
+        setDialog(prev => ({ ...prev, show: false }));
+        options.onConfirm && options.onConfirm(val);
+      },
+      onCancel: () => {
+        setDialog(prev => ({ ...prev, show: false }));
+        options.onCancel && options.onCancel();
+      }
+    });
+  };
   
   // Customization state - initialized synchronously to avoid flash of default names
   const cachedInv = id ? dbStore.getInvitationById(id) : null;
@@ -48,6 +78,7 @@ export default function InvitationEditor() {
 
   // UI state
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobilePanelMode, setMobilePanelMode] = useState("split"); // "split" (55vh) | "expanded" (85vh)
   const [previewEnvelope, setPreviewEnvelope] = useState(false);
   const [isGeneratingImg, setIsGeneratingImg] = useState({ hero: false, story: false, scratch: false });
   const [musicPlaying, setMusicPlaying] = useState(true);
@@ -264,13 +295,85 @@ export default function InvitationEditor() {
       showToast("Please save the invitation first before duplicating.", "info");
       return;
     }
-    const dup = dbStore.duplicateInvitation(id, null, currentUser?.role === 'customer' ? currentUser?.id : null);
-    if (dup) {
-      showToast(`Duplicated as "${dup.title}"! Loading new copy...`, "success");
-      navigate(`/admin/editor/${dup.id}`);
-    } else {
-      showToast("Failed to duplicate invitation", "error");
-    }
+    const defaultFolder = formatDriveFolderName(config, `${title || 'Invitation'} (Copy)`);
+    triggerDialog({
+      type: 'prompt',
+      title: 'Duplicate Invitation & Create Drive Folder',
+      message: 'Enter title & Google Drive folder name for the new copy:',
+      defaultValue: defaultFolder,
+      placeholder: 'e.g. Suman & Vishal Wedding (Copy)',
+      confirmText: 'Duplicate & Sync Drive',
+      onConfirm: async (customName) => {
+        const folderName = (customName || '').trim() || defaultFolder;
+        const dup = dbStore.duplicateInvitation(
+          id,
+          folderName,
+          currentUser?.role === 'customer' ? currentUser?.id : null,
+          folderName
+        );
+        if (dup) {
+          showToast(`Duplicated as "${folderName}"! Creating Drive folder...`, 'info');
+          try {
+            let token = getStoredOAuthToken();
+            if (!token && !getDriveWebhookUrl()) {
+              token = await requestGoogleDriveAuth();
+            }
+            const res = await syncDriveFolder({ invitation: dup, customFolderName: folderName, token });
+            if (res && res.folderId) {
+              dbStore.updateInvitation(dup.id, {
+                driveStorage: { ...(dup.driveStorage || {}), ...res }
+              });
+            }
+          } catch (e) {
+            console.warn("Drive sync on duplicate error:", e);
+          }
+          navigate(`/admin/editor/${dup.id}`);
+        } else {
+          showToast('Failed to duplicate invitation', 'error');
+        }
+      }
+    });
+  };
+
+  const handleSyncDriveFolder = () => {
+    const currentName = invitation?.driveStorage?.folderName || formatDriveFolderName(config, title);
+    triggerDialog({
+      type: 'prompt',
+      title: 'Create / Sync Unique Google Drive Folder',
+      message: `Enter Google Drive folder name for "${title || 'this invitation'}" inside DS_Envite_DataCentre:`,
+      defaultValue: currentName,
+      placeholder: 'e.g. Suman & Vishal (Neamatpur)',
+      confirmText: 'Create / Sync in Drive',
+      onConfirm: async (customName) => {
+        const folderName = (customName || '').trim() || currentName;
+        showToast(`Syncing folder "${folderName}" with Google Drive...`, 'info');
+        try {
+          let token = getStoredOAuthToken();
+          if (!token && !getDriveWebhookUrl()) {
+            token = await requestGoogleDriveAuth();
+          }
+          const res = await syncDriveFolder({ invitation: invitation || { id, title, config }, customFolderName: folderName, token });
+          if (res && res.folderId) {
+            const updatedStorage = {
+              ...(invitation?.driveStorage || {}),
+              ...res,
+              folderName,
+              folderUrl: res.folderUrl || `https://drive.google.com/drive/folders/${res.folderId}`,
+              lastSyncedAt: new Date().toISOString()
+            };
+            if (id) {
+              dbStore.updateInvitation(id, { driveStorage: updatedStorage });
+            }
+            setInvitation(prev => ({ ...prev, driveStorage: updatedStorage }));
+            showToast(`Google Drive folder "${folderName}" created and linked!`, 'success');
+          } else {
+            showToast('Could not create folder. Please authorize Google Drive.', 'error');
+          }
+        } catch (err) {
+          showToast(`Drive sync error: ${err.message}`, 'error');
+        }
+      }
+    });
   };
 
   // real Google Imagen 4.0 fetch with prompt settings
@@ -350,7 +453,7 @@ export default function InvitationEditor() {
   };
 
   return (
-    <div className="h-screen flex flex-col md:flex-row bg-[var(--bg-app)] text-[var(--text-body)] overflow-hidden font-sans relative">
+    <div className="h-screen h-[100dvh] max-h-[100dvh] flex flex-col md:flex-row bg-[var(--bg-app)] text-[var(--text-body)] overflow-hidden font-sans relative">
       {toast.show && (
         <Toast message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: "" })} />
       )}
@@ -358,9 +461,13 @@ export default function InvitationEditor() {
       {/* Collapsible Customization Sidebar Panel */}
       <div 
         id="admin-sidebar"
-        className={`admin-sidebar border-slate-800 transition-all duration-300 shrink-0 z-10 order-last md:order-first ${
+        className={`admin-sidebar border-slate-800 transition-all duration-300 shrink-0 z-10 order-last md:order-first flex flex-col min-h-0 overflow-hidden ${
           sidebarOpen 
-            ? 'w-full h-[55vh] md:h-full md:w-[420px] border-t md:border-t-0 md:border-r' 
+            ? `w-full ${
+                mobilePanelMode === 'expanded' 
+                  ? 'h-[85vh] h-[85dvh]' 
+                  : 'h-[55vh] h-[55dvh]'
+              } md:h-full md:w-[420px] border-t md:border-t-0 md:border-r` 
             : 'hidden'
         }`}
       >
@@ -380,12 +487,20 @@ export default function InvitationEditor() {
           onClose={() => setSidebarOpen(false)}
           isAdmin={isAdmin}
           onSave={handleSave}
+          mobilePanelMode={mobilePanelMode}
+          onToggleMobileHeight={() => setMobilePanelMode(prev => prev === 'expanded' ? 'split' : 'expanded')}
         />
       </div>
 
       {/* Split screen content: Live preview with floating control bar */}
-      <div className={`flex-1 flex flex-col relative overflow-hidden w-full order-first md:order-last ${
-        sidebarOpen ? 'h-[45vh] md:h-full sidebar-open' : 'h-full sidebar-closed'
+      <div className={`flex flex-col relative overflow-hidden w-full order-first md:order-last min-h-0 md:flex-1 ${
+        sidebarOpen 
+          ? `${
+              mobilePanelMode === 'expanded' 
+                ? 'h-[15vh] h-[15dvh]' 
+                : 'h-[45vh] h-[45dvh]'
+            } md:h-full sidebar-open` 
+          : 'h-full flex-1 sidebar-closed'
       }`}>
         
         {/* Editor floating toolbar with smooth responsive fit, middle mouse wheel scrolling & navigation chevrons */}
@@ -526,19 +641,33 @@ export default function InvitationEditor() {
                 </>
               )}
 
-              <a
-                href={invitation?.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="editor-toolbar-btn editor-toolbar-btn-collapsible text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-300/60"
-                title={`Google Drive Cloud Folder: ${invitation?.driveStorage?.folderName || formatDriveFolderName(config, title)} (Click to open)`}
-              >
-                <span className="text-[10px]">☁️</span>
-                <span className="editor-btn-text text-emerald-800 font-bold truncate max-w-[120px]">
-                  {invitation?.driveStorage?.folderName || formatDriveFolderName(config, title)}
-                </span>
-                <span className="text-[8px] text-emerald-600">↗</span>
-              </a>
+              {invitation?.driveStorage?.folderId ? (
+                <a
+                  href={invitation.driveStorage.folderUrl || `https://drive.google.com/drive/folders/${invitation.driveStorage.folderId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="editor-toolbar-btn editor-toolbar-btn-collapsible text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-300/60"
+                  title={`Google Drive Cloud Folder: ${invitation.driveStorage.folderName || formatDriveFolderName(config, title)} (Click to open)`}
+                >
+                  <span className="text-[10px]">☁️</span>
+                  <span className="editor-btn-text text-emerald-800 font-bold truncate max-w-[120px]">
+                    {invitation.driveStorage.folderName || formatDriveFolderName(config, title)}
+                  </span>
+                  <span className="text-[8px] text-emerald-600">↗</span>
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSyncDriveFolder}
+                  className="editor-toolbar-btn editor-toolbar-btn-collapsible text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300/70"
+                  title="Create & Link unique Google Drive folder for this invitation"
+                >
+                  <span className="text-[10px]">📁+</span>
+                  <span className="editor-btn-text text-amber-900 font-bold truncate max-w-[120px]">
+                    Sync Drive
+                  </span>
+                </button>
+              )}
 
               <button
                 onClick={handleSave}
@@ -676,6 +805,8 @@ export default function InvitationEditor() {
         isPaid={isPaid}
         showToast={showToast}
       />
+
+      <CustomDialog {...dialog} themeConfig={config} />
     </div>
   );
 }

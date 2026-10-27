@@ -288,8 +288,23 @@ export function extractDriveFileId(url) {
 }
 
 /**
+ * Check if a URL or data URI represents a video asset
+ */
+export function isVideoUrl(url, mediaType) {
+  if (mediaType === "video") return true;
+  if (!url || typeof url !== "string") return false;
+  const trimmed = url.trim().toLowerCase();
+  if (!trimmed) return false;
+  if (trimmed.startsWith("data:video/") || trimmed.startsWith("blob:")) return true;
+  if (/\.(mp4|webm|ogg|mov|m4v|mkv|avi)(\?.*)?$/i.test(trimmed)) return true;
+  if (trimmed.includes("type=video") || trimmed.includes("mediatype=video") || trimmed.includes("video/mp4") || trimmed.includes("video/webm")) return true;
+  return false;
+}
+
+/**
  * Automatically format Google Drive URLs into fast, permanent embeddable CDN URLs
  * - type: 'image' -> 'https://lh3.googleusercontent.com/d/{fileId}=s0' (Full HD original resolution)
+ * - type: 'video' -> 'https://drive.google.com/file/d/{fileId}/preview#type=video' (HD streaming video player)
  * - type: 'audio' / 'media' -> 'https://drive.google.com/uc?export=download&id={fileId}'
  */
 export function formatDriveDirectUrl(url, type = "image") {
@@ -297,10 +312,17 @@ export function formatDriveDirectUrl(url, type = "image") {
   const trimmed = url.trim();
   if (!trimmed) return trimmed;
 
+  const isVideo = type === "video" || isVideoUrl(trimmed);
+  const isAudio = type === "audio" || type === "music" || type === "sound" || type === "media";
+
   const fileId = extractDriveFileId(trimmed);
   if (!fileId) return trimmed;
 
-  if (type === "audio" || type === "music" || type === "sound" || type === "video" || type === "media") {
+  if (isVideo) {
+    return `https://drive.google.com/file/d/${fileId}/preview#type=video`;
+  }
+
+  if (isAudio) {
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
 
@@ -319,5 +341,6 @@ export function formatDriveDirectUrl(url, type = "image") {
   }
   return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
 }
+
 
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import dbStore from '../data/store';
-import { formatWeddingDate, formatWeddingTime, formatWeddingDateDmy, getFrameClasses, hexToRgb, parseColor, rgbaToCss, formatDriveDirectUrl } from '../utils/helpers';
+import { formatWeddingDate, formatWeddingTime, formatWeddingDateDmy, getFrameClasses, hexToRgb, parseColor, rgbaToCss, formatDriveDirectUrl, isVideoUrl, extractDriveFileId } from '../utils/helpers';
 import { 
   SvgHeart, SvgSparkles, SvgCalendar, SvgMapPin, 
   SvgVolume2, SvgVolumeX, SvgUsers, SvgMessageSquare, 
@@ -67,7 +67,17 @@ const ScratchCardShield = React.memo(
     isScratchFinished = false,
     setIsScratchFinished,
     setScratchedPercentage,
-    triggerCelebration
+    triggerCelebration,
+    scratchShieldBadgeEnabled = true,
+    scratchShieldBadgeTitle,
+    scratchShieldBadgeSubtitle,
+    scratchShieldBadgeTextColor,
+    scratchShieldBadgeSubtextColor,
+    scratchShieldBadgeBg,
+    scratchShieldBadgeBorderColor,
+    scratchShieldBadgeWidth,
+    scratchShieldBadgeHeight,
+    scratchShieldBadgeRadius
   }) {
     const canvasRef = useRef(null);
     const [debugText, setDebugText] = useState("paint not called");
@@ -160,48 +170,54 @@ const ScratchCardShield = React.memo(
       drawShieldShapeBorder(ctx, width - 40, height - 40, 20, cardShape);
       ctx.stroke();
 
-      // 2. Luxury center badge
-      const badgeW = Math.min(340, width - 60);
-      const badgeH = 82;
-      const badgeX = (width - badgeW) / 2;
-      const badgeY = (height - badgeH) / 2;
+      // 2. Luxury center badge / black box (Can be hidden, customized, or recolored)
+      const isBadgeEnabled = scratchShieldBadgeEnabled !== false && scratchShieldBadgeEnabled !== 'false';
+      if (isBadgeEnabled) {
+        const badgeW = Math.min(scratchShieldBadgeWidth || 340, width - 40);
+        const badgeH = scratchShieldBadgeHeight || 82;
+        const badgeX = (width - badgeW) / 2;
+        const badgeY = (height - badgeH) / 2;
 
-      ctx.fillStyle = 'rgba(9, 14, 26, 0.82)';
-      ctx.strokeStyle = accent;
-      ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-      ctx.shadowBlur = 16;
-      
-      const br = 16;
-      ctx.beginPath();
-      ctx.moveTo(badgeX + br, badgeY);
-      ctx.lineTo(badgeX + badgeW - br, badgeY);
-      ctx.arcTo(badgeX + badgeW, badgeY, badgeX + badgeW, badgeY + br, br);
-      ctx.lineTo(badgeX + badgeW, badgeY + badgeH - br);
-      ctx.arcTo(badgeX + badgeW, badgeY + badgeH, badgeX + badgeW - br, badgeY + badgeH, br);
-      ctx.lineTo(badgeX + br, badgeY + badgeH);
-      ctx.arcTo(badgeX, badgeY + badgeH, badgeX, badgeY + badgeH - br, br);
-      ctx.lineTo(badgeX, badgeY + br);
-      ctx.arcTo(badgeX, badgeY, badgeX + br, badgeY, br);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
+        ctx.fillStyle = scratchShieldBadgeBg || 'rgba(9, 14, 26, 0.82)';
+        ctx.strokeStyle = scratchShieldBadgeBorderColor || accent;
+        ctx.lineWidth = 1.5;
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+        ctx.shadowBlur = 16;
+        
+        const br = scratchShieldBadgeRadius !== undefined ? scratchShieldBadgeRadius : 16;
+        ctx.beginPath();
+        ctx.moveTo(badgeX + br, badgeY);
+        ctx.lineTo(badgeX + badgeW - br, badgeY);
+        ctx.arcTo(badgeX + badgeW, badgeY, badgeX + badgeW, badgeY + br, br);
+        ctx.lineTo(badgeX + badgeW, badgeY + badgeH - br);
+        ctx.arcTo(badgeX + badgeW, badgeY + badgeH, badgeX + badgeW - br, badgeY + badgeH, br);
+        ctx.lineTo(badgeX + br, badgeY + badgeH);
+        ctx.arcTo(badgeX, badgeY + badgeH, badgeX, badgeY + badgeH - br, br);
+        ctx.lineTo(badgeX, badgeY + br);
+        ctx.arcTo(badgeX, badgeY, badgeX + br, badgeY, br);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
 
-      // 3. Shimmering High-Contrast Typography
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-      ctx.shadowBlur = 8;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
+        // 3. Shimmering High-Contrast Typography
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+        ctx.shadowBlur = 8;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
 
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 15px "Playfair Display", "Cinzel", Georgia, serif';
-      ctx.fillText('✦ SCRATCH TO REVEAL DATE ✦', width / 2, height / 2 - 12);
+        const isVideo = isVideoUrl(scratchImage);
+        ctx.fillStyle = scratchShieldBadgeTextColor || '#ffffff';
+        ctx.font = 'bold 15px "Playfair Display", "Cinzel", Georgia, serif';
+        const defaultTitle = isVideo ? '✦ SCRATCH TO REVEAL VIDEO ✦' : '✦ SCRATCH TO REVEAL DATE ✦';
+        ctx.fillText(scratchShieldBadgeTitle || defaultTitle, width / 2, height / 2 - 12);
 
-      ctx.fillStyle = accent;
-      ctx.font = 'italic 12px "Cormorant Garamond", Georgia, serif';
-      ctx.fillText('Wipe gold shield to reveal wedding date & countdown', width / 2, height / 2 + 14);
+        ctx.fillStyle = scratchShieldBadgeSubtextColor || accent;
+        ctx.font = 'italic 12px "Cormorant Garamond", Georgia, serif';
+        const defaultSubtitle = isVideo ? 'Wipe gold shield to reveal romantic video & date' : 'Wipe gold shield to reveal wedding date & countdown';
+        ctx.fillText(scratchShieldBadgeSubtitle || defaultSubtitle, width / 2, height / 2 + 14);
 
-      ctx.shadowBlur = 0;
+        ctx.shadowBlur = 0;
+      }
     };
 
     const drawDefaultMetallicShield = (ctx, width, height) => {
@@ -249,6 +265,9 @@ const ScratchCardShield = React.memo(
       setScratchedPercentage(0);
       hasTriggeredScratchRef.current = false;
 
+      // Ensure canvas is completely wiped clean before any repaint
+      ctx.clearRect(0, 0, width, height);
+
       ctx.globalCompositeOperation = 'source-over';
 
       // 1. Draw default luxury metallic foil shield immediately
@@ -261,12 +280,13 @@ const ScratchCardShield = React.memo(
       const elAtCenter = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
       setDebugText(`cZ:${cardZ} cvZ:${canvasZ} top:<${elAtCenter?.tagName} c='${elAtCenter?.className?.slice(0,10)}'>`);
 
-      // 2. Check if user provided a custom uploaded image for the scratch card surface
+      // 2. Check if user provided a custom uploaded image for the scratch card surface (skip if it is a video)
       const hasCustomImage = Boolean(
         scratchImage &&
         typeof scratchImage === 'string' &&
         scratchImage.trim() !== '' &&
-        !scratchImage.includes('photo-1519225495810-7512c696505a')
+        !scratchImage.includes('photo-1519225495810-7512c696505a') &&
+        !isVideoUrl(scratchImage)
       );
       console.log("🎨 HAS CUSTOM IMAGE?", hasCustomImage, scratchImage);
 
@@ -296,6 +316,7 @@ const ScratchCardShield = React.memo(
             const drawY = (height - drawH) * yOff;
 
             // Fill deep opaque background first
+            ctx.clearRect(0, 0, width, height);
             ctx.fillStyle = '#0f172a';
             ctx.fillRect(0, 0, width, height);
             ctx.drawImage(img, drawX, drawY, drawW, drawH);
@@ -321,7 +342,17 @@ const ScratchCardShield = React.memo(
       revealColor,
       accentGold,
       setIsScratchFinished,
-      setScratchedPercentage
+      setScratchedPercentage,
+      scratchShieldBadgeEnabled,
+      scratchShieldBadgeTitle,
+      scratchShieldBadgeSubtitle,
+      scratchShieldBadgeTextColor,
+      scratchShieldBadgeSubtextColor,
+      scratchShieldBadgeBg,
+      scratchShieldBadgeBorderColor,
+      scratchShieldBadgeWidth,
+      scratchShieldBadgeHeight,
+      scratchShieldBadgeRadius
     ]);
 
     useEffect(() => {
@@ -448,18 +479,6 @@ const ScratchCardShield = React.memo(
         onTouchEnd={handleScratchEnd}
       />
     );
-  },
-  (prev, next) => {
-    return (
-      prev.shape === next.shape &&
-      prev.revealColor === next.revealColor &&
-      prev.accentGold === next.accentGold &&
-      prev.scratchImage === next.scratchImage &&
-      prev.scratchImageScale === next.scratchImageScale &&
-      prev.scratchImageXOffset === next.scratchImageXOffset &&
-      prev.scratchImageYOffset === next.scratchImageYOffset &&
-      prev.isScratchFinished === next.isScratchFinished
-    );
   }
 );
 
@@ -582,6 +601,24 @@ export default function InvitationRenderer({
       setCoverImageDimensions({ width: 0, height: 0, ratio: null });
       return;
     }
+
+    if (isVideoUrl(config.heroImage)) {
+      const directVideoSrc = formatDriveDirectUrl(config.heroImage, "video");
+      setCoverImgSrc(directVideoSrc);
+      const vid = document.createElement("video");
+      vid.onloadedmetadata = () => {
+        if (vid.videoWidth && vid.videoHeight) {
+          setCoverImageDimensions({
+            width: vid.videoWidth,
+            height: vid.videoHeight,
+            ratio: vid.videoWidth / vid.videoHeight
+          });
+        }
+      };
+      vid.src = directVideoSrc;
+      return;
+    }
+
     const directSrc = formatDriveDirectUrl(config.heroImage, "image");
     setCoverImgSrc(directSrc);
 
@@ -2365,13 +2402,17 @@ export default function InvitationRenderer({
                 return `clamp(${minPx * scale}px, ${factor * scale}cqw, ${maxPx * scale}px)`;
               };
 
+              const isCoverVideo = isVideoUrl(config.heroImage);
+
               return (
                 <section 
                   id="cover-section"
                   className={`relative ${isUploadedCover ? 'min-h-0' : 'min-h-[75vh]'} flex flex-col justify-center items-center text-center ${isUploadedCover ? 'p-2 sm:p-4 md:p-6' : 'p-3 sm:p-5 md:p-6'} bg-center overflow-hidden w-full mx-auto rounded-3xl`} 
                   style={{ 
                     containerType: 'inline-size',
-                    backgroundImage: `linear-gradient(${config.coverBgOverlayStart || 'rgba(0, 0, 0, 0.45)'}, ${config.coverBgOverlayEnd || 'rgba(0, 0, 0, 0.70)'}), url("${coverImgSrc || formatDriveDirectUrl(config.heroImage, "image")}")`,
+                    backgroundImage: isCoverVideo
+                      ? 'none'
+                      : `linear-gradient(${config.coverBgOverlayStart || 'rgba(0, 0, 0, 0.45)'}, ${config.coverBgOverlayEnd || 'rgba(0, 0, 0, 0.70)'}), url("${coverImgSrc || formatDriveDirectUrl(config.heroImage, "image")}")`,
                     backgroundSize: isUploadedCover
                       ? (config.coverFitStyle || (config.coverHeroScale ? `${config.coverHeroScale}%` : 'contain'))
                       : (config.coverHeroScale ? `${config.coverHeroScale}%` : 'cover'),
@@ -2396,9 +2437,52 @@ export default function InvitationRenderer({
                     padding: shouldScale ? 'clamp(6px, 1.8cqw, 24px) clamp(10px, 3cqw, 32px)' : undefined
                   }}
                 >
+                  {/* Seamless Full HD Background Video Player for Cover Design (Supports Drive Preview iframe & Native Video) */}
+                  {isCoverVideo && (
+                    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 rounded-3xl">
+                      {extractDriveFileId(config.heroImage) ? (
+                        <iframe
+                          key={extractDriveFileId(config.heroImage)}
+                          src={`https://drive.google.com/file/d/${extractDriveFileId(config.heroImage)}/preview`}
+                          className="w-full h-full border-0 pointer-events-none scale-[1.08]"
+                          allow="autoplay; encrypted-media"
+                          style={{
+                            opacity: config.coverHeroOpacity !== undefined ? config.coverHeroOpacity : 1,
+                            filter: config.coverHeroGlow ? `brightness(${config.coverHeroGlow}%)` : undefined,
+                          }}
+                        />
+                      ) : (
+                        <video
+                          key={config.heroImage}
+                          src={formatDriveDirectUrl(config.heroImage, "video")}
+                          autoPlay
+                          loop
+                          muted
+                          playsInline
+                          preload="auto"
+                          className="w-full h-full pointer-events-none"
+                          style={{
+                            objectFit: isUploadedCover ? (config.coverFitStyle || 'cover') : 'cover',
+                            objectPosition: `${config.coverHeroXOffset ?? 50}% ${config.coverHeroYOffset ?? 50}%`,
+                            transform: config.coverHeroScale ? `scale(${config.coverHeroScale / 100})` : undefined,
+                            opacity: config.coverHeroOpacity !== undefined ? config.coverHeroOpacity : 1,
+                            filter: config.coverHeroGlow ? `brightness(${config.coverHeroGlow}%)` : undefined,
+                          }}
+                        />
+                      )}
+                      {/* Dark Gradient Overlay for Text Legibility & Contrast */}
+                      <div 
+                        className="absolute inset-0 pointer-events-none"
+                        style={{
+                          background: `linear-gradient(${config.coverBgOverlayStart || 'rgba(0, 0, 0, 0.45)'}, ${config.coverBgOverlayEnd || 'rgba(0, 0, 0, 0.70)'})`
+                        }}
+                      />
+                    </div>
+                  )}
+
                   {config.coverInnerBorderEnabled !== false && (
                     <div 
-                      className="absolute rounded-2xl pointer-events-none flex flex-col justify-between"
+                      className="absolute rounded-2xl pointer-events-none flex flex-col justify-between z-10"
                       style={{
                         ...customStyles.coverInnerBorder,
                         inset: shouldScale ? 'clamp(6px, 2cqw, 32px)' : undefined,
@@ -2712,9 +2796,11 @@ export default function InvitationRenderer({
             id="scratch-section" 
             className="py-12 px-4 sm:px-5 text-center w-full mx-auto rounded-3xl relative overflow-hidden"
             style={{
-              backgroundImage: config.scratchSectionBgImage 
-                ? `linear-gradient(${config.scratchSectionBgImageOverlayStart || 'rgba(5,7,13,0.7)'}, ${config.scratchSectionBgImageOverlayEnd || 'rgba(4,6,10,0.9)'}), url("${formatDriveDirectUrl(config.scratchSectionBgImage, "image")}")` 
-                : (config.scratchSectionBg || 'linear-gradient(180deg, #05070D 0%, #09111D 45%, #04060A 100%)'),
+              backgroundImage: isVideoUrl(config.scratchSectionBgImage)
+                ? 'none'
+                : (config.scratchSectionBgImage 
+                  ? `linear-gradient(${config.scratchSectionBgImageOverlayStart || 'rgba(5,7,13,0.7)'}, ${config.scratchSectionBgImageOverlayEnd || 'rgba(4,6,10,0.9)'}), url("${formatDriveDirectUrl(config.scratchSectionBgImage, "image")}")` 
+                  : (config.scratchSectionBg || 'linear-gradient(180deg, #05070D 0%, #09111D 45%, #04060A 100%)')),
               backgroundSize: config.scratchSectionBgImageScale ? `${config.scratchSectionBgImageScale}%` : 'cover',
               backgroundPosition: `${config.scratchSectionBgImageXOffset ?? 50}% ${config.scratchSectionBgImageYOffset ?? 50}%`,
               opacity: config.scratchSectionBgImageOpacity !== undefined ? config.scratchSectionBgImageOpacity : 1,
@@ -2726,6 +2812,33 @@ export default function InvitationRenderer({
               transformStyle: 'flat'
             }}
           >
+            {/* Seamless HD Video Player for Scratch Section Outer Banner */}
+            {isVideoUrl(config.scratchSectionBgImage) && (
+              <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 rounded-3xl">
+                <video
+                  key={config.scratchSectionBgImage}
+                  src={formatDriveDirectUrl(config.scratchSectionBgImage, "video")}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="auto"
+                  className="w-full h-full object-cover pointer-events-none"
+                  style={{
+                    opacity: config.scratchSectionBgImageOpacity !== undefined ? config.scratchSectionBgImageOpacity : 0.85,
+                    transform: config.scratchSectionBgImageScale ? `scale(${config.scratchSectionBgImageScale / 100})` : undefined,
+                    objectPosition: `${config.scratchSectionBgImageXOffset ?? 50}% ${config.scratchSectionBgImageYOffset ?? 50}%`
+                  }}
+                />
+                <div 
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background: `linear-gradient(${config.scratchSectionBgImageOverlayStart || 'rgba(5,7,13,0.7)'}, ${config.scratchSectionBgImageOverlayEnd || 'rgba(4,6,10,0.9)'})`
+                  }}
+                />
+              </div>
+            )}
+
             {/* Ambient Gold Spotlight */}
             <div className="absolute inset-0 pointer-events-none" style={{
               background: `radial-gradient(ellipse at center top, ${config.scratchCardGlow || 'rgba(255,215,120,0.08)'}, transparent 70%)`
@@ -2879,11 +2992,13 @@ export default function InvitationRenderer({
                     
                     {/* Save the Date Revealed Card — Premium Interior */}
                     <div 
-                      className="absolute inset-0 bg-cover bg-center flex flex-col justify-between p-4 sm:p-5 z-10" 
+                      className="absolute inset-0 bg-cover bg-center flex flex-col justify-between p-4 sm:p-5 z-10 overflow-hidden" 
                       style={{ 
-                        backgroundImage: config.scratchCardBgImage 
-                          ? `linear-gradient(${config.scratchCardBgImageOverlayStart || 'rgba(5,7,13,0.5)'}, ${config.scratchCardBgImageOverlayEnd || 'rgba(5,7,13,0.85)'}), url("${config.scratchCardBgImage}")` 
-                          : `linear-gradient(180deg, ${config.scratchCardBg || '#0D1322'}, #05070D)`,
+                        backgroundImage: (isVideoUrl(config.scratchImage) || isVideoUrl(config.scratchCardBgImage))
+                          ? 'none'
+                          : (config.scratchCardBgImage 
+                            ? `linear-gradient(${config.scratchCardBgImageOverlayStart || 'rgba(5,7,13,0.5)'}, ${config.scratchCardBgImageOverlayEnd || 'rgba(5,7,13,0.85)'}), url("${config.scratchCardBgImage}")` 
+                            : `linear-gradient(180deg, ${config.scratchCardBg || '#0D1322'}, #05070D)`),
                         backgroundSize: config.scratchCardBgImageScale ? `${config.scratchCardBgImageScale}%` : 'cover',
                         backgroundPosition: `${config.scratchCardBgImageXOffset ?? 50}% ${config.scratchCardBgImageYOffset ?? 50}%`,
                         opacity: config.scratchCardBgImageOpacity !== undefined ? config.scratchCardBgImageOpacity : (config.scratchCardOpacity !== undefined ? config.scratchCardOpacity : 1),
@@ -2892,6 +3007,53 @@ export default function InvitationRenderer({
                         zIndex: 10
                       }}
                     >
+                      {/* Seamless HD Video Player for Revealed Scratch Card (Drive Preview iframe & Native Video) */}
+                      {(isVideoUrl(config.scratchImage) || isVideoUrl(config.scratchCardBgImage)) && (
+                        <div className="absolute inset-0 overflow-hidden pointer-events-none z-0" style={{ ...shapeStyles }}>
+                          {(() => {
+                            const activeMedia = config.scratchCardBgImage || config.scratchImage;
+                            const driveId = extractDriveFileId(activeMedia);
+                            if (driveId) {
+                              return (
+                                <iframe
+                                  key={driveId}
+                                  src={`https://drive.google.com/file/d/${driveId}/preview`}
+                                  className="w-full h-full border-0 pointer-events-none scale-[1.08]"
+                                  allow="autoplay; encrypted-media"
+                                  style={{
+                                    opacity: config.scratchImageOpacity !== undefined ? config.scratchImageOpacity : 0.95,
+                                    filter: config.scratchImageGlow ? `brightness(${config.scratchImageGlow}%)` : undefined,
+                                  }}
+                                />
+                              );
+                            }
+                            return (
+                              <video
+                                key={activeMedia}
+                                src={formatDriveDirectUrl(activeMedia, "video")}
+                                autoPlay
+                                loop
+                                muted
+                                playsInline
+                                preload="auto"
+                                className="w-full h-full object-cover pointer-events-none"
+                                style={{
+                                  opacity: config.scratchImageOpacity !== undefined ? config.scratchImageOpacity : 0.95,
+                                  transform: `scale(${(config.scratchImageScale || 100) / 100})`,
+                                  objectPosition: `${config.scratchImageXOffset ?? 50}% ${config.scratchImageYOffset ?? 50}%`,
+                                  filter: config.scratchImageGlow ? `brightness(${config.scratchImageGlow}%)` : undefined,
+                                }}
+                              />
+                            );
+                          })()}
+                          <div 
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                              background: `linear-gradient(${config.scratchCardBgImageOverlayStart || 'rgba(5,7,13,0.30)'}, ${config.scratchCardBgImageOverlayEnd || 'rgba(5,7,13,0.70)'})`
+                            }}
+                          />
+                        </div>
+                      )}
                         {/* Decorative Shape-Matched Inner Border Line */}
                         <div 
                           className="absolute inset-2 sm:inset-3 pointer-events-none transition-all duration-300 z-10"
@@ -3084,7 +3246,65 @@ export default function InvitationRenderer({
                         setIsScratchFinished={setIsScratchFinished}
                         setScratchedPercentage={setScratchedPercentage}
                         triggerCelebration={triggerCelebration}
+                        scratchShieldBadgeEnabled={config.scratchShieldBadgeEnabled}
+                        scratchShieldBadgeTitle={config.scratchShieldBadgeTitle}
+                        scratchShieldBadgeSubtitle={config.scratchShieldBadgeSubtitle}
+                        scratchShieldBadgeTextColor={config.scratchShieldBadgeTextColor}
+                        scratchShieldBadgeSubtextColor={config.scratchShieldBadgeSubtextColor}
+                        scratchShieldBadgeBg={config.scratchShieldBadgeBg}
+                        scratchShieldBadgeBorderColor={config.scratchShieldBadgeBorderColor}
+                        scratchShieldBadgeWidth={config.scratchShieldBadgeWidth}
+                        scratchShieldBadgeHeight={config.scratchShieldBadgeHeight}
+                        scratchShieldBadgeRadius={config.scratchShieldBadgeRadius}
                       />
+                    )}
+
+                    {/* Editor Floating Toggle for Center Shield Black Box & Text */}
+                    {!isPrintMode && (isModerator || Boolean(onSelectElement)) && (
+                      <div 
+                        className="absolute top-2.5 right-2.5 z-30 flex items-center select-none"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {config.scratchShieldBadgeEnabled !== false ? (
+                          <div className="flex items-center gap-1.5 bg-slate-950/90 backdrop-blur-md px-2.5 py-1 rounded-xl border border-amber-500/50 shadow-xl">
+                            <button
+                              type="button"
+                              id="scratchCardEditShieldBtn"
+                              onClick={() => {
+                                onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchShieldBadgeTitle' });
+                              }}
+                              className="text-[9.5px] font-extrabold uppercase text-amber-300 hover:text-amber-100 flex items-center gap-1 cursor-pointer transition active:scale-95"
+                              title="Edit Black Box & Text in Sidebar"
+                            >
+                              <span>✏️ Edit Black Box</span>
+                            </button>
+                            <span className="text-white/20 text-xs">|</span>
+                            <button
+                              type="button"
+                              id="scratchCardToggleShieldBtn"
+                              onClick={() => {
+                                onChangeField && onChangeField('scratchShieldBadgeEnabled', false);
+                              }}
+                              className="text-[9.5px] font-extrabold uppercase text-rose-400 hover:text-rose-300 flex items-center gap-1 cursor-pointer transition active:scale-95"
+                              title="Turn OFF this whole black box along with text"
+                            >
+                              <span>✕ Turn OFF</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            id="scratchCardToggleShieldBtn"
+                            onClick={() => {
+                              onChangeField && onChangeField('scratchShieldBadgeEnabled', true);
+                            }}
+                            className="px-2.5 py-1 rounded-xl bg-slate-950/80 hover:bg-slate-900 backdrop-blur-md border border-amber-500/60 hover:border-amber-400 text-amber-300 hover:text-amber-100 text-[9.5px] font-extrabold uppercase tracking-wide transition shadow-lg flex items-center gap-1.5 cursor-pointer active:scale-95"
+                            title="Black Box & Text is currently OFF. Click to turn ON."
+                          >
+                            <span>✦ Black Box: OFF (Click to Turn ON)</span>
+                          </button>
+                        )}
+                      </div>
                     )}
 
                     {/* Alternative 14 Reveal Effects Overlays — Clipped to Save The Date Card Dimensions */}
@@ -3223,12 +3443,18 @@ export default function InvitationRenderer({
                   </>
                 )}
 
-                <div 
-                  className="grid grid-cols-2 gap-2.5 sm:gap-4 w-full"
-                  style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px' }}
-                >
-                  {config.showBrideDetails !== false && (
-                    <div className="p-2.5 sm:p-4 rounded-xl bg-black/20 border flex flex-col justify-center min-w-0 text-center overflow-hidden" style={customStyles.borderAccentSoft}>
+                {(() => {
+                  const isGroomFirst = config.coupleCardsOrder === 'groomFirst';
+                  const isStacked = config.coupleCardsLayout === 'stacked';
+                  const gapPx = config.coupleCardsGap !== undefined ? config.coupleCardsGap : 12;
+                  const borderRadiusClass = config.coupleCardsBorderRadius || 'rounded-xl';
+
+                  const brideCardNode = config.showBrideDetails !== false && (
+                    <div 
+                      key="card-bride"
+                      className={`p-2.5 sm:p-4 ${borderRadiusClass} bg-black/20 border flex flex-col justify-center min-w-0 text-center overflow-hidden transition-all duration-300`} 
+                      style={customStyles.borderAccentSoft}
+                    >
                       <EditableText config={config}
                         as="h4"
                         isEditing={!!onChangeField}
@@ -3314,10 +3540,14 @@ export default function InvitationRenderer({
                         value={config.brideFamily}
                       />
                     </div>
-                  )}
+                  );
 
-                  {config.showGroomDetails !== false && (
-                    <div className="p-2.5 sm:p-4 rounded-xl bg-black/20 border flex flex-col justify-center min-w-0 text-center overflow-hidden" style={customStyles.borderAccentSoft}>
+                  const groomCardNode = config.showGroomDetails !== false && (
+                    <div 
+                      key="card-groom"
+                      className={`p-2.5 sm:p-4 ${borderRadiusClass} bg-black/20 border flex flex-col justify-center min-w-0 text-center overflow-hidden transition-all duration-300`} 
+                      style={customStyles.borderAccentSoft}
+                    >
                       <EditableText config={config}
                         as="h4"
                         isEditing={!!onChangeField}
@@ -3403,8 +3633,29 @@ export default function InvitationRenderer({
                         value={config.groomFamily}
                       />
                     </div>
-                  )}
-                </div>
+                  );
+
+                  const cards = (isGroomFirst 
+                    ? [groomCardNode, brideCardNode] 
+                    : [brideCardNode, groomCardNode]).filter(Boolean);
+
+                  return (
+                    <div 
+                      className={`w-full transition-all duration-300 ${
+                        isStacked 
+                          ? 'grid grid-cols-1' 
+                          : 'grid grid-cols-2'
+                      }`}
+                      style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: isStacked ? '1fr' : 'repeat(2, minmax(0, 1fr))', 
+                        gap: `${gapPx}px` 
+                      }}
+                    >
+                      {cards}
+                    </div>
+                  );
+                })()}
 
                 {config.showStoryParagraph !== false && (
                   <div className="space-y-3 pt-2">
