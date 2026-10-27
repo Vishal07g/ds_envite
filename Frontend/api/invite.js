@@ -132,21 +132,6 @@ export default async function handler(req, res) {
   const { slug } = req.query;
   const rawSlug = String(slug || '').trim();
 
-  // If a real human browser directly opens /api/invite?slug=..., redirect to the SPA page
-  const ua = (req.headers['user-agent'] || '').toLowerCase();
-  const isCrawler = [
-    'whatsapp', 'facebookexternalhit', 'facebot', 'twitterbot', 'linkedinbot',
-    'slackbot', 'telegrambot', 'discordbot', 'pinterestbot', 'applebot',
-    'googlebot', 'google-inspectiontool', 'bingbot', 'yahoo', 'ia_archiver',
-    'embedly', 'quora link preview', 'outbrain', 'rogerbot', 'showyoubot',
-    'vkshare', 'w3c_validator', 'redditbot', 'iframely', 'developers.google.com',
-    'skypeuripreview', 'viber'
-  ].some(c => ua.includes(c));
-
-  if (!isCrawler && req.url && req.url.startsWith('/api/invite')) {
-    const targetUrl = rawSlug ? `/invite/${encodeURIComponent(rawSlug)}` : '/';
-    return res.redirect(302, targetUrl);
-  }
 
   // ── Fetch invitation data from Firebase ──────────────────────────────
   let invitation = null;

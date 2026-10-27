@@ -10,20 +10,6 @@ function escapeHtml(str) {
 }
 
 export default async function handler(req, res) {
-  const ua = (req.headers['user-agent'] || '').toLowerCase();
-  const isCrawler = [
-    'whatsapp', 'facebookexternalhit', 'facebot', 'twitterbot', 'linkedinbot',
-    'slackbot', 'telegrambot', 'discordbot', 'pinterestbot', 'applebot',
-    'googlebot', 'google-inspectiontool', 'bingbot', 'yahoo', 'ia_archiver',
-    'embedly', 'quora link preview', 'outbrain', 'rogerbot', 'showyoubot',
-    'vkshare', 'w3c_validator', 'redditbot', 'iframely', 'developers.google.com',
-    'skypeuripreview', 'viber'
-  ].some(c => ua.includes(c));
-
-  // If a real human browser directly hits /api/home, redirect them to the home page
-  if (!isCrawler && req.url && req.url.startsWith('/api/home')) {
-    return res.redirect(302, '/');
-  }
 
   // Resolve active host dynamically so previews work on custom domains, preview URLs, and production URLs
   const host = req.headers['x-forwarded-host'] || req.headers.host || 'ds-envite.vercel.app';
