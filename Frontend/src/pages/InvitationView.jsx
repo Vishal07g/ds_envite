@@ -131,17 +131,25 @@ export default function InvitationView() {
           const cloudInvs = cloudDb.invitations ? (Array.isArray(cloudDb.invitations) ? cloudDb.invitations : Object.values(cloudDb.invitations)) : [];
           const numMatch = String(id).match(/(\d{6,})/);
           const num = numMatch ? numMatch[1] : null;
-          const cleanId = String(id).toLowerCase().trim();
-          const foundCloud = cloudInvs.find(i => 
-            i.id === id || 
-            i.slug === id || 
-            i.customSlug === id ||
-            (num && ((i.id && i.id.includes(num)) || (i.slug && i.slug.includes(num)) || (i.customSlug && i.customSlug.includes(num)))) ||
-            (String(id).replace(/^invite-/, '') === String(i.id || '').replace(/^invite-/, '')) ||
-            (i.slug && (i.slug.toLowerCase().startsWith(cleanId) || cleanId.startsWith(i.slug.toLowerCase()))) ||
-            (i.customSlug && (i.customSlug.toLowerCase().startsWith(cleanId) || cleanId.startsWith(i.customSlug.toLowerCase()))) ||
-            (cleanId.includes("suman") && (i.slug?.includes("suman") || i.config?.brideName?.toLowerCase().includes("suman")))
-          ) || (cloudInvs.length === 1 && !cleanId.startsWith("preset-") && cleanId !== "demo" ? cloudInvs[0] : null);
+          const strippedTarget = cleanId.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
+          const foundCloud = cloudInvs.find(i => {
+            if (!i) return false;
+            const s = String(i.slug || '').toLowerCase();
+            const cs = String(i.customSlug || '').toLowerCase();
+            const sStripped = s.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
+            const csStripped = cs.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
+            return (
+              i.id === id || 
+              i.slug === id || 
+              i.customSlug === id ||
+              sStripped === strippedTarget ||
+              csStripped === strippedTarget ||
+              (num && ((i.id && i.id.includes(num)) || (i.slug && i.slug.includes(num)) || (i.customSlug && i.customSlug.includes(num)))) ||
+              (String(id).replace(/^invite-/, '') === String(i.id || '').replace(/^invite-/, '')) ||
+              (s && s.startsWith(cleanId)) ||
+              (cs && cs.startsWith(cleanId))
+            );
+          }) || (cloudInvs.length === 1 && !cleanId.startsWith("preset-") && cleanId !== "demo" ? cloudInvs[0] : null);
           if (foundCloud) {
             inv = foundCloud;
           }
@@ -185,11 +193,12 @@ export default function InvitationView() {
       const bride = (invitation.config.coverBrideText || invitation.config.brideName || "").trim();
       const groom = (invitation.config.coverGroomText || invitation.config.groomName || "").trim();
       const title = (invitation.title || "").trim();
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ds-envite.vercel.app';
+      const origin = dbStore.getCleanShareOrigin();
       const cleanSlug = dbStore.getInvitationShareSlug(invitation);
       const shareUrl = `${origin}/invite/${cleanSlug}`;
 
       const params = new URLSearchParams();
+      params.set('slug', cleanSlug);
       if (bride) params.set('bride', bride);
       if (groom) params.set('groom', groom);
       if (title) params.set('title', title);

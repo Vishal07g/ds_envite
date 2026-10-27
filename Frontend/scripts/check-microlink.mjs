@@ -1,7 +1,6 @@
 async function checkMicrolink() {
   const urls = [
-    'https://ds-envite-cbn70mmpf-vishal-g1.vercel.app/',
-    'https://ds-envite-cbn70mmpf-vishal-g1.vercel.app/invite/vishal-suman-1792995422776'
+    'https://ds-envite.vercel.app/invite/vishal-suman'
   ];
 
   for (const u of urls) {

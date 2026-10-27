@@ -9,6 +9,8 @@
  * Compresses with sharp to high-quality progressive JPEG strictly under 50KB.
  */
 
+import fs from 'fs';
+import path from 'path';
 import { Resvg } from '@resvg/resvg-js';
 import sharp from 'sharp';
 import opentype from 'opentype.js';
@@ -57,6 +59,117 @@ function capitalizeWord(word = '') {
   return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 }
 
+function getCoupleDetails({
+  bride = '',
+  groom = '',
+  title = '',
+  slug = '',
+  customSlug = '',
+  config = {}
+} = {}) {
+  const cleanBride = (bride || config?.coverBrideText || config?.brideName || '').trim();
+  const cleanGroom = (groom || config?.coverGroomText || config?.groomName || '').trim();
+  const cleanTitle = (title || config?.weddingTitle || '').trim();
+  const rawSlug = String(slug || customSlug || '')
+    .toLowerCase()
+    .replace(/^https?:\/\/[^\/]+\/invite\//, '')
+    .replace(/^invite-/, '')
+    .replace(/-\d{6,}$/, '')
+    .trim();
+
+  let isGroomFirst = false;
+
+  if (cleanBride && cleanGroom) {
+    const brideSlug = cleanBride.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const groomSlug = cleanGroom.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    if (rawSlug) {
+      if (rawSlug.startsWith(groomSlug)) {
+        isGroomFirst = true;
+      } else if (rawSlug.startsWith(brideSlug)) {
+        isGroomFirst = false;
+      }
+    }
+
+    if (!rawSlug && cleanTitle) {
+      const titleLower = cleanTitle.toLowerCase();
+      const gIdx = titleLower.indexOf(cleanGroom.toLowerCase());
+      const bIdx = titleLower.indexOf(cleanBride.toLowerCase());
+      if (gIdx !== -1 && bIdx !== -1) {
+        isGroomFirst = gIdx < bIdx;
+      } else if (gIdx !== -1) {
+        isGroomFirst = true;
+      }
+    }
+  } else if (!cleanBride && !cleanGroom && rawSlug) {
+    const parts = rawSlug.split(/[-_]+/).filter(Boolean);
+    const EVENT_WORDS = new Set(['wedding', 'invitation', 'invite', 'weds', 'and', 'reception', 'engagement', 'anniversary', 'birthday', 'party', 'sample', 'demo']);
+    const names = parts.filter(p => !/^\d+$/.test(p) && !EVENT_WORDS.has(p.toLowerCase()));
+    if (names.length >= 2) {
+      const p1 = capitalizeWord(names[0]);
+      const p2 = capitalizeWord(names[1]);
+      return {
+        firstPerson: p1,
+        secondPerson: p2,
+        isGroomFirst: false,
+        initials: `${p1.charAt(0)}${p2.charAt(0)}`.toUpperCase(),
+        displayName: `${p1} & ${p2}`,
+        slug: `${names[0].toLowerCase()}-${names[1].toLowerCase()}`
+      };
+    } else if (names.length === 1) {
+      const p1 = capitalizeWord(names[0]);
+      return {
+        firstPerson: p1,
+        secondPerson: '',
+        isGroomFirst: false,
+        initials: p1.slice(0, 2).toUpperCase(),
+        displayName: p1,
+        slug: names[0].toLowerCase()
+      };
+    }
+  }
+
+  const firstPerson = isGroomFirst ? cleanGroom : cleanBride;
+  const secondPerson = isGroomFirst ? cleanBride : cleanGroom;
+
+  let initials = '';
+  let displayName = '';
+
+  if (firstPerson && secondPerson) {
+    const fInit = (firstPerson.charAt(0) || 'B').toUpperCase();
+    const sInit = (secondPerson.charAt(0) || 'G').toUpperCase();
+    initials = `${fInit}${sInit}`;
+    displayName = `${firstPerson} & ${secondPerson}`;
+  } else if (firstPerson || secondPerson) {
+    const single = firstPerson || secondPerson;
+    initials = single.slice(0, 2).toUpperCase();
+    displayName = single;
+  } else if (cleanTitle) {
+    const words = cleanTitle.split(/\s+/).filter(Boolean);
+    initials = words.length >= 2 
+      ? `${words[0].charAt(0)}${words[1].charAt(0)}`.toUpperCase()
+      : cleanTitle.slice(0, 2).toUpperCase();
+    displayName = cleanTitle;
+  } else {
+    initials = 'DS';
+    displayName = 'Royal Wedding';
+  }
+
+  const toSlug = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const slugPart = (firstPerson && secondPerson)
+    ? `${toSlug(firstPerson)}-${toSlug(secondPerson)}`
+    : (firstPerson ? toSlug(firstPerson) : 'wedding');
+
+  return {
+    firstPerson,
+    secondPerson,
+    isGroomFirst,
+    initials,
+    displayName,
+    slug: slugPart
+  };
+}
+
 function parseNamesFromSlug(slug = '') {
   if (!slug) return { bride: '', groom: '', title: '' };
   const cleaned = String(slug).replace(/^invite-/, '').replace(/-\d{6,}$/, '').trim();
@@ -81,6 +194,28 @@ export default async function handler(req, res) {
       slug = slug.replace(/\.(jpg|jpeg|png)$/i, '');
     }
 
+    // High performance fast-path: Stream pre-rendered static thumbnail if available on disk (< 2ms)
+    if (slug) {
+      const cleanSlug = String(slug).toLowerCase().replace(/^invite-/, '').replace(/-\d{6,}$/, '');
+      const possiblePaths = [
+        path.join(process.cwd(), 'dist', 'thumbnails', `${cleanSlug}.jpg`),
+        path.join(process.cwd(), 'public', 'thumbnails', `${cleanSlug}.jpg`),
+        path.join(process.cwd(), 'Frontend', 'dist', 'thumbnails', `${cleanSlug}.jpg`),
+        path.join(process.cwd(), 'Frontend', 'public', 'thumbnails', `${cleanSlug}.jpg`)
+      ];
+      for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+          const fileBuf = fs.readFileSync(p);
+          res.setHeader('Content-Type', 'image/jpeg');
+          res.setHeader('Content-Length', fileBuf.length);
+          res.setHeader('X-Robots-Tag', 'all, index, follow');
+          res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          return res.status(200).send(fileBuf);
+        }
+      }
+    }
+
     let bride = getParam('bride');
     let groom = getParam('groom');
     let title = getParam('title');
@@ -90,6 +225,7 @@ export default async function handler(req, res) {
     let accentParam = getParam('accent');
 
     // If slug is provided but bride/groom details are missing, resolve from database or slug parsing
+    let matchedInvite = null;
     if (slug && (!bride || !groom)) {
       try {
         const controller = new AbortController();
@@ -99,24 +235,31 @@ export default async function handler(req, res) {
         if (fbRes.ok) {
           const invData = await fbRes.json();
           const invList = Array.isArray(invData) ? invData : Object.values(invData || {});
-          const targetSlug = slug.toLowerCase();
-          const match = invList.find(i => {
+          const targetSlug = slug.toLowerCase().trim();
+          const strippedTarget = targetSlug.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
+          const numMatch = targetSlug.match(/(\d{6,})/);
+
+          matchedInvite = invList.find(i => {
             if (!i) return false;
             const s = String(i.slug || '').toLowerCase();
             const cs = String(i.customSlug || '').toLowerCase();
-            const id = String(i.id || '');
-            return (s && (s === targetSlug || targetSlug.includes(s))) ||
-                   (cs && (cs === targetSlug || targetSlug.includes(cs))) ||
-                   (id && targetSlug.includes(id));
+            const id = String(i.id || '').toLowerCase();
+            const sStripped = s.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
+            const csStripped = cs.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
+            return (s && (s === targetSlug || s.startsWith(targetSlug) || targetSlug.startsWith(s))) ||
+                   (cs && (cs === targetSlug || cs.startsWith(targetSlug) || targetSlug.startsWith(cs))) ||
+                   sStripped === strippedTarget || csStripped === strippedTarget ||
+                   (numMatch && (id.includes(numMatch[1]) || s.includes(numMatch[1]) || cs.includes(numMatch[1])));
           });
-          if (match && match.config) {
-            bride = bride || match.config.brideName || match.config.coverBrideText || '';
-            groom = groom || match.config.groomName || match.config.coverGroomText || '';
-            title = title || match.config.weddingTitle || match.title || '';
-            date = date || match.config.weddingDate || '';
-            venue = venue || match.config.weddingVenue || '';
-            bgParam = bgParam || match.config.primaryColor || '';
-            accentParam = accentParam || match.config.accentGold || '';
+
+          if (matchedInvite && matchedInvite.config) {
+            bride = bride || matchedInvite.config.brideName || matchedInvite.config.coverBrideText || '';
+            groom = groom || matchedInvite.config.groomName || matchedInvite.config.coverGroomText || '';
+            title = title || matchedInvite.config.weddingTitle || matchedInvite.title || '';
+            date = date || matchedInvite.config.weddingDate || '';
+            venue = venue || matchedInvite.config.weddingVenue || '';
+            bgParam = bgParam || matchedInvite.config.primaryColor || '';
+            accentParam = accentParam || matchedInvite.config.accentGold || '';
           }
         }
       } catch (err) {
@@ -131,28 +274,15 @@ export default async function handler(req, res) {
       }
     }
 
-    let initials = '';
-    let mainHeading = '';
+    const couple = getCoupleDetails({
+      bride,
+      groom,
+      title,
+      slug: slug || matchedInvite?.slug || matchedInvite?.customSlug
+    });
 
-    if (bride && groom) {
-      const bInit = (bride.charAt(0) || 'B').toUpperCase();
-      const gInit = (groom.charAt(0) || 'G').toUpperCase();
-      initials = `${bInit} & ${gInit}`;
-      mainHeading = `${bride.toUpperCase()}  &  ${groom.toUpperCase()}`;
-    } else if (bride || groom) {
-      const name = bride || groom;
-      initials = (name.charAt(0) || 'D').toUpperCase();
-      mainHeading = name.toUpperCase();
-    } else if (title) {
-      const words = title.split(/\s+/).filter(Boolean);
-      initials = words.length >= 2 
-        ? `${words[0].charAt(0).toUpperCase()} & ${words[1].charAt(0).toUpperCase()}`
-        : (words[0]?.charAt(0) || 'DS').toUpperCase();
-      mainHeading = title.toUpperCase();
-    } else {
-      initials = 'DS';
-      mainHeading = 'ROYAL INVITATION';
-    }
+    const initials = couple.initials;
+    const mainHeading = (couple.displayName || title || 'ROYAL INVITATION').toUpperCase();
 
     let dateText = 'CORDIALLY INVITED';
     if (date) {
@@ -177,7 +307,7 @@ export default async function handler(req, res) {
 
     let typographySvg = '';
     if (font) {
-      const initialsPath = getCenteredPathData(font, initials, 600, 255, initials.length > 3 ? 56 : 68);
+      const initialsPath = getCenteredPathData(font, initials, 600, 255, initials.length > 3 ? 56 : (initials.length <= 2 ? 76 : 68));
       const coupleNamesPath = getCenteredPathData(font, mainHeading, 600, 440, mainHeading.length > 28 ? 24 : 32);
       const subtitlePath = getCenteredPathData(font, 'W E D D I N G   I N V I T A T I O N', 600, 488, 14);
       const datePath = getCenteredPathData(font, venueText ? `${dateText} • ${venueText}` : dateText, 600, 530, 12);
@@ -192,7 +322,7 @@ export default async function handler(req, res) {
     } else {
       // Fallback text if font object unavailable
       typographySvg = `
-  <text x="600" y="255" text-anchor="middle" dominant-baseline="central" font-family="Georgia, serif" font-weight="bold" font-size="${initials.length > 3 ? 56 : 68}" fill="url(#gold)">${escapeXml(initials)}</text>
+  <text x="600" y="255" text-anchor="middle" dominant-baseline="central" font-family="Georgia, serif" font-weight="bold" font-size="${initials.length > 3 ? 56 : (initials.length <= 2 ? 76 : 68)}" fill="url(#gold)">${escapeXml(initials)}</text>
   <text x="600" y="440" text-anchor="middle" font-family="Georgia, serif" font-weight="bold" font-size="${mainHeading.length > 28 ? 24 : 32}" fill="#FFFFFF">${escapeXml(mainHeading)}</text>
   <text x="600" y="488" text-anchor="middle" font-family="Georgia, serif" font-size="14" fill="url(#gold)">W E D D I N G   I N V I T A T I O N</text>
   <text x="600" y="530" text-anchor="middle" font-family="Georgia, serif" font-size="12" fill="#F5DA88" opacity="0.95">${escapeXml(venueText ? `${dateText} • ${venueText}` : dateText)}</text>`;

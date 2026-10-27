@@ -16,6 +16,14 @@
       "destination": "/api/home"
     },
     {
+      "source": "/thumbnails/:slug.jpg",
+      "destination": "/api/og-image?slug=:slug"
+    },
+    {
+      "source": "/thumbnails/:slug.png",
+      "destination": "/api/og-image?slug=:slug"
+    },
+    {
       "source": "/api/og-image/:slug.jpg",
       "destination": "/api/og-image?slug=:slug"
     },

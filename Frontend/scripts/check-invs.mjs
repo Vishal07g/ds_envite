@@ -8,7 +8,8 @@ async function check() {
     console.log(`     title=${inv.title}`);
     console.log(`     bride=${inv.config?.brideName}, groom=${inv.config?.groomName}`);
     console.log(`     venue=${inv.config?.weddingVenue}`);
-    console.log(`     heroImage=${inv.config?.heroImage?.slice(0, 50)}...`);
+    console.log(`     socialThumbnailUrl=${inv.socialThumbnailUrl}`);
+    console.log(`     thumbnailUrl=${inv.thumbnailUrl}`);
   });
 }
 

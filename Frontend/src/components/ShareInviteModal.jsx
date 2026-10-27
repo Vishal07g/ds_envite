@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SvgX, SvgCopy, SvgCheck, SvgDownload, SvgSend, SvgSparkles, SvgHeart } from './icons';
 import { downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
 import { dbStore } from '../data/store';
-import { getCoupleInitials, getMonogramThumbnailDataUrl } from '../utils/monogramThumbnail';
+import { getCoupleInitials, getMonogramThumbnailDataUrl, getCoupleDetails } from '../utils/monogramThumbnail';
 
 export default function ShareInviteModal({
   isOpen,
@@ -27,18 +27,24 @@ export default function ShareInviteModal({
   const brideName = (currentConfig.coverBrideText || currentConfig.brideName || "").trim();
   const groomName = (currentConfig.coverGroomText || currentConfig.groomName || "").trim();
   const invitationTitle = (invObj?.title || "").trim();
-  const coupleInitials = brideName && groomName 
-    ? `${brideName.charAt(0)} & ${groomName.charAt(0)}` 
-    : (invitationTitle ? invitationTitle.slice(0, 2).toUpperCase() : "DS");
-
-  const defaultSocialTitle = invObj?.socialTitle || ((brideName && groomName) ? `${brideName} & ${groomName} — Wedding Invitation` : (invitationTitle || "Digital Invitation"));
-  const defaultSocialDesc = invObj?.socialDescription || "Tap to open our interactive digital invitation card, music, timeline & RSVP.";
-  const [socialTitleInput, setSocialTitleInput] = useState(defaultSocialTitle);
-  const [socialDescInput, setSocialDescInput] = useState(defaultSocialDesc);
 
   const autoSlug = dbStore.getInvitationShareSlug(invObj || { id: targetId }, currentConfig);
   const isManuallySet = Boolean(invObj?.isCustomSlugManuallySet && invObj?.customSlug && !invObj.customSlug.startsWith("ananya-aarav"));
-  const activeSlug = isManuallySet ? invObj.customSlug : autoSlug;
+  const activeSlug = isManuallySet ? dbStore.slugify(String(invObj.customSlug).replace(/-\d{6,}$/, '')) : autoSlug;
+
+  const couple = getCoupleDetails({
+    bride: brideName,
+    groom: groomName,
+    title: invitationTitle,
+    slug: activeSlug
+  });
+  const coupleInitials = couple.initials;
+  const displayName = couple.displayName;
+
+  const defaultSocialTitle = invObj?.socialTitle || ((couple.firstPerson && couple.secondPerson) ? `${couple.displayName} — Wedding Invitation` : (invitationTitle || "Digital Invitation"));
+  const defaultSocialDesc = invObj?.socialDescription || "Tap to open our interactive digital invitation card, music, timeline & RSVP.";
+  const [socialTitleInput, setSocialTitleInput] = useState(defaultSocialTitle);
+  const [socialDescInput, setSocialDescInput] = useState(defaultSocialDesc);
 
   useEffect(() => {
     if (isOpen) {
@@ -52,6 +58,7 @@ export default function ShareInviteModal({
           brideName,
           groomName,
           title: invitationTitle,
+          slug: activeSlug,
           weddingDate: currentConfig.weddingDate,
           primaryColor: currentConfig.primaryColor || "#400d18",
           accentGold: currentConfig.accentGold || "#d4af37"
@@ -65,10 +72,9 @@ export default function ShareInviteModal({
 
   if (!isOpen) return null;
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : '';
+  const origin = dbStore.getCleanShareOrigin();
   const shareUrl = `${origin}/invite/${activeSlug}`;
 
-  const displayName = brideName && groomName ? `${brideName} & ${groomName}` : (invitationTitle || "Wedding Celebration");
   const defaultWhatsappMsg = `💍 *WEDDING INVITATION* 💍\n✨ *${coupleInitials}* ✨\n\n*${displayName}*\n\nWe warmly invite you to celebrate our sacred wedding union! Tap to view our interactive invitation, music, and RSVP:\n${shareUrl}`;
 
   const handleCopyLink = () => {
@@ -93,14 +99,12 @@ export default function ShareInviteModal({
   };
 
   const handleResetSlug = () => {
-    const rawId = (targetId || "").replace(/^invite-/, "");
-    const namePart = dbStore.slugify(`${brideName}-${groomName}`) || "wedding";
-    const resetVal = `${namePart}-${rawId || "invite"}`;
+    const resetVal = couple.slug || "wedding";
     setCustomSlugInput(resetVal);
     if (targetId) {
       dbStore.updateInvitation(targetId, { customSlug: resetVal, slug: resetVal, isCustomSlugManuallySet: false });
       window.dispatchEvent(new Event("db_synced"));
-      if (showToast) showToast("Sharing link reset to couple name!", "success");
+      if (showToast) showToast(`Sharing link reset to ${resetVal}!`, "success");
     }
     setIsEditingSlug(false);
   };
@@ -324,7 +328,7 @@ export default function ShareInviteModal({
             <div className="rounded-xl overflow-hidden border border-amber-500/40 bg-[#0d141e] shadow-lg max-w-md mx-auto">
               <div className="relative aspect-[16/9] w-full overflow-hidden bg-slate-950 flex items-center justify-center">
                 <img
-                  src={monogramDataUrl || `/api/og-image?bride=${encodeURIComponent(brideName)}&groom=${encodeURIComponent(groomName)}&title=${encodeURIComponent(invitationTitle)}`}
+                  src={monogramDataUrl || `/api/og-image?slug=${encodeURIComponent(activeSlug)}&bride=${encodeURIComponent(brideName)}&groom=${encodeURIComponent(groomName)}&title=${encodeURIComponent(invitationTitle)}`}
                   alt={`${displayName} Monogram Thumbnail`}
                   className="w-full h-full object-cover"
                   onError={(e) => {
