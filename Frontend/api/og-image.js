@@ -9,6 +9,8 @@
  * Compresses with sharp to high-quality progressive JPEG strictly under 50KB.
  */
 
+import fs from 'fs';
+import path from 'path';
 import { Resvg } from '@resvg/resvg-js';
 import sharp from 'sharp';
 import opentype from 'opentype.js';
@@ -190,6 +192,28 @@ export default async function handler(req, res) {
     let slug = getParam('slug');
     if (slug) {
       slug = slug.replace(/\.(jpg|jpeg|png)$/i, '');
+    }
+
+    // High performance fast-path: Stream pre-rendered static thumbnail if available on disk (< 2ms)
+    if (slug) {
+      const cleanSlug = String(slug).toLowerCase().replace(/^invite-/, '').replace(/-\d{6,}$/, '');
+      const possiblePaths = [
+        path.join(process.cwd(), 'dist', 'thumbnails', `${cleanSlug}.jpg`),
+        path.join(process.cwd(), 'public', 'thumbnails', `${cleanSlug}.jpg`),
+        path.join(process.cwd(), 'Frontend', 'dist', 'thumbnails', `${cleanSlug}.jpg`),
+        path.join(process.cwd(), 'Frontend', 'public', 'thumbnails', `${cleanSlug}.jpg`)
+      ];
+      for (const p of possiblePaths) {
+        if (fs.existsSync(p)) {
+          const fileBuf = fs.readFileSync(p);
+          res.setHeader('Content-Type', 'image/jpeg');
+          res.setHeader('Content-Length', fileBuf.length);
+          res.setHeader('X-Robots-Tag', 'all, index, follow');
+          res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          return res.status(200).send(fileBuf);
+        }
+      }
     }
 
     let bride = getParam('bride');

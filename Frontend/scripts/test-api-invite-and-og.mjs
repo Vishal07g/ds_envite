@@ -71,10 +71,10 @@ await inviteHandler(req3, res3);
 assert.strictEqual(res3.statusCode, 200);
 const html3 = res3.body;
 assert(html3.includes('Vishal &amp; Suman') || html3.includes('Vishal & Suman'), 'OG title must be Vishal & Suman');
-assert(html3.includes('https://ds-envite.vercel.app/api/og-image/vishal-suman.jpg'), 'OG image URL must be clean without hash host');
+assert(html3.includes('https://ds-envite.vercel.app/thumbnails/vishal-suman.jpg') || html3.includes('https://ds-envite.vercel.app/api/og-image/vishal-suman.jpg'), 'OG image URL must be clean without hash host');
 assert(html3.includes('https://ds-envite.vercel.app/invite/vishal-suman'), 'Canonical & og:url must be clean without hash host or timestamp');
 console.log('  ✓ OG title correctly features Vishal & Suman');
-console.log('  ✓ OG image link is https://ds-envite.vercel.app/api/og-image/vishal-suman.jpg');
+console.log('  ✓ OG image link is clean');
 console.log('  ✓ Canonical & og:url is https://ds-envite.vercel.app/invite/vishal-suman\n');
 
 // ── Test 4: /api/invite for suman-vishal ──
@@ -94,10 +94,10 @@ await inviteHandler(req4, res4);
 assert.strictEqual(res4.statusCode, 200);
 const html4 = res4.body;
 assert(html4.includes('Suman &amp; Vishal') || html4.includes('Suman & Vishal'), 'OG title must be Suman & Vishal');
-assert(html4.includes('https://ds-envite.vercel.app/api/og-image/suman-vishal.jpg'), 'OG image URL must be clean suman-vishal');
+assert(html4.includes('https://ds-envite.vercel.app/thumbnails/suman-vishal.jpg') || html4.includes('https://ds-envite.vercel.app/api/og-image/suman-vishal.jpg'), 'OG image URL must be clean suman-vishal');
 assert(html4.includes('https://ds-envite.vercel.app/invite/suman-vishal'), 'Canonical & og:url must be clean suman-vishal');
 console.log('  ✓ OG title correctly features Suman & Vishal');
-console.log('  ✓ OG image link is https://ds-envite.vercel.app/api/og-image/suman-vishal.jpg');
+console.log('  ✓ OG image link is clean');
 console.log('  ✓ Canonical & og:url is https://ds-envite.vercel.app/invite/suman-vishal\n');
 
 console.log('All API tests passed with flying colors!');

@@ -272,10 +272,17 @@ export default async function handler(req, res) {
       invitation = findInvitationBySlug(req.mockInvitations, rawSlug);
     }
     if (!invitation) {
-      const fbRes = await fetch(FIREBASE_DB_URL);
-      if (fbRes.ok) {
-        const data = await fbRes.json();
-        invitation = findInvitationBySlug(data, rawSlug);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 800);
+      try {
+        const fbRes = await fetch(FIREBASE_DB_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (fbRes.ok) {
+          const data = await fbRes.json();
+          invitation = findInvitationBySlug(data, rawSlug);
+        }
+      } catch (err) {
+        clearTimeout(timeoutId);
       }
     }
 
@@ -409,7 +416,7 @@ export default async function handler(req, res) {
   const proto = req.headers['x-forwarded-proto'] || 'https';
   const cleanSlug = rawSlug.replace(/^invite-/, '').replace(/-\d{6,}$/, '') || couple.slug || 'wedding';
 
-  // Build OG image URL: Use stored social thumbnail if available, otherwise generate dynamically
+  // Build OG image URL: Use stored social thumbnail if available, otherwise direct static thumbnail path
   let ogImageUrl = '';
   if (isUnpublished) {
     ogImageUrl = `${proto}://${host}/website_thumbnail.jpg`;
@@ -417,8 +424,8 @@ export default async function handler(req, res) {
     // Use the invitation's explicitly assigned social thumbnail
     ogImageUrl = socialThumbnailUrl;
   } else {
-    // Generate clean .jpg URL referencing the clean invitation slug
-    ogImageUrl = `${proto}://${host}/api/og-image/${encodeURIComponent(cleanSlug)}.jpg`;
+    // Direct path to static thumbnail on CDN (fallback handled by Vercel rewrite to /api/og-image)
+    ogImageUrl = `${proto}://${host}/thumbnails/${encodeURIComponent(cleanSlug)}.jpg`;
   }
 
   const shareUrl = `${proto}://${host}/invite/${cleanSlug}`;
@@ -449,6 +456,7 @@ export default async function handler(req, res) {
     <title>${escapeHtml(pageTitle)}</title>
     <meta name="description" content="${escapeHtml(ogDesc)}" />
     <link rel="canonical" href="${escapeHtml(shareUrl)}" />
+    <link rel="image_src" href="${escapeHtml(ogImageUrl)}" />
     <meta property="og:title" content="${escapeHtml(ogTitle)}" />
     <meta property="og:description" content="${escapeHtml(ogDesc)}" />
     <meta property="og:image" content="${escapeHtml(ogImageUrl)}" />
@@ -480,7 +488,8 @@ export default async function handler(req, res) {
     html = html.replace(/<meta\s+name=["']twitter:.*?\/>/gi, '');
     html = html.replace(/<meta\s+name=["']twitter:.*?>/gi, '');
     html = html.replace(/<link\s+rel=["']canonical["'][^>]*>/gi, '');
-    html = html.replace('<head>', `<head>${metaTags}`);
+    html = html.replace(/<link\s+rel=["']image_src["'][^>]*>/gi, '');
+    html = html.replace('<head>', `<head prefix="og: http://ogp.me/ns#">${metaTags}`);
   } else {
     // Standalone HTML page with meta tags for crawlers (NO circular refresh redirect)
     html = `<!doctype html>
