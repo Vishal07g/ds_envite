@@ -26,7 +26,7 @@ export default async function handler(req, res) {
   }
 
   // Resolve active host dynamically so previews work on custom domains, preview URLs, and production URLs
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'ds-envite-pbaaott76-vishal-g1.vercel.app';
+  const host = req.headers['x-forwarded-host'] || req.headers.host || 'ds-envite.vercel.app';
   const proto = req.headers['x-forwarded-proto'] || 'https';
   const siteUrl = `${proto}://${host}`;
 

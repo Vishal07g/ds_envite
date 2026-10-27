@@ -29,7 +29,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(?i).*(facebookexternalhit|facebot|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot|googlebot|google-inspectiontool|bingbot|yahoo|ia_archiver|embedly|quora link preview|outbrain|rogerbot|showyoubot|vkshare|w3c_validator|redditbot|iframely|developers.google.com/\\+/web/snippet|skypeuripreview|viber|pinterest).*"
+          "value": ".*([wW]hats[aA]pp|[fF]acebookexternalhit|[fF]acebot|[tT]witterbot|[tT]elegram[bB]ot|[lL]inked[iI]n[bB]ot|[sS]lackbot|[dD]iscordbot|[aA]pplebot|[gG]ooglebot|[gG]oogle-[iI]nspection[tT]ool|[bB]ingbot|[yY]ahoo|[iI]a_archiver|[eE]mbedly|[qQ]uora link preview|[oO]utbrain|[rR]ogerbot|[sS]howyoubot|[vV]k[sS]hare|[wW]3c_validator|[rR]edditbot|[iI]framely|developers\\.google\\.com|[sS]kype[uU]ri[pP]review|[vV]iber|[pP]interest).*"
         }
       ],
       "destination": "/api/home"
@@ -40,7 +40,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(?i).*(facebookexternalhit|facebot|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot|googlebot|google-inspectiontool|bingbot|yahoo|ia_archiver|embedly|quora link preview|outbrain|rogerbot|showyoubot|vkshare|w3c_validator|redditbot|iframely|developers.google.com/\\+/web/snippet|skypeuripreview|viber|pinterest).*"
+          "value": ".*([wW]hats[aA]pp|[fF]acebookexternalhit|[fF]acebot|[tT]witterbot|[tT]elegram[bB]ot|[lL]inked[iI]n[bB]ot|[sS]lackbot|[dD]iscordbot|[aA]pplebot|[gG]ooglebot|[gG]oogle-[iI]nspection[tT]ool|[bB]ingbot|[yY]ahoo|[iI]a_archiver|[eE]mbedly|[qQ]uora link preview|[oO]utbrain|[rR]ogerbot|[sS]howyoubot|[vV]k[sS]hare|[wW]3c_validator|[rR]edditbot|[iI]framely|developers\\.google\\.com|[sS]kype[uU]ri[pP]review|[vV]iber|[pP]interest).*"
         }
       ],
       "destination": "/api/home"
@@ -51,7 +51,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(?i).*(facebookexternalhit|facebot|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot|googlebot|google-inspectiontool|bingbot|yahoo|ia_archiver|embedly|quora link preview|outbrain|rogerbot|showyoubot|vkshare|w3c_validator|redditbot|iframely|developers.google.com/\\+/web/snippet|skypeuripreview|viber|pinterest).*"
+          "value": ".*([wW]hats[aA]pp|[fF]acebookexternalhit|[fF]acebot|[tT]witterbot|[tT]elegram[bB]ot|[lL]inked[iI]n[bB]ot|[sS]lackbot|[dD]iscordbot|[aA]pplebot|[gG]ooglebot|[gG]oogle-[iI]nspection[tT]ool|[bB]ingbot|[yY]ahoo|[iI]a_archiver|[eE]mbedly|[qQ]uora link preview|[oO]utbrain|[rR]ogerbot|[sS]howyoubot|[vV]k[sS]hare|[wW]3c_validator|[rR]edditbot|[iI]framely|developers\\.google\\.com|[sS]kype[uU]ri[pP]review|[vV]iber|[pP]interest).*"
         }
       ],
       "destination": "/api/invite?slug=:slug"
@@ -62,7 +62,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": "(?i).*(facebookexternalhit|facebot|whatsapp|twitterbot|telegrambot|linkedinbot|slackbot|discordbot|applebot|googlebot|google-inspectiontool|bingbot|yahoo|ia_archiver|embedly|quora link preview|outbrain|rogerbot|showyoubot|vkshare|w3c_validator|redditbot|iframely|developers.google.com/\\+/web/snippet|skypeuripreview|viber|pinterest).*"
+          "value": ".*([wW]hats[aA]pp|[fF]acebookexternalhit|[fF]acebot|[tT]witterbot|[tT]elegram[bB]ot|[lL]inked[iI]n[bB]ot|[sS]lackbot|[dD]iscordbot|[aA]pplebot|[gG]ooglebot|[gG]oogle-[iI]nspection[tT]ool|[bB]ingbot|[yY]ahoo|[iI]a_archiver|[eE]mbedly|[qQ]uora link preview|[oO]utbrain|[rR]ogerbot|[sS]howyoubot|[vV]k[sS]hare|[wW]3c_validator|[rR]edditbot|[iI]framely|developers\\.google\\.com|[sS]kype[uU]ri[pP]review|[vV]iber|[pP]interest).*"
         }
       ],
       "destination": "/api/invite?slug=:slug"

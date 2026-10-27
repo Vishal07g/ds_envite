@@ -83,6 +83,7 @@ async function runHomepageTests() {
   const EXPECTED_DESC = 'Create beautiful, personalized digital wedding invitations with elegant designs, stunning themes, and memorable ways to share your special moments.';
   const EXPECTED_URL = 'https://ds-envite-pbaaott76-vishal-g1.vercel.app/';
   const EXPECTED_IMG = 'https://ds-envite-pbaaott76-vishal-g1.vercel.app/website_thumbnail.jpg';
+  const OFFICIAL_IMG = 'https://ds-envite.vercel.app/website_thumbnail.jpg';
 
   // ── Test 1: Crawler Handler (/api/home) ──
   console.log('━━━ Test 1: WhatsApp Crawler Response via /api/home ━━━');
@@ -168,7 +169,7 @@ async function runHomepageTests() {
   const indexHtml = fs.readFileSync('index.html', 'utf8');
   assert(indexHtml.includes(EXPECTED_TITLE) || indexHtml.includes(EXPECTED_TITLE_HTML), 'index.html contains expected brand title');
   assert(indexHtml.includes(EXPECTED_DESC), 'index.html contains approved description');
-  assert(indexHtml.includes(EXPECTED_IMG), 'index.html contains expected image URL');
+  assert(indexHtml.includes(EXPECTED_IMG) || indexHtml.includes(OFFICIAL_IMG), 'index.html contains expected image URL');
   assert(indexHtml.includes('name="robots" content="all, index, follow"'),
     'index.html contains explicit robots all, index, follow tag');
 

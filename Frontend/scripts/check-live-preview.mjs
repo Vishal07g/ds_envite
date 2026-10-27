@@ -1,5 +1,5 @@
-async function checkLive() {
-  const url = 'https://ds-envite-pbaaott76-vishal-g1.vercel.app/';
+async function checkLive(targetUrl) {
+  const url = targetUrl || process.argv[2] || 'https://ds-envite-38ewhuvf1-vishal-g1.vercel.app/';
   const res = await fetch(url, {
     headers: {
       'User-Agent': 'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'
