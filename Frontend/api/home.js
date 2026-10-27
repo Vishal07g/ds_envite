@@ -10,20 +10,6 @@ function escapeHtml(str) {
 }
 
 export default async function handler(req, res) {
-  const ua = (req.headers['user-agent'] || '').toLowerCase();
-  const isCrawler = [
-    'whatsapp', 'facebookexternalhit', 'facebot', 'twitterbot', 'linkedinbot',
-    'slackbot', 'telegrambot', 'discordbot', 'pinterestbot', 'applebot',
-    'googlebot', 'google-inspectiontool', 'bingbot', 'yahoo', 'ia_archiver',
-    'embedly', 'quora link preview', 'outbrain', 'rogerbot', 'showyoubot',
-    'vkshare', 'w3c_validator', 'redditbot', 'iframely', 'developers.google.com',
-    'skypeuripreview', 'viber'
-  ].some(c => ua.includes(c));
-
-  // If a real human browser directly hits /api/home, redirect them to the home page
-  if (!isCrawler && req.url && req.url.startsWith('/api/home')) {
-    return res.redirect(302, '/');
-  }
 
   // Resolve active host dynamically so previews work on custom domains, preview URLs, and production URLs
   const host = req.headers['x-forwarded-host'] || req.headers.host || 'ds-envite.vercel.app';
@@ -48,6 +34,9 @@ export default async function handler(req, res) {
   }
 
   const metaTags = `
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="all, index, follow" />
     <title>${escapeHtml(title)}</title>
     <meta name="description" content="${escapeHtml(description)}" />
     <link rel="canonical" href="${escapeHtml(canonicalUrl)}" />
@@ -71,6 +60,9 @@ export default async function handler(req, res) {
 
   if (html && html.includes('<head>')) {
     html = html.replace(/<title>.*?<\/title>/gi, '');
+    html = html.replace(/<meta\s+charset=[^>]*>/gi, '');
+    html = html.replace(/<meta\s+name=["']robots["'][^>]*>/gi, '');
+    html = html.replace(/<meta\s+name=["']viewport["'][^>]*>/gi, '');
     html = html.replace(/<meta\s+name=["']description["'][^>]*>/gi, '');
     html = html.replace(/<meta\s+name=["']keywords["'][^>]*>/gi, '');
     html = html.replace(/<meta\s+property=["']og:.*?\/>/gi, '');

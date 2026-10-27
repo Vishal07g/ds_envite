@@ -49,16 +49,87 @@ function getCenteredPathData(font, text, centerX, centerY, fontSize) {
   }
 }
 
+const FIREBASE_DB_URL = 'https://digital-invitation-e906f-default-rtdb.asia-southeast1.firebasedatabase.app/saas_data/invitations.json';
+
+function capitalizeWord(word = '') {
+  if (!word) return '';
+  if (word.length <= 3) return word.toUpperCase();
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+}
+
+function parseNamesFromSlug(slug = '') {
+  if (!slug) return { bride: '', groom: '', title: '' };
+  const cleaned = String(slug).replace(/^invite-/, '').replace(/-\d{6,}$/, '').trim();
+  const rawParts = cleaned.split(/[-_]+/).filter(Boolean);
+  const EVENT_WORDS = new Set(['wedding', 'invitation', 'invite', 'weds', 'and', 'reception', 'engagement', 'anniversary', 'birthday', 'party', 'sample', 'demo']);
+  const parts = rawParts.filter(p => !/^\d+$/.test(p) && !EVENT_WORDS.has(p.toLowerCase()));
+  if (parts.length >= 2) {
+    return { bride: capitalizeWord(parts[0]), groom: capitalizeWord(parts[1]), title: `${capitalizeWord(parts[0])} & ${capitalizeWord(parts[1])} — Wedding Invitation` };
+  } else if (parts.length === 1) {
+    return { bride: capitalizeWord(parts[0]), groom: '', title: `${capitalizeWord(parts[0])} — Digital Invitation` };
+  }
+  return { bride: '', groom: '', title: 'Special Invitation' };
+}
+
 export default async function handler(req, res) {
   try {
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-    const bride = (url.searchParams.get('bride') || '').trim();
-    const groom = (url.searchParams.get('groom') || '').trim();
-    const title = (url.searchParams.get('title') || '').trim();
-    const date = (url.searchParams.get('date') || '').trim();
-    const venue = (url.searchParams.get('venue') || '').trim();
-    const bgParam = (url.searchParams.get('bg') || '').trim();
-    const accentParam = (url.searchParams.get('accent') || '').trim();
+    const getParam = (k) => (url.searchParams.get(k) || url.searchParams.get(`amp;${k}`) || (req.query && req.query[k]) || '').trim();
+
+    let slug = getParam('slug');
+    if (slug) {
+      slug = slug.replace(/\.(jpg|jpeg|png)$/i, '');
+    }
+
+    let bride = getParam('bride');
+    let groom = getParam('groom');
+    let title = getParam('title');
+    let date = getParam('date');
+    let venue = getParam('venue');
+    let bgParam = getParam('bg');
+    let accentParam = getParam('accent');
+
+    // If slug is provided but bride/groom details are missing, resolve from database or slug parsing
+    if (slug && (!bride || !groom)) {
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 1200);
+        const fbRes = await fetch(FIREBASE_DB_URL, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        if (fbRes.ok) {
+          const invData = await fbRes.json();
+          const invList = Array.isArray(invData) ? invData : Object.values(invData || {});
+          const targetSlug = slug.toLowerCase();
+          const match = invList.find(i => {
+            if (!i) return false;
+            const s = String(i.slug || '').toLowerCase();
+            const cs = String(i.customSlug || '').toLowerCase();
+            const id = String(i.id || '');
+            return (s && (s === targetSlug || targetSlug.includes(s))) ||
+                   (cs && (cs === targetSlug || targetSlug.includes(cs))) ||
+                   (id && targetSlug.includes(id));
+          });
+          if (match && match.config) {
+            bride = bride || match.config.brideName || match.config.coverBrideText || '';
+            groom = groom || match.config.groomName || match.config.coverGroomText || '';
+            title = title || match.config.weddingTitle || match.title || '';
+            date = date || match.config.weddingDate || '';
+            venue = venue || match.config.weddingVenue || '';
+            bgParam = bgParam || match.config.primaryColor || '';
+            accentParam = accentParam || match.config.accentGold || '';
+          }
+        }
+      } catch (err) {
+        // Fall through to slug name parsing
+      }
+
+      if (!bride && !groom) {
+        const parsed = parseNamesFromSlug(slug);
+        bride = bride || parsed.bride;
+        groom = groom || parsed.groom;
+        title = title || parsed.title;
+      }
+    }
 
     let initials = '';
     let mainHeading = '';
@@ -196,6 +267,7 @@ export default async function handler(req, res) {
 
     res.setHeader('Content-Type', 'image/jpeg');
     res.setHeader('Content-Length', outputBuffer.length);
+    res.setHeader('X-Robots-Tag', 'all, index, follow');
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.status(200).send(outputBuffer);

@@ -149,7 +149,7 @@ async function runHomepageTests() {
 
   console.log('');
 
-  // ── Test 2: Real Browser Visitor to /api/home (302 Redirect) ──
+  // ── Test 2: Real Browser Visitor to /api/home (HTTP 200 without circular redirect) ──
   console.log('━━━ Test 2: Direct Browser Navigation to /api/home ━━━');
   const mockBrowser = createMockReqRes({
     headers: {
@@ -159,8 +159,9 @@ async function runHomepageTests() {
   });
   await homeHandler(mockBrowser.req, mockBrowser.res);
   const resBrowser = mockBrowser.getResult();
-  assert(resBrowser.statusCode === 302, 'Real browser directly visiting /api/home gets HTTP 302 redirect');
-  assert(resBrowser.headersSent['location'] === '/', 'Redirect location points to root /');
+  assert(resBrowser.statusCode === 200, 'Real browser directly visiting /api/home gets HTTP 200 (no 302 redirect loop)');
+  assert(String(resBrowser.bodyData).includes('DS Envite'), 'Response body contains brand name');
+
 
   console.log('');
 
