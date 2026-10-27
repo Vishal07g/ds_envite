@@ -15,7 +15,7 @@ import InvitationTypeDropdown from '../components/InvitationTypeDropdown';
 import AiAssistantModal from '../components/AiAssistantModal';
 import GuestManagerModal from '../components/GuestManagerModal';
 import { downloadPrintablePdfCard, downloadInvitationImage, downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
-import { getCoupleInitials } from '../utils/monogramThumbnail';
+import { getCoupleInitials, getCoupleDetails } from '../utils/monogramThumbnail';
 import { formatDriveFolderName, GOOGLE_DRIVE_ROOT_FOLDER_URL, uploadInvitationFileToDrive } from '../utils/googleDriveStorage';
 import { formatDriveDirectUrl } from '../utils/helpers';
 
@@ -315,24 +315,27 @@ export default function CustomerDashboard() {
 
   const handleOpenShare = (inv) => {
     setActiveShareInvite(inv);
-    const origin = window.location.origin;
+    const origin = dbStore.getCleanShareOrigin();
     const shareSlug = dbStore.getInvitationShareSlug(inv);
     const shareUrl = `${origin}/invite/${shareSlug}`;
     const bride = inv.config?.brideName || "Bride";
     const groom = inv.config?.groomName || "Groom";
+    const couple = getCoupleDetails({ bride, groom, title: inv.title, slug: shareSlug });
     
     // Set clean, uncluttered wedding invitation template
-    const template = inv.shareText || "💌 *Wedding Invitation* 💌\n*{bride} & {groom}*\n\nWe warmly invite you to celebrate our wedding union! 💍\n\n✨ *View our interactive invitation & RSVP:*\n{url}";
+    const template = inv.shareText || "💌 *Wedding Invitation* 💌\n✨ *{initials}* ✨\n*{displayName}*\n\nWe warmly invite you to celebrate our wedding union! 💍\n\n✨ *View our interactive invitation & RSVP:*\n{url}";
     const replaced = template
       .replace("{url}", shareUrl)
-      .replace("{bride}", bride)
-      .replace("{groom}", groom);
+      .replace("{initials}", couple.initials)
+      .replace("{displayName}", couple.displayName)
+      .replace("{bride}", couple.firstPerson)
+      .replace("{groom}", couple.secondPerson);
     
     setCustomShareText(replaced);
   };
 
   const handleCopyLink = (invId) => {
-    const origin = window.location.origin;
+    const origin = dbStore.getCleanShareOrigin();
     const inv = dbStore.getInvitationById(invId);
     const shareSlug = dbStore.getInvitationShareSlug(inv || { id: invId });
     const shareUrl = `${origin}/invite/${shareSlug}`;
@@ -813,11 +816,13 @@ export default function CustomerDashboard() {
                   const bName = (activeShareInvite.config?.coverBrideText || activeShareInvite.config?.brideName || "").trim();
                   const gName = (activeShareInvite.config?.coverGroomText || activeShareInvite.config?.groomName || "").trim();
                   const title = (activeShareInvite.title || "").trim();
+                  const shareSlug = dbStore.getInvitationShareSlug(activeShareInvite);
+                  const couple = getCoupleDetails({ bride: bName, groom: gName, title, slug: shareSlug });
                   const dateParam = activeShareInvite.config?.weddingDate ? `&date=${encodeURIComponent(activeShareInvite.config.weddingDate)}` : '';
                   const venueParam = activeShareInvite.config?.weddingVenue ? `&venue=${encodeURIComponent(activeShareInvite.config.weddingVenue)}` : '';
                   const bgParam = activeShareInvite.config?.primaryColor ? `&bg=${encodeURIComponent(activeShareInvite.config.primaryColor)}` : '';
                   const accentParam = activeShareInvite.config?.accentGold ? `&accent=${encodeURIComponent(activeShareInvite.config.accentGold)}` : '';
-                  const thumbUrl = `/api/og-image?bride=${encodeURIComponent(bName)}&groom=${encodeURIComponent(gName)}&title=${encodeURIComponent(title)}${dateParam}${venueParam}${bgParam}${accentParam}`;
+                  const thumbUrl = `/api/og-image?slug=${encodeURIComponent(shareSlug)}&bride=${encodeURIComponent(bName)}&groom=${encodeURIComponent(gName)}&title=${encodeURIComponent(title)}${dateParam}${venueParam}${bgParam}${accentParam}`;
 
                   return (
                     <>
@@ -827,13 +832,13 @@ export default function CustomerDashboard() {
                           <span>Invitation Thumbnail Preview</span>
                         </span>
                         <span className="bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-extrabold border border-amber-500/40">
-                          {bName && gName ? `Initials: ${getCoupleInitials(bName, gName)}` : (title || "Custom Invite")}
+                          {`Initials: ${couple.initials}`}
                         </span>
                       </div>
                       <div className="relative aspect-[16/9] w-full rounded-lg overflow-hidden border border-amber-500/20 bg-slate-950">
                         <img
                           src={thumbUrl}
-                          alt={`${bName || title} Invitation Thumbnail`}
+                          alt={`${couple.displayName || title} Invitation Thumbnail`}
                           className="w-full h-full object-cover"
                           onError={(e) => {
                             e.currentTarget.src = "/website_thumbnail.jpg";
@@ -2048,7 +2053,7 @@ export default function CustomerDashboard() {
         isOpen={showGuestModal}
         onClose={() => setShowGuestModal(false)}
         guests={invitations[0]?.guestList || []}
-        inviteUrl={invitations[0] ? `${window.location.origin}/invite/${dbStore.getInvitationShareSlug(invitations[0])}` : ""}
+        inviteUrl={invitations[0] ? `${dbStore.getCleanShareOrigin()}/invite/${dbStore.getInvitationShareSlug(invitations[0])}` : ""}
         brideName={invitations[0]?.config?.brideName || "Ananya"}
         groomName={invitations[0]?.config?.groomName || "Aarav"}
         onUpdateGuests={(newList) => {

@@ -4,10 +4,136 @@
  * featuring the Bride & Groom initials, royal gold filigree crest, names, and wedding date.
  */
 
-export function getCoupleInitials(brideName = "Bride", groomName = "Groom") {
-  const b = (brideName.trim().charAt(0) || "B").toUpperCase();
-  const g = (groomName.trim().charAt(0) || "G").toUpperCase();
-  return `${b} & ${g}`;
+/**
+ * Determine ordered couple names, initials, and slugs based on wedding slug, title, or config.
+ * E.g.:
+ * - suman-vishal -> initials: "SV", displayName: "Suman & Vishal", slug: "suman-vishal"
+ * - vishal-suman -> initials: "VS", displayName: "Vishal & Suman", slug: "vishal-suman"
+ */
+export function getCoupleDetails({
+  bride = "",
+  groom = "",
+  title = "",
+  slug = "",
+  customSlug = "",
+  config = {}
+} = {}) {
+  const cleanBride = (bride || config?.coverBrideText || config?.brideName || "").trim();
+  const cleanGroom = (groom || config?.coverGroomText || config?.groomName || "").trim();
+  const cleanTitle = (title || config?.weddingTitle || "").trim();
+  const rawSlug = String(slug || customSlug || "")
+    .toLowerCase()
+    .replace(/^https?:\/\/[^\/]+\/invite\//, "")
+    .replace(/^invite-/, "")
+    .replace(/-\d{6,}$/, "")
+    .trim();
+
+  let isGroomFirst = false;
+
+  if (cleanBride && cleanGroom) {
+    const brideSlug = cleanBride.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const groomSlug = cleanGroom.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+
+    // 1. Slug priority: Does the slug start with groom name or bride name?
+    if (rawSlug) {
+      if (rawSlug.startsWith(groomSlug)) {
+        isGroomFirst = true;
+      } else if (rawSlug.startsWith(brideSlug)) {
+        isGroomFirst = false;
+      }
+    }
+
+    // 2. Title priority if slug did not determine order
+    if (!rawSlug && cleanTitle) {
+      const titleLower = cleanTitle.toLowerCase();
+      const gIdx = titleLower.indexOf(cleanGroom.toLowerCase());
+      const bIdx = titleLower.indexOf(cleanBride.toLowerCase());
+      if (gIdx !== -1 && bIdx !== -1) {
+        isGroomFirst = gIdx < bIdx;
+      } else if (gIdx !== -1) {
+        isGroomFirst = true;
+      }
+    }
+  } else if (!cleanBride && !cleanGroom && rawSlug) {
+    // Neither bride nor groom provided, parse from slug
+    const parts = rawSlug.split(/[-_]+/).filter(Boolean);
+    const EVENT_WORDS = new Set(['wedding', 'invitation', 'invite', 'weds', 'and', 'reception', 'engagement', 'anniversary', 'birthday', 'party', 'sample', 'demo']);
+    const names = parts.filter(p => !/^\d+$/.test(p) && !EVENT_WORDS.has(p.toLowerCase()));
+    if (names.length >= 2) {
+      const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      const p1 = cap(names[0]);
+      const p2 = cap(names[1]);
+      return {
+        firstPerson: p1,
+        secondPerson: p2,
+        isGroomFirst: false,
+        initials: `${p1.charAt(0)}${p2.charAt(0)}`.toUpperCase(),
+        displayName: `${p1} & ${p2}`,
+        slug: `${names[0].toLowerCase()}-${names[1].toLowerCase()}`
+      };
+    } else if (names.length === 1) {
+      const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+      const p1 = cap(names[0]);
+      return {
+        firstPerson: p1,
+        secondPerson: "",
+        isGroomFirst: false,
+        initials: p1.slice(0, 2).toUpperCase(),
+        displayName: p1,
+        slug: names[0].toLowerCase()
+      };
+    }
+  }
+
+  const firstPerson = isGroomFirst ? cleanGroom : cleanBride;
+  const secondPerson = isGroomFirst ? cleanBride : cleanGroom;
+
+  let initials = "";
+  let displayName = "";
+
+  if (firstPerson && secondPerson) {
+    const fInit = (firstPerson.charAt(0) || "B").toUpperCase();
+    const sInit = (secondPerson.charAt(0) || "G").toUpperCase();
+    initials = `${fInit}${sInit}`;
+    displayName = `${firstPerson} & ${secondPerson}`;
+  } else if (firstPerson || secondPerson) {
+    const single = firstPerson || secondPerson;
+    initials = single.slice(0, 2).toUpperCase();
+    displayName = single;
+  } else if (cleanTitle) {
+    const words = cleanTitle.split(/\s+/).filter(Boolean);
+    initials = words.length >= 2 
+      ? `${words[0].charAt(0)}${words[1].charAt(0)}`.toUpperCase()
+      : cleanTitle.slice(0, 2).toUpperCase();
+    displayName = cleanTitle;
+  } else {
+    initials = "DS";
+    displayName = "Royal Wedding";
+  }
+
+  const toSlug = (s) => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const slugPart = (firstPerson && secondPerson)
+    ? `${toSlug(firstPerson)}-${toSlug(secondPerson)}`
+    : (firstPerson ? toSlug(firstPerson) : "wedding");
+
+  return {
+    firstPerson,
+    secondPerson,
+    isGroomFirst,
+    initials,
+    displayName,
+    slug: slugPart
+  };
+}
+
+export function getCoupleInitials(first = "Bride", second = "Groom") {
+  if (typeof first === "object" && first !== null) {
+    return getCoupleDetails(first).initials;
+  }
+  const f = (String(first || "").trim().charAt(0) || "").toUpperCase();
+  const s = (String(second || "").trim().charAt(0) || "").toUpperCase();
+  if (f && s) return `${f}${s}`;
+  return f || s || "DS";
 }
 
 export function generateMonogramCanvas({
@@ -17,6 +143,7 @@ export function generateMonogramCanvas({
   weddingDate = "",
   primaryColor = "#400d18",
   accentGold = "#d4af37",
+  slug = "",
   width = 1200,
   height = 630
 }) {
@@ -25,15 +152,9 @@ export function generateMonogramCanvas({
   canvas.height = height;
   const ctx = canvas.getContext("2d");
 
-  const cleanBride = (brideName || "").trim();
-  const cleanGroom = (groomName || "").trim();
-  const initials = (cleanBride && cleanGroom) 
-    ? getCoupleInitials(cleanBride, cleanGroom) 
-    : (title ? title.slice(0, 2).toUpperCase() : "DS");
-
-  const mainHeading = (cleanBride && cleanGroom)
-    ? `${cleanBride.toUpperCase()}  &  ${cleanGroom.toUpperCase()}`
-    : (title || cleanBride || cleanGroom || "ROYAL INVITATION").toUpperCase();
+  const couple = getCoupleDetails({ bride: brideName, groom: groomName, title, slug });
+  const initials = couple.initials;
+  const mainHeading = (couple.displayName || title || "ROYAL INVITATION").toUpperCase();
 
   // 1. Rich Royal Background Gradient
   const bgGrad = ctx.createRadialGradient(width / 2, height / 2, 80, width / 2, height / 2, width / 1.3);
@@ -221,11 +342,18 @@ export function updateSocialMetaTags({
     thumbnailUrl = socialThumbnailUrl;
   }
 
+  const couple = getCoupleDetails({
+    bride: brideName,
+    groom: groomName,
+    title,
+    slug: shareUrl
+  });
+
   // Priority 2: Auto-generate if no custom social metadata
   if (!socialTitle) {
-    if (brideName && groomName) {
-      pageTitle = `${brideName} & ${groomName} — Wedding Invitation | DS Envite`;
-      ogTitle = `${brideName} & ${groomName} — Wedding Invitation`;
+    if (couple.firstPerson && couple.secondPerson) {
+      pageTitle = `${couple.displayName} — Wedding Invitation | DS Envite`;
+      ogTitle = `${couple.displayName} — Wedding Invitation`;
     } else if (title) {
       pageTitle = `${title} | DS Envite`;
       ogTitle = title;
@@ -233,9 +361,9 @@ export function updateSocialMetaTags({
   }
 
   if (!socialDescription) {
-    if (brideName && groomName) {
+    if (couple.firstPerson && couple.secondPerson) {
       const venueText = weddingVenue ? ` at ${weddingVenue}` : '';
-      pageDesc = `We cordially invite you to celebrate the wedding union of ${brideName} & ${groomName}${venueText}. Tap to view interactive invitation, music, and RSVP.`;
+      pageDesc = `We cordially invite you to celebrate the wedding union of ${couple.displayName}${venueText}. Tap to view interactive invitation, music, and RSVP.`;
     } else if (title) {
       pageDesc = `You are cordially invited to ${title}. Tap to view the interactive invitation, music, and RSVP on DS Envite.`;
     }

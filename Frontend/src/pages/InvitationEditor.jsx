@@ -445,7 +445,7 @@ export default function InvitationEditor() {
 
   const handleCopyLink = () => {
     if (!id) return;
-    const origin = window.location.origin;
+    const origin = dbStore.getCleanShareOrigin();
     const shareSlug = dbStore.getInvitationShareSlug(invitation || { id, config });
     const shareUrl = `${origin}/invite/${shareSlug}${isPaid ? '' : '?preview=true'}`;
     navigator.clipboard.writeText(shareUrl);
@@ -786,7 +786,7 @@ export default function InvitationEditor() {
         isOpen={showGuestModal}
         onClose={() => setShowGuestModal(false)}
         guests={invitation?.guestList || []}
-        inviteUrl={id ? `${window.location.origin}/invite/${dbStore.getInvitationShareSlug(invitation || { id, config })}` : ""}
+        inviteUrl={id ? `${dbStore.getCleanShareOrigin()}/invite/${dbStore.getInvitationShareSlug(invitation || { id, config })}` : ""}
         brideName={config.brideName || "Ananya"}
         groomName={config.groomName || "Aarav"}
         onUpdateGuests={(newList) => {

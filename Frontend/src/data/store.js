@@ -12,6 +12,7 @@ import {
   scanDatabaseForBase64Media,
   uploadBase64ToDriveStorage
 } from "../utils/googleDriveStorage.js";
+import { getCoupleDetails } from "../utils/monogramThumbnail.js";
 
 // Firebase Realtime Database sync status
 let isFirebaseSynced = false;
@@ -1804,50 +1805,58 @@ export const dbStore = {
       .replace(/^-+|-+$/g, "");
   },
 
+  getCleanShareOrigin() {
+    if (typeof window === "undefined") return "https://ds-envite.vercel.app";
+    const { hostname, origin } = window.location;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return origin;
+    }
+    if (hostname.endsWith(".vercel.app")) {
+      return "https://ds-envite.vercel.app";
+    }
+    return origin;
+  },
+
   getInvitationShareSlug(invitation, configOverride = null) {
     if (!invitation) return "wedding-invitation";
 
     const cfg = configOverride || invitation.config || {};
-    const bride = (cfg.brideName || "").trim();
-    const groom = (cfg.groomName || "").trim();
+    const bride = (cfg.coverBrideText || cfg.brideName || "").trim();
+    const groom = (cfg.coverGroomText || cfg.groomName || "").trim();
+    const title = (invitation.title || "").trim();
+    const rawCustom = String(invitation.customSlug || "").trim();
 
     // Respect customSlug only if explicitly manually configured and not legacy default starter names
     const isManual = Boolean(
       invitation.isCustomSlugManuallySet &&
-      invitation.customSlug &&
-      typeof invitation.customSlug === "string" &&
-      invitation.customSlug.trim() &&
-      !invitation.customSlug.startsWith("ananya-aarav")
+      rawCustom &&
+      !rawCustom.startsWith("ananya-aarav")
     );
 
     if (isManual) {
-      return this.slugify(invitation.customSlug.trim());
+      // Strip trailing timestamps e.g. -1792995422776 if present
+      const cleaned = rawCustom.replace(/-\d{6,}$/, "").trim();
+      return this.slugify(cleaned || rawCustom);
     }
-    const title = (invitation.title || "").trim();
 
-    let namePart = "";
-    if (bride && groom) {
-      namePart = `${bride}-${groom}`;
-    } else if (bride || groom) {
-      namePart = bride || groom;
+    const couple = getCoupleDetails({
+      bride,
+      groom,
+      title,
+      slug: invitation.slug,
+      customSlug: rawCustom
+    });
+
+    if (couple.firstPerson && couple.secondPerson) {
+      return this.slugify(`${couple.firstPerson}-${couple.secondPerson}`);
+    } else if (couple.firstPerson) {
+      return this.slugify(couple.firstPerson);
     } else if (title && !title.toLowerCase().includes("untitled")) {
-      namePart = title.replace(/\bwedding\b/gi, "").replace(/\binvitation\b/gi, "").trim();
-    } else if (invitation.customerId) {
-      const user = this.getUserById(invitation.customerId);
-      if (user?.displayName) {
-        namePart = user.displayName;
-      }
+      const cleanTitle = title.replace(/\bwedding\b/gi, "").replace(/\binvitation\b/gi, "").trim();
+      if (cleanTitle) return this.slugify(cleanTitle);
     }
 
-    const cleanName = this.slugify(namePart) || "wedding";
-    const rawId = (invitation.id || "").replace(/^invite-/, "");
-    const uniqueSuffix = rawId || "invite";
-
-    if (cleanName.endsWith(uniqueSuffix)) {
-      return cleanName;
-    }
-
-    return `${cleanName}-${uniqueSuffix}`;
+    return "wedding-invitation";
   },
 
   getInvitationById(idOrSlug) {
@@ -1886,22 +1895,31 @@ export const dbStore = {
     found = invs.find(inv => this.getInvitationShareSlug(inv) === idOrSlug);
     if (found) return found;
 
-    // 6. Match by prefix or contains (e.g. "suman-vishal" matching "suman-vishal-1792461190488")
+    // 5b. Match by stripped timestamp on slug or customSlug
+    const strippedSearch = String(idOrSlug).replace(/^invite-/, "").replace(/-\d{6,}$/, "").toLowerCase().trim();
+    found = invs.find(inv => {
+      const s = String(inv.slug || "").replace(/^invite-/, "").replace(/-\d{6,}$/, "").toLowerCase();
+      const cs = String(inv.customSlug || "").replace(/^invite-/, "").replace(/-\d{6,}$/, "").toLowerCase();
+      return s === strippedSearch || cs === strippedSearch;
+    });
+    if (found) return found;
+
+    // 6. Match by prefix (e.g. "suman-vishal" matching "suman-vishal-1792461190488")
     const cleanSearch = String(idOrSlug).toLowerCase().trim();
     found = invs.find(inv => {
       const s = (inv.slug || "").toLowerCase();
       const cs = (inv.customSlug || "").toLowerCase();
-      return (s && (s.startsWith(cleanSearch) || cleanSearch.startsWith(s))) || 
-             (cs && (cs.startsWith(cleanSearch) || cleanSearch.startsWith(cs)));
+      return (s && s.startsWith(cleanSearch)) || 
+             (cs && cs.startsWith(cleanSearch));
     });
     if (found) return found;
 
-    // 7. Match by couple names in config or title
+    // 7. Match by couple names in config (BOTH bride AND groom must match)
     found = invs.find(inv => {
       const bride = (inv.config?.brideName || inv.config?.coverBrideText || "").toLowerCase();
       const groom = (inv.config?.groomName || inv.config?.coverGroomText || "").toLowerCase();
       if (bride && groom) {
-        if (cleanSearch.includes(bride) || cleanSearch.includes(groom)) return true;
+        if (cleanSearch.includes(bride) && cleanSearch.includes(groom)) return true;
       }
       return false;
     });

@@ -9,6 +9,117 @@ function capitalizeWord(word = '') {
   return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 }
 
+function getCoupleDetails({
+  bride = '',
+  groom = '',
+  title = '',
+  slug = '',
+  customSlug = '',
+  config = {}
+} = {}) {
+  const cleanBride = (bride || config?.coverBrideText || config?.brideName || '').trim();
+  const cleanGroom = (groom || config?.coverGroomText || config?.groomName || '').trim();
+  const cleanTitle = (title || config?.weddingTitle || '').trim();
+  const rawSlug = String(slug || customSlug || '')
+    .toLowerCase()
+    .replace(/^https?:\/\/[^\/]+\/invite\//, '')
+    .replace(/^invite-/, '')
+    .replace(/-\d{6,}$/, '')
+    .trim();
+
+  let isGroomFirst = false;
+
+  if (cleanBride && cleanGroom) {
+    const brideSlug = cleanBride.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    const groomSlug = cleanGroom.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+    if (rawSlug) {
+      if (rawSlug.startsWith(groomSlug)) {
+        isGroomFirst = true;
+      } else if (rawSlug.startsWith(brideSlug)) {
+        isGroomFirst = false;
+      }
+    }
+
+    if (!rawSlug && cleanTitle) {
+      const titleLower = cleanTitle.toLowerCase();
+      const gIdx = titleLower.indexOf(cleanGroom.toLowerCase());
+      const bIdx = titleLower.indexOf(cleanBride.toLowerCase());
+      if (gIdx !== -1 && bIdx !== -1) {
+        isGroomFirst = gIdx < bIdx;
+      } else if (gIdx !== -1) {
+        isGroomFirst = true;
+      }
+    }
+  } else if (!cleanBride && !cleanGroom && rawSlug) {
+    const parts = rawSlug.split(/[-_]+/).filter(Boolean);
+    const EVENT_WORDS = new Set(['wedding', 'invitation', 'invite', 'weds', 'and', 'reception', 'engagement', 'anniversary', 'birthday', 'party', 'sample', 'demo']);
+    const names = parts.filter(p => !/^\d+$/.test(p) && !EVENT_WORDS.has(p.toLowerCase()));
+    if (names.length >= 2) {
+      const p1 = capitalizeWord(names[0]);
+      const p2 = capitalizeWord(names[1]);
+      return {
+        firstPerson: p1,
+        secondPerson: p2,
+        isGroomFirst: false,
+        initials: `${p1.charAt(0)}${p2.charAt(0)}`.toUpperCase(),
+        displayName: `${p1} & ${p2}`,
+        slug: `${names[0].toLowerCase()}-${names[1].toLowerCase()}`
+      };
+    } else if (names.length === 1) {
+      const p1 = capitalizeWord(names[0]);
+      return {
+        firstPerson: p1,
+        secondPerson: '',
+        isGroomFirst: false,
+        initials: p1.slice(0, 2).toUpperCase(),
+        displayName: p1,
+        slug: names[0].toLowerCase()
+      };
+    }
+  }
+
+  const firstPerson = isGroomFirst ? cleanGroom : cleanBride;
+  const secondPerson = isGroomFirst ? cleanBride : cleanGroom;
+
+  let initials = '';
+  let displayName = '';
+
+  if (firstPerson && secondPerson) {
+    const fInit = (firstPerson.charAt(0) || 'B').toUpperCase();
+    const sInit = (secondPerson.charAt(0) || 'G').toUpperCase();
+    initials = `${fInit}${sInit}`;
+    displayName = `${firstPerson} & ${secondPerson}`;
+  } else if (firstPerson || secondPerson) {
+    const single = firstPerson || secondPerson;
+    initials = single.slice(0, 2).toUpperCase();
+    displayName = single;
+  } else if (cleanTitle) {
+    const words = cleanTitle.split(/\s+/).filter(Boolean);
+    initials = words.length >= 2 
+      ? `${words[0].charAt(0)}${words[1].charAt(0)}`.toUpperCase()
+      : cleanTitle.slice(0, 2).toUpperCase();
+    displayName = cleanTitle;
+  } else {
+    initials = 'DS';
+    displayName = 'Royal Wedding';
+  }
+
+  const toSlug = (s) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const slugPart = (firstPerson && secondPerson)
+    ? `${toSlug(firstPerson)}-${toSlug(secondPerson)}`
+    : (firstPerson ? toSlug(firstPerson) : 'wedding');
+
+  return {
+    firstPerson,
+    secondPerson,
+    isGroomFirst,
+    initials,
+    displayName,
+    slug: slugPart
+  };
+}
+
 function parseNamesFromSlug(slug = '') {
   if (!slug) return { bride: '', groom: '', title: '' };
   // Remove prefix "invite-" and trailing numeric IDs (e.g. -1792995422776)
@@ -21,12 +132,12 @@ function parseNamesFromSlug(slug = '') {
   const isWedding = rawParts.some(p => p.toLowerCase() === 'wedding' || p.toLowerCase() === 'weds');
 
   if (parts.length >= 2) {
-    const bride = capitalizeWord(parts[0]);
-    const groom = capitalizeWord(parts[1]);
+    const p1 = capitalizeWord(parts[0]);
+    const p2 = capitalizeWord(parts[1]);
     return {
-      bride,
-      groom,
-      title: `${bride} & ${groom} — Wedding Invitation`
+      bride: p1,
+      groom: p2,
+      title: `${p1} & ${p2} — Wedding Invitation`
     };
   } else if (parts.length === 1) {
     const single = capitalizeWord(parts[0]);
@@ -56,6 +167,7 @@ function findInvitationBySlug(invitations, rawSlug) {
 
   const invs = Array.isArray(invitations) ? invitations : Object.values(invitations || {});
   const targetSlug = rawSlug.toLowerCase().trim();
+  const strippedTarget = targetSlug.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
   const numMatch = targetSlug.match(/(\d{6,})/);
 
   // Strategy 1: Exact match on id, slug, or customSlug
@@ -68,12 +180,16 @@ function findInvitationBySlug(invitations, rawSlug) {
   });
   if (match) return match;
 
-  // Strategy 2: Match on stripped invite- prefix
-  const strippedTarget = targetSlug.replace(/^invite-/, '');
+  // Strategy 2: Match on stripped invite- prefix and trailing timestamp
   match = invs.find(i => {
     if (!i) return false;
+    const s = String(i.slug || '').toLowerCase();
+    const cs = String(i.customSlug || '').toLowerCase();
     const rawId = String(i.id || '').replace(/^invite-/, '').toLowerCase();
-    return rawId && (rawId === strippedTarget || targetSlug.includes(rawId) || strippedTarget.includes(rawId));
+    const sStripped = s.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
+    const csStripped = cs.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
+    return sStripped === strippedTarget || csStripped === strippedTarget ||
+           (rawId && (rawId === strippedTarget || targetSlug.includes(rawId) || strippedTarget.includes(rawId)));
   });
   if (match) return match;
 
@@ -99,7 +215,7 @@ function findInvitationBySlug(invitations, rawSlug) {
   });
   if (match) return match;
 
-  // Strategy 5: Match by couple names in config
+  // Strategy 5: Match by couple names in config (BOTH names must match)
   match = invs.find(i => {
     if (!i || !i.config) return false;
     const bride = (i.config.brideName || i.config.coverBrideText || '').toLowerCase();
@@ -215,6 +331,13 @@ export default async function handler(req, res) {
   }
 
   // ── Construct unique Titles & Descriptions strictly matching this invitation ──
+  const couple = getCoupleDetails({
+    bride,
+    groom,
+    title: eventTitle,
+    slug: rawSlug || invitation?.slug || invitation?.customSlug
+  });
+
   let pageTitle = '';
   let ogTitle = '';
   let ogDesc = '';
@@ -230,11 +353,11 @@ export default async function handler(req, res) {
 
   // Priority 2: Generate from invitation data if no stored social metadata
   if (!ogTitle) {
-    if (bride && groom) {
-      pageTitle = `${bride} & ${groom} — Wedding Invitation | DS Envite`;
-      ogTitle = `${bride} & ${groom} — Wedding Invitation`;
-    } else if (bride) {
-      const heading = eventTitle || `${bride} Wedding Invitation`;
+    if (couple.firstPerson && couple.secondPerson) {
+      pageTitle = `${couple.displayName} — Wedding Invitation | DS Envite`;
+      ogTitle = `${couple.displayName} — Wedding Invitation`;
+    } else if (couple.firstPerson) {
+      const heading = eventTitle || `${couple.firstPerson} Wedding Invitation`;
       pageTitle = `${heading} | DS Envite`;
       ogTitle = heading;
     } else if (eventTitle) {
@@ -247,15 +370,15 @@ export default async function handler(req, res) {
   }
 
   if (!ogDesc) {
-    if (bride && groom) {
+    if (couple.firstPerson && couple.secondPerson) {
       const venueSnippet = weddingVenue ? ` at ${weddingVenue}` : '';
       const dateSnippet = formattedDate ? ` on ${formattedDate}` : '';
       const quoteSnippet = introQuote ? ` "${introQuote.length > 70 ? introQuote.slice(0, 67) + '...' : introQuote}"` : '';
-      ogDesc = `We cordially invite you to celebrate the wedding union of ${bride} & ${groom}${dateSnippet}${venueSnippet}.${quoteSnippet} Tap to open interactive invitation, music & RSVP.`;
-    } else if (bride) {
+      ogDesc = `We cordially invite you to celebrate the wedding union of ${couple.displayName}${dateSnippet}${venueSnippet}.${quoteSnippet} Tap to open interactive invitation, music & RSVP.`;
+    } else if (couple.firstPerson) {
       const venueSnippet = weddingVenue ? ` at ${weddingVenue}` : '';
       const dateSnippet = formattedDate ? ` on ${formattedDate}` : '';
-      ogDesc = `You are cordially invited to celebrate ${eventTitle || 'the wedding celebration'} of ${bride}${dateSnippet}${venueSnippet}. Tap to view the interactive invitation, music, and RSVP on DS Envite.`;
+      ogDesc = `You are cordially invited to celebrate ${eventTitle || 'the wedding celebration'} of ${couple.firstPerson}${dateSnippet}${venueSnippet}. Tap to view the interactive invitation, music, and RSVP on DS Envite.`;
     } else if (eventTitle) {
       const venueSnippet = weddingVenue ? ` at ${weddingVenue}` : '';
       const dateSnippet = formattedDate ? ` on ${formattedDate}` : '';
@@ -266,9 +389,9 @@ export default async function handler(req, res) {
   }
 
   if (!imageAlt) {
-    imageAlt = (bride && groom) 
-      ? `${bride} & ${groom} Wedding Invitation Preview`
-      : (bride ? `${bride} Wedding Invitation Preview` : 'Digital Invitation Preview');
+    imageAlt = (couple.firstPerson && couple.secondPerson) 
+      ? `${couple.displayName} Wedding Invitation Preview`
+      : (couple.firstPerson ? `${couple.firstPerson} Wedding Invitation Preview` : 'Digital Invitation Preview');
   }
 
   // ── Handle Unpublished / Private Invitations ────────────────────────
@@ -281,8 +404,10 @@ export default async function handler(req, res) {
   }
 
   // ── Build URLs ───────────────────────────────────────────────────────
-  const host = req.headers['x-forwarded-host'] || req.headers.host || 'ds-envite.vercel.app';
+  const rawHost = req.headers['x-forwarded-host'] || req.headers.host || 'ds-envite.vercel.app';
+  const host = rawHost.endsWith('.vercel.app') ? 'ds-envite.vercel.app' : rawHost;
   const proto = req.headers['x-forwarded-proto'] || 'https';
+  const cleanSlug = rawSlug.replace(/^invite-/, '').replace(/-\d{6,}$/, '') || couple.slug || 'wedding';
 
   // Build OG image URL: Use stored social thumbnail if available, otherwise generate dynamically
   let ogImageUrl = '';
@@ -292,13 +417,11 @@ export default async function handler(req, res) {
     // Use the invitation's explicitly assigned social thumbnail
     ogImageUrl = socialThumbnailUrl;
   } else {
-    // Generate clean .jpg URL referencing the invitation slug
-    ogImageUrl = `${proto}://${host}/api/og-image/${encodeURIComponent(rawSlug || 'wedding')}.jpg`;
+    // Generate clean .jpg URL referencing the clean invitation slug
+    ogImageUrl = `${proto}://${host}/api/og-image/${encodeURIComponent(cleanSlug)}.jpg`;
   }
 
-  const shareUrl = (invitation && invitation.canonicalUrl) 
-    ? invitation.canonicalUrl 
-    : `${proto}://${host}/invite/${rawSlug || 'wedding'}`;
+  const shareUrl = `${proto}://${host}/invite/${cleanSlug}`;
 
   // ── Read index.html template from dist or root ───────────────────────
   let html = '';
