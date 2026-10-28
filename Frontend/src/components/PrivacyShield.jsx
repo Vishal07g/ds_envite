@@ -74,7 +74,7 @@ export default function PrivacyShield({
   // Handle keyboard shortcuts (PrintScreen, Snipping Tool, Print, Inspect, Hardware Volume/Power combo)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // 0. Mobile Hardware Volume Down / Power key combination detection
+      // 0. Mobile Hardware Volume Down / Power key combination detection (Android & iOS)
       if (
         e.key === "AudioVolumeDown" || 
         e.code === "AudioVolumeDown" || 
@@ -83,8 +83,22 @@ export default function PrivacyShield({
         e.key === "VolumeDown"
       ) {
         scrubClipboard();
-        triggerShield("Mobile Hardware Capture Attempt (Power + Volume Down)");
-        notify("🚫 Mobile Screenshot Blocked: Hardware button capture is disabled.");
+        triggerShield("Mobile Hardware Capture Attempt (Power + Low Volume)");
+        notify("🚫 Mobile Screenshot Blocked: Power + Low Volume capture is restricted.");
+        return;
+      }
+
+      // Mobile Hardware Volume Up / Power key combination detection (iOS Side + VolUp Screenshot)
+      if (
+        e.key === "AudioVolumeUp" || 
+        e.code === "AudioVolumeUp" || 
+        e.keyCode === 175 || 
+        e.keyCode === 24 || 
+        e.key === "VolumeUp"
+      ) {
+        scrubClipboard();
+        triggerShield("Mobile Hardware Capture Attempt (Power + Volume Up)");
+        notify("🚫 Mobile Screenshot Blocked: Power + Volume capture is restricted.");
         return;
       }
 
@@ -139,6 +153,12 @@ export default function PrivacyShield({
         scrubClipboard();
         triggerShield("PrintScreen released");
       }
+      if (
+        e.key === "AudioVolumeDown" || e.key === "VolumeDown" || e.keyCode === 25 || e.keyCode === 174 ||
+        e.key === "AudioVolumeUp" || e.key === "VolumeUp" || e.keyCode === 24 || e.keyCode === 175
+      ) {
+        scrubClipboard();
+      }
     };
 
     // 7. Context Menu prevention (Right-click to Inspect / Save Image As)
@@ -154,13 +174,15 @@ export default function PrivacyShield({
       return false;
     };
 
-    // 9. Mobile 3-Finger Touch & Palm Swipe Screenshot Interception
+    // 9. Mobile Multi-Touch & 3-Finger Screenshot Interception (iOS & Android)
+    // Strictly blocks 3-finger screenshot gestures without blocking standard 1-finger / 2-finger interaction on iOS/Android
     const handleMultiTouch = (e) => {
       const touches = e.touches || [];
       const hasThreeFingers = touches.length >= 3;
-      const hasPalmContact = Array.from(touches).some(t => 
-        (t.radiusX && t.radiusX > 30) || 
-        (t.radiusY && t.radiusY > 30)
+      
+      // Palm capture defense: strictly requires >= 2 touches with large contact area to avoid false-triggering on iOS single finger taps
+      const hasPalmContact = touches.length >= 2 && Array.from(touches).some(t => 
+        (t.radiusX && t.radiusX > 85 && t.radiusY && t.radiusY > 85)
       );
 
       if (hasThreeFingers || hasPalmContact) {
@@ -192,10 +214,10 @@ export default function PrivacyShield({
   }, [triggerShield, dismissShield, scrubClipboard, notify]);
 
   // Interactive Test Simulation Trigger
-  const handleTestShield = () => {
+  const handleTestShield = (reason = "Simulated 3-Finger Gesture / Hardware Capture Attempt (Test)") => {
     setTestModeCount(prev => prev + 1);
-    triggerShield("Simulated Screenshot Attempt (Test Verification)");
-    notify("🛡️ Privacy Shield Active! Content is blacked out. Click anywhere to resume.");
+    triggerShield(reason);
+    notify("🛡️ Privacy Shield Active! Content is blacked out. Tap anywhere to resume.");
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       dismissShield();
@@ -219,11 +241,18 @@ export default function PrivacyShield({
       {isShieldActive && (
         <div 
           onClick={dismissShield}
+          onTouchEnd={(e) => {
+            e.stopPropagation();
+            dismissShield();
+          }}
           className="fixed inset-0 z-[9999999] bg-[#070b19] flex flex-col items-center justify-center p-6 text-center select-none cursor-pointer transition-opacity duration-200"
           style={{ backdropFilter: "blur(40px)" }}
         >
           {/* Decorative luxury golden frame */}
-          <div className="relative max-w-md w-full p-8 rounded-3xl border border-amber-500/40 bg-gradient-to-b from-slate-900/90 to-slate-950/95 shadow-2xl space-y-6 text-slate-100 animate-fade-in">
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="relative max-w-md w-full p-8 rounded-3xl border border-amber-500/40 bg-gradient-to-b from-slate-900/90 to-slate-950/95 shadow-2xl space-y-6 text-slate-100 animate-fade-in"
+          >
             {/* Pulsing Lock Icon */}
             <div className="w-20 h-20 mx-auto rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center shadow-inner">
               <span className="text-3xl animate-pulse">🔒</span>
@@ -249,6 +278,10 @@ export default function PrivacyShield({
               <button
                 type="button"
                 onClick={dismissShield}
+                onTouchEnd={(e) => {
+                  e.stopPropagation();
+                  dismissShield();
+                }}
                 className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 font-bold uppercase tracking-wider text-xs shadow-lg transition"
               >
                 Click Anywhere to Resume Viewing
@@ -333,14 +366,24 @@ export default function PrivacyShield({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={handleTestShield}
-                className="w-full py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold text-[10px] uppercase tracking-wider transition flex items-center justify-center space-x-1 cursor-pointer"
-              >
-                <span>⚡</span>
-                <span>Test Screenshot Shield ({testModeCount} tested)</span>
-              </button>
+              <div className="space-y-1.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => handleTestShield("3-Finger Screenshot Gesture Blocked (Test)")}
+                  className="w-full py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-bold text-[10px] uppercase tracking-wider transition flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  <span>⚡</span>
+                  <span>Test 3-Finger Screenshot ({testModeCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleTestShield("Power + Low Volume Capture Blocked (Test)")}
+                  className="w-full py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 hover:border-amber-500/40 text-slate-200 hover:text-amber-300 font-semibold text-[10px] uppercase tracking-wider transition flex items-center justify-center space-x-1 cursor-pointer"
+                >
+                  <span>📱</span>
+                  <span>Test Power + Low Volume</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
