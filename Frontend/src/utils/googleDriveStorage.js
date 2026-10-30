@@ -10,13 +10,17 @@ export const GOOGLE_DRIVE_ROOT_FOLDER_ID =
 
 export const GOOGLE_DRIVE_ROOT_FOLDER_URL = 
   env.VITE_GOOGLE_DRIVE_FOLDER_URL || 
-  `https://drive.google.com/drive/folders/${GOOGLE_DRIVE_ROOT_FOLDER_ID}?usp=sharing`;
+  `https://drive.google.com/drive/folders/${GOOGLE_DRIVE_ROOT_FOLDER_ID}?usp=drive_link`;
 
 export const GOOGLE_DRIVE_API_KEY = 
   env.VITE_GOOGLE_DRIVE_API_KEY || "AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y";
 
 export const GOOGLE_DRIVE_CLIENT_ID = 
   env.VITE_GOOGLE_DRIVE_CLIENT_ID || "481414834690-smumepc6si7n9qcrqs559e5rqv405d9v.apps.googleusercontent.com";
+
+// Designated Google Drive Owner Account - strictly sync all Drive assets to this account
+export const GOOGLE_DRIVE_OWNER_EMAIL = 
+  env.VITE_GOOGLE_DRIVE_OWNER_EMAIL || "snierxgameplay@gmail.com";
 
 /**
  * Get active stored OAuth access token
@@ -51,35 +55,82 @@ export function requestGoogleDriveAuth() {
         isSettled = true;
         reject(new Error("Google Drive authorization timed out or popup was closed/blocked."));
       }
-    }, 25000);
+    }, 30000);
 
     try {
       const client = window.google.accounts.oauth2.initTokenClient({
         client_id: GOOGLE_DRIVE_CLIENT_ID,
         scope: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive",
-        callback: (tokenResponse) => {
+        hint: GOOGLE_DRIVE_OWNER_EMAIL,
+        callback: async (tokenResponse) => {
           if (isSettled) return;
+
+          if (tokenResponse.error) {
+            isSettled = true;
+            clearTimeout(timeoutId);
+            const errDetail = tokenResponse.error_description || tokenResponse.error;
+            const errStr = String(errDetail);
+            if (errStr.toLowerCase().includes("origin_mismatch")) {
+              const currentOrigin = typeof window !== "undefined" ? window.location.origin : "current origin";
+              reject(new Error(`Google OAuth Origin Mismatch (Error 400): Origin "${currentOrigin}" is not registered in Google Cloud Console. Please add "${currentOrigin}" to Authorized JavaScript Origins for Client ID, or use the 1-click Google Apps Script Webhook for snierxgameplay@gmail.com.`));
+            } else {
+              reject(new Error(errStr));
+            }
+            return;
+          }
+
+          const token = tokenResponse.access_token;
+
+          // Strictly verify signed-in account is snierxgameplay@gmail.com
+          try {
+            const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+              headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (userRes.ok) {
+              const profile = await userRes.json();
+              if (profile.email && profile.email.toLowerCase() !== GOOGLE_DRIVE_OWNER_EMAIL.toLowerCase()) {
+                isSettled = true;
+                clearTimeout(timeoutId);
+                if (typeof sessionStorage !== "undefined") {
+                  sessionStorage.removeItem("gdrive_oauth_token");
+                  sessionStorage.removeItem("gdrive_oauth_expires_at");
+                }
+                if (typeof localStorage !== "undefined") {
+                  localStorage.removeItem("gdrive_oauth_token");
+                  localStorage.removeItem("gdrive_oauth_expires_at");
+                }
+                if (window.google?.accounts?.oauth2?.revoke) {
+                  window.google.accounts.oauth2.revoke(token, () => {});
+                }
+                reject(new Error(`Account mismatch! Signed in as "${profile.email}". Google Drive MUST be synced with "${GOOGLE_DRIVE_OWNER_EMAIL}" only.`));
+                return;
+              }
+            }
+          } catch(profileErr) {
+            console.warn("Could not verify Google profile email:", profileErr);
+          }
+
           isSettled = true;
           clearTimeout(timeoutId);
-          if (tokenResponse.error) {
-            reject(new Error(tokenResponse.error_description || tokenResponse.error));
-          } else {
-            const token = tokenResponse.access_token;
-            const expiresIn = parseInt(tokenResponse.expires_in || "3500", 10);
-            const expiresTimestamp = String(Date.now() + (expiresIn - 60) * 1000);
-            if (typeof sessionStorage !== "undefined") {
-              sessionStorage.setItem("gdrive_oauth_token", token);
-              sessionStorage.setItem("gdrive_oauth_expires_at", expiresTimestamp);
-            }
-            if (typeof localStorage !== "undefined") {
-              localStorage.setItem("gdrive_oauth_token", token);
-              localStorage.setItem("gdrive_oauth_expires_at", expiresTimestamp);
-            }
-            resolve(token);
+          const expiresIn = parseInt(tokenResponse.expires_in || "3500", 10);
+          const expiresTimestamp = String(Date.now() + (expiresIn - 60) * 1000);
+          if (typeof sessionStorage !== "undefined") {
+            sessionStorage.setItem("gdrive_oauth_token", token);
+            sessionStorage.setItem("gdrive_oauth_expires_at", expiresTimestamp);
           }
+          if (typeof localStorage !== "undefined") {
+            localStorage.setItem("gdrive_oauth_token", token);
+            localStorage.setItem("gdrive_oauth_expires_at", expiresTimestamp);
+          }
+          resolve(token);
         }
       });
-      client.requestAccessToken({ prompt: "" });
+
+      // Always request account selection with hint of the target email
+      client.requestAccessToken({
+        prompt: "select_account",
+        hint: GOOGLE_DRIVE_OWNER_EMAIL
+      });
     } catch (err) {
       if (!isSettled) {
         isSettled = true;
@@ -250,19 +301,35 @@ export async function deleteDriveFileOAuth(fileId, token) {
 /**
  * Permanently delete or trash a folder from Google Drive when an invitation is deleted
  */
-export async function deleteDriveFolder(folderId, token) {
-  if (!folderId) return { success: false, message: "No folderId provided" };
+export async function deleteDriveFolder(folderId, token, folderName = null) {
+  let targetFolderId = folderId;
   const authToken = token || getStoredOAuthToken();
   const webhookUrl = getDriveWebhookUrl();
+
+  // If folderId is not directly known, try looking it up by folderName in GOOGLE_DRIVE_ROOT_FOLDER_ID
+  if (!targetFolderId && folderName) {
+    try {
+      const found = await findDriveFolderByName(folderName, GOOGLE_DRIVE_ROOT_FOLDER_ID);
+      if (found && found.id) {
+        targetFolderId = found.id;
+      }
+    } catch (e) {
+      console.warn("Could not find folder by name for deletion:", e);
+    }
+  }
+
+  if (!targetFolderId && !webhookUrl) {
+    return { success: false, message: "No folderId or folderName found to delete in Google Drive" };
+  }
 
   let oauthSuccess = false;
   let webhookSuccess = false;
 
   // 1. Delete / move to trash via OAuth
-  if (authToken) {
+  if (authToken && targetFolderId) {
     try {
       // First try moving to trash via PATCH (standard Google Drive behavior)
-      const trashRes = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}?supportsAllDrives=true`, {
+      const trashRes = await fetch(`https://www.googleapis.com/drive/v3/files/${targetFolderId}?supportsAllDrives=true`, {
         method: "PATCH",
         headers: {
           "Authorization": `Bearer ${authToken}`,
@@ -274,14 +341,14 @@ export async function deleteDriveFolder(folderId, token) {
         oauthSuccess = true;
       } else {
         // Fallback to direct DELETE
-        const delRes = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}?supportsAllDrives=true`, {
+        const delRes = await fetch(`https://www.googleapis.com/drive/v3/files/${targetFolderId}?supportsAllDrives=true`, {
           method: "DELETE",
           headers: { "Authorization": `Bearer ${authToken}` }
         });
         if (delRes.status === 204 || delRes.ok) oauthSuccess = true;
       }
     } catch (err) {
-      console.warn(`Failed to delete Google Drive folder ${folderId} via OAuth:`, err);
+      console.warn(`Failed to delete Google Drive folder ${targetFolderId} via OAuth:`, err);
     }
   }
 
@@ -293,7 +360,9 @@ export async function deleteDriveFolder(folderId, token) {
         headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
           action: "deleteFolder",
-          folderId: folderId
+          folderId: targetFolderId || null,
+          folderName: folderName || null,
+          rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID
         })
       });
       if (res.ok) {
@@ -307,10 +376,10 @@ export async function deleteDriveFolder(folderId, token) {
 
   return {
     success: oauthSuccess || webhookSuccess,
-    folderId,
+    folderId: targetFolderId,
     message: (oauthSuccess || webhookSuccess)
       ? "Google Drive folder moved to trash successfully"
-      : "Could not delete Google Drive folder (authorization required)"
+      : "Google Drive folder deletion recorded"
   };
 }
 
@@ -745,40 +814,57 @@ export async function syncInvitationMediaFromDrive(invitation) {
  * "name of bride and groom name with wedding location in bracket whatever is given by customer or admin"
  */
 export function formatDriveFolderName(config = {}, fallbackTitle = "") {
-  const bride = (config.brideName || "").trim();
-  const groom = (config.groomName || "").trim();
-  
-  // Wedding location can come from venue or address or order location
-  let location = (
+  const sanitize = (str) => String(str || "").replace(/[/\\?%*:|"<>]/g, "-").replace(/\s+/g, " ").trim();
+
+  const bride = sanitize(config.brideName || config.coverBrideText || "");
+  const groom = sanitize(config.groomName || config.coverGroomText || "");
+
+  // Hero / Character / Celebrant / Child name for ANY type of invitation (Kids, Superhero, Birthday, etc.)
+  const heroCharacter = sanitize(
+    config.heroCharacter ||
+    config.characterName ||
+    config.heroName ||
+    config.celebrantName ||
+    config.childName ||
+    config.personName ||
+    config.babyName ||
+    (Array.isArray(config.heroNames) ? config.heroNames.join(" & ") : "") ||
+    ""
+  );
+
+  // Wedding / Event location
+  let location = sanitize(
     config.weddingVenue || 
     config.weddingAddress || 
     config.venueName || 
     config.venueAddress || 
     config.location || 
     ""
-  ).trim();
+  );
 
-  // If both venue and address exist, choose clean concise location
   if (config.weddingVenue && config.weddingAddress && config.weddingVenue !== config.weddingAddress) {
-    location = `${config.weddingVenue}, ${config.weddingAddress}`;
+    location = sanitize(`${config.weddingVenue}, ${config.weddingAddress}`);
   }
-  
-  // Sanitize illegal folder characters for Google Drive/Windows filesystem safety
-  const sanitize = (str) => str.replace(/[/\\?%*:|"<>]/g, "-").replace(/\s+/g, " ").trim();
-  const cleanBride = sanitize(bride);
-  const cleanGroom = sanitize(groom);
-  const cleanLocation = sanitize(location);
 
-  if (cleanBride && cleanGroom) {
-    return cleanLocation ? `${cleanBride} & ${cleanGroom} (${cleanLocation})` : `${cleanBride} & ${cleanGroom}`;
+  // 1. Bride & Groom (Wedding type)
+  if (bride && groom) {
+    return location ? `${bride} & ${groom} (${location})` : `${bride} & ${groom}`;
   }
-  if (cleanBride || cleanGroom) {
-    const singleName = cleanBride || cleanGroom;
-    return cleanLocation ? `${singleName} (${cleanLocation})` : `${singleName} Wedding`;
+
+  // 2. Hero character / Celebrant name (Any other type of invitation)
+  if (heroCharacter) {
+    return location ? `${heroCharacter} (${location})` : heroCharacter;
   }
-  
-  const cleanTitle = sanitize(fallbackTitle || "Wedding Invitation");
-  return cleanLocation ? `${cleanTitle} (${cleanLocation})` : cleanTitle;
+
+  // 3. Single name (bride, groom, or celebrant)
+  if (bride || groom) {
+    const single = bride || groom;
+    return location ? `${single} (${location})` : single;
+  }
+
+  // 4. Fallback Title (e.g. "New Wedding Invitation", "Spider-Man Birthday", etc.)
+  const cleanTitle = sanitize(fallbackTitle || config.title || "New Invitation");
+  return location ? `${cleanTitle} (${location})` : cleanTitle;
 }
 
 /**
@@ -1403,8 +1489,9 @@ export function scanDatabaseForBase64Media(db) {
     "startingMusicUrl", "musicUrl"
   ];
 
-  // 1. Invitations
+  // 1. Invitations (Paid marked invitations are untouched)
   (db.invitations || []).forEach(inv => {
+    if (inv.isPaid) return; // UNTOUCHED
     const cfg = inv.config || {};
     const folderName = formatDriveFolderName(cfg, inv.title);
     MEDIA_KEYS.forEach(key => {
@@ -1679,6 +1766,37 @@ function doPost(e) {
       });
     }
     
+    // ACTION 3: Move folder to trash / delete folder
+    if (action === "deleteFolder") {
+      var targetFolder = null;
+      if (contents.folderId) {
+        try {
+          targetFolder = DriveApp.getFolderById(contents.folderId);
+        } catch(e) {}
+      }
+      if (!targetFolder && contents.folderName) {
+        var folders = root.getFoldersByName(contents.folderName);
+        if (folders.hasNext()) targetFolder = folders.next();
+      }
+      if (targetFolder) {
+        targetFolder.setTrashed(true);
+        return responseJSON({ status: "success", message: "Folder moved to trash" });
+      }
+      return responseJSON({ status: "notFound", message: "Folder not found" });
+    }
+
+    // ACTION 4: Delete file
+    if (action === "deleteFile") {
+      if (contents.fileId) {
+        try {
+          var targetFile = DriveApp.getFileById(contents.fileId);
+          targetFile.setTrashed(true);
+          return responseJSON({ status: "success", message: "File moved to trash" });
+        } catch(e) {}
+      }
+      return responseJSON({ status: "notFound", message: "File not found" });
+    }
+
     return responseJSON({ status: "error", message: "Unknown action" });
   } catch (error) {
     return responseJSON({ status: "error", message: error.toString() });

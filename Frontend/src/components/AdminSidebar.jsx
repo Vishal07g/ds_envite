@@ -1963,6 +1963,11 @@ export default function AdminSidebar({
                     if (key === "storyGroomFamily") onChangeField("groomFamily", val);
                     if (key === "coverBrideText") onChangeField("brideName", val);
                     if (key === "coverGroomText") onChangeField("groomName", val);
+                    if (key === "heroCharacter") {
+                      onChangeField("characterName", val);
+                      onChangeField("heroName", val);
+                      onChangeField("celebrantName", val);
+                    }
                     if (key === "coverQuoteText") onChangeField("introQuote", val);
                   }}
                   className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 font-semibold focus:outline-none focus:border-amber-500 shadow-inner"
@@ -6416,6 +6421,7 @@ export default function AdminSidebar({
             {renderCategorizedElementTool("Bride Name Details", "coverBrideText", config.brideName || "Ananya")}
             {renderCategorizedElementTool("Ampersand (&) Symbol", "coverAmpersandText", "&")}
             {renderCategorizedElementTool("Groom Name Details", "coverGroomText", config.groomName || "Aarav")}
+            {renderCategorizedElementTool("Hero Character / Theme Name", "heroCharacter", config.heroCharacter || "Spider-Man")}
             {renderCategorizedElementTool("Intro Love Quote", "coverQuoteText", config.introQuote || "Joined in holy matrimony, we celebrate a bond written in heaven and lived in faith.")}
             {renderCategorizedElementTool("Bottom Tagline Banner", "coverBottomTaglineText", "Joined in holy matrimony, we celebrate a bond written in heaven and lived in faith.")}
             {renderCategorizedElementTool("Cover Reveal Button", "coverRevealBtnText", "Reveal Secret Save the Date")}

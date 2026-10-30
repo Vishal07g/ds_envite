@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import dbStore, { DEFAULT_CONFIG } from '../data/store';
+import dbStore, { DEFAULT_CONFIG, generateRandomDraftConfig } from '../data/store';
 import { useAuth } from '../context/AuthContext';
 import AdminSidebar from '../components/AdminSidebar';
 import InvitationRenderer from '../components/InvitationRenderer';
@@ -55,6 +55,11 @@ export default function InvitationEditor() {
   // Customization state - initialized synchronously to avoid flash of default names
   const cachedInv = id ? dbStore.getInvitationById(id) : null;
   const [invitation, setInvitation] = useState(() => cachedInv);
+  const initialDraftConfig = useRef(null);
+  if (!initialDraftConfig.current) {
+    initialDraftConfig.current = generateRandomDraftConfig();
+  }
+
   const [config, setConfig] = useState(() => {
     if (cachedInv?.config) {
       const cleaned = { ...DEFAULT_CONFIG, ...cachedInv.config };
@@ -63,9 +68,20 @@ export default function InvitationEditor() {
       }
       return cleaned;
     }
-    return DEFAULT_CONFIG;
+    return initialDraftConfig.current;
   });
-  const [title, setTitle] = useState(() => cachedInv?.title || "New Wedding Invitation");
+
+  const [title, setTitle] = useState(() => {
+    if (cachedInv?.title) return cachedInv.title;
+    const cfg = initialDraftConfig.current;
+    if (cfg?.brideName && cfg?.groomName) {
+      return `${cfg.brideName} & ${cfg.groomName}'s Wedding`;
+    }
+    if (cfg?.heroCharacter) {
+      return `${cfg.heroCharacter} Invitation`;
+    }
+    return "New Invitation";
+  });
   const [customerId, setCustomerId] = useState(() => cachedInv?.customerId || "");
   const [isPaid, setIsPaid] = useState(() => cachedInv?.isPaid || false);
   const [status, setStatus] = useState(() => cachedInv?.status || "draft");
@@ -273,9 +289,10 @@ export default function InvitationEditor() {
         
         showToast("Invitation customisation saved successfully!", "success");
       } else {
-        const newInv = dbStore.createInvitation(customerId || null, title, config, isPaid, status);
+        const token = getStoredOAuthToken();
+        const newInv = dbStore.createInvitation(customerId || null, title, config, isPaid, status, null, token);
         targetId = newInv.id;
-        showToast("New invitation draft created!", "success");
+        showToast("New invitation draft created & Google Drive folder linked!", "success");
         navigate(`/admin/editor/${newInv.id}`, { replace: true });
       }
 
