@@ -1183,16 +1183,30 @@ export default function AdminDashboard() {
 
   const handleDeleteInvitation = (id) => {
     const inv = dbStore.getInvitationById(id);
-    const folderInfo = inv?.driveStorage?.folderName ? ` and its linked Google Drive folder "${inv.driveStorage.folderName}"` : '';
+    if (!inv) return;
+
+    // RULE: Paid marked invitations are untouched and protected from deletion
+    if (inv.isPaid) {
+      showToast("Paid marked invitations are protected and cannot be deleted or modified.", "error");
+      return;
+    }
+
+    const folderName = inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title);
+    const folderInfo = folderName ? ` and its linked Google Drive folder "${folderName}"` : '';
 
     triggerDialog({
       type: 'confirm',
-      title: 'Move Invitation to Archive & Trash Drive Folder',
-      message: `Are you sure you want to delete this invitation? It will be safely held in the Archive for 2 days${folderInfo} will be automatically moved to Google Drive trash.`,
+      title: 'Delete Invitation & Google Drive Folder',
+      message: `Are you sure you want to delete "${inv.title || 'this invitation'}"? The invitation${folderInfo} in snierxgameplay@gmail.com Drive will both be deleted.`,
       confirmText: 'Delete Invitation & Drive Folder',
       onConfirm: async () => {
-        dbStore.deleteInvitation(id);
-        showToast("Invitation deleted & linked Drive folder moved to trash", "success");
+        const token = getStoredOAuthToken();
+        const deleted = dbStore.deleteInvitation(id, token);
+        if (deleted) {
+          showToast("Invitation and associated Google Drive folder deleted successfully", "success");
+        } else {
+          showToast("Paid marked invitation is protected and cannot be deleted.", "error");
+        }
         setTick(t => t + 1);
       }
     });
@@ -1630,9 +1644,20 @@ export default function AdminDashboard() {
                               <SvgCopy className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleDeleteInvitation(inv.id)}
-                              className="p-2 rounded bg-slate-900 border border-slate-800 text-rose-500/80 hover:text-rose-500 transition"
-                              title="Delete Invitation"
+                              onClick={() => {
+                                if (inv.isPaid) {
+                                  showToast("Paid marked invitations are protected and cannot be deleted.", "info");
+                                  return;
+                                }
+                                handleDeleteInvitation(inv.id);
+                              }}
+                              className={`p-2 rounded border transition ${
+                                inv.isPaid
+                                  ? 'bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-40'
+                                  : 'bg-slate-900 border-slate-800 text-rose-500/80 hover:text-rose-500 cursor-pointer'
+                              }`}
+                              title={inv.isPaid ? "Paid marked invitations are protected from deletion" : "Delete Invitation & Google Drive Folder"}
+                              disabled={inv.isPaid}
                             >
                               <SvgTrash className="w-4 h-4" />
                             </button>
@@ -2493,7 +2518,7 @@ export default function AdminDashboard() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-300 max-w-2xl">
-                    Every wedding invitation and theme automatically gets its own dedicated folder inside your root Google Drive folder, formatted strictly as <strong className="text-amber-300">“Bride &amp; Groom (Wedding Location)”</strong> and renames automatically whenever the invitation is edited.
+                    Every invitation automatically gets its own dedicated folder inside your root Google Drive folder (<strong>snierxgameplay@gmail.com</strong>), named after the <strong className="text-amber-300">Bride &amp; Groom or Hero Character Name</strong> for any type of invitation. Deleting an invitation automatically deletes its Drive folder as well. Paid marked invitations remain completely untouched.
                   </p>
                 </div>
                 <div className="flex items-center gap-2 self-start md:self-center">
@@ -2644,9 +2669,25 @@ export default function AdminDashboard() {
                     onClick={async () => {
                       setIsSyncingAllDrive(true);
                       let totalSyncedMedia = 0;
+                      let token = getStoredOAuthToken();
+                      if (!token && !getDriveWebhookUrl()) {
+                        try {
+                          token = await requestGoogleDriveAuth();
+                        } catch (authErr) {
+                          console.warn("Drive auth skipped or failed:", authErr);
+                        }
+                      }
                       for (const inv of invitations) {
                         try {
-                          await syncDriveFolder({ invitation: inv });
+                          // Paid invitations are untouched
+                          if (inv.isPaid) continue;
+
+                          const res = await syncDriveFolder({ invitation: inv, token });
+                          if (res && res.folderId && (!inv.driveStorage?.folderId || inv.driveStorage?.folderId !== res.folderId)) {
+                            dbStore.updateInvitation(inv.id, {
+                              driveStorage: { ...(inv.driveStorage || {}), ...res }
+                            });
+                          }
                           const mediaRes = await syncInvitationMediaFromDrive(inv);
                           if (mediaRes.success && mediaRes.syncedFiles > 0) {
                             totalSyncedMedia += mediaRes.syncedFiles;

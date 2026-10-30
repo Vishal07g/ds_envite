@@ -129,6 +129,61 @@ export const CURATED_CLIPARTS = [
   }
 ];
 
+export const RANDOM_BRIDE_NAMES = [
+  "Ananya", "Priya", "Meera", "Ishita", "Diya", "Rhea", "Sneha", "Aisha",
+  "Kiara", "Riya", "Tara", "Pooja", "Tanvi", "Kavya", "Aditi", "Simran",
+  "Sanjana", "Neha", "Alisha", "Natasha", "Maya", "Suman", "Shreya", "Kritika",
+  "Avani", "Zoya", "Mira", "Nandini"
+];
+
+export const RANDOM_GROOM_NAMES = [
+  "Aarav", "Rohan", "Kabir", "Aditya", "Reyansh", "Vihaan", "Arjun", "Siddharth",
+  "Aryan", "Dev", "Kunal", "Rahul", "Aman", "Neil", "Varun", "Vikrant",
+  "Nikhil", "Yash", "Samar", "Sameer", "Vishal", "Dhruv", "Rishi", "Shaurya",
+  "Karan", "Manav", "Ishan"
+];
+
+export const RANDOM_HERO_CHARACTERS = [
+  "Spider-Man", "Batman", "Iron Man", "Captain America", "Thor", "Superman",
+  "Wonder Woman", "Black Panther", "Elsa", "Simba", "Moana", "Harry Potter",
+  "Aladdin", "Mickey Mouse", "Pikachu", "Sonic", "Goku", "Little Prince",
+  "Princess Jasmine", "Buzz Lightyear", "Miles Morales", "Peter Pan"
+];
+
+export function getRandomBrideGroomNames() {
+  const bride = RANDOM_BRIDE_NAMES[Math.floor(Math.random() * RANDOM_BRIDE_NAMES.length)];
+  const groom = RANDOM_GROOM_NAMES[Math.floor(Math.random() * RANDOM_GROOM_NAMES.length)];
+  return { bride, groom };
+}
+
+export function getRandomHeroCharacterName() {
+  return RANDOM_HERO_CHARACTERS[Math.floor(Math.random() * RANDOM_HERO_CHARACTERS.length)];
+}
+
+export function generateRandomDraftConfig(eventType = 'wedding', baseConfig = DEFAULT_CONFIG) {
+  const { bride, groom } = getRandomBrideGroomNames();
+  const heroCharacter = getRandomHeroCharacterName();
+
+  const coupleNames = `${bride} & ${groom}`;
+  const coupleInitials = `${bride.charAt(0)} & ${groom.charAt(0)}`;
+
+  return {
+    ...baseConfig,
+    eventType: eventType || 'wedding',
+    brideName: bride,
+    groomName: groom,
+    coverBrideText: bride,
+    coverGroomText: groom,
+    envelopeNamesText: coupleNames,
+    envelopeInitials: coupleInitials,
+    heroCharacter: heroCharacter,
+    characterName: heroCharacter,
+    heroName: heroCharacter,
+    celebrantName: heroCharacter,
+    childName: heroCharacter
+  };
+}
+
 const DEFAULT_CONFIG = {
   ...DEFAULT_TIMELINE_CONFIG,
   brideName: "Suman",
@@ -1932,17 +1987,34 @@ export const dbStore = {
 
     return null;
   },
-  createInvitation(customerId, title, config = DEFAULT_CONFIG, isPaid = false, status = "draft", customFolderName = null) {
+  createInvitation(customerId, title = null, config = DEFAULT_CONFIG, isPaid = false, status = "draft", customFolderName = null, token = null) {
     const db = getDb();
     const timestamp = Date.now();
-    const bride = (config.coverBrideText || config.brideName || "").trim();
-    const groom = (config.coverGroomText || config.groomName || "").trim();
-    const namePart = (bride && groom) ? `${bride}-${groom}` : (title ? this.slugify(title) : "wedding");
+    
+    // For new draft invitations, if no names provided or using static default, generate random bride/groom and hero character
+    let fullConfig = { ...DEFAULT_CONFIG, ...(config || {}) };
+    let bride = (fullConfig.coverBrideText || fullConfig.brideName || "").trim();
+    let groom = (fullConfig.coverGroomText || fullConfig.groomName || "").trim();
+    let hero = (fullConfig.heroCharacter || fullConfig.characterName || fullConfig.heroName || "").trim();
+
+    if ((!bride && !groom && !hero) || (bride === "Suman" && groom === "Vishal" && !title)) {
+      const randomCfg = generateRandomDraftConfig(fullConfig.eventType || 'wedding', fullConfig);
+      fullConfig = randomCfg;
+      bride = randomCfg.brideName;
+      groom = randomCfg.groomName;
+      hero = randomCfg.heroCharacter;
+    }
+
+    const defaultTitle = (bride && groom)
+      ? `${bride} & ${groom}'s Wedding`
+      : (hero ? `${hero} Invitation` : "New Invitation");
+    const finalTitle = title || defaultTitle;
+
+    const namePart = (bride && groom) ? `${bride}-${groom}` : (hero ? this.slugify(hero) : this.slugify(finalTitle));
     const nameSlug = this.slugify(namePart) || "wedding";
     const uniqueId = `invite-${timestamp}`;
     const initialSlug = `${nameSlug}-${timestamp}`;
-    const fullConfig = { ...DEFAULT_CONFIG, ...config };
-    const folderName = customFolderName || formatDriveFolderName(fullConfig, title || (bride && groom ? `${bride} & ${groom}'s Wedding` : "New Invitation"));
+    const folderName = customFolderName || formatDriveFolderName(fullConfig, finalTitle);
 
     // Auto-generate social metadata from the invitation's actual data
     const autoTitle = (bride && groom) ? `${bride} & ${groom} — Wedding Invitation` : (title || 'Digital Invitation');
@@ -1961,7 +2033,7 @@ export const dbStore = {
       customerId,
       themeId,
       heroNames,
-      title: title || `${bride} & ${groom}'s Wedding`,
+      title: finalTitle,
       description: autoDesc,
       thumbnailUrl: '',
       canonicalUrl,
@@ -1995,7 +2067,7 @@ export const dbStore = {
     dispatchDbSynced();
 
     // Asynchronously create and sync folder on Google Drive
-    syncDriveFolder({ invitation: newInv, customFolderName: folderName }).then(driveRes => {
+    syncDriveFolder({ invitation: newInv, customFolderName: folderName, token }).then(driveRes => {
       if (driveRes && driveRes.folderId) {
         const freshDb = getDb();
         const target = freshDb.invitations.find(i => i.id === uniqueId);
@@ -2174,21 +2246,28 @@ export const dbStore = {
 
     return db.invitations[idx];
   },
-  deleteInvitation(id) {
+  deleteInvitation(id, token = null) {
     const db = getDb();
     const inv = db.invitations.find(i => i.id === id);
-    if (inv) {
-      this.archiveItem('invitation', inv, inv.title || 'Invitation');
-      // Automatically delete linked Google Drive folder
-      const folderId = inv.driveStorage?.folderId;
-      if (folderId) {
-        deleteDriveFolder(folderId).then(res => {
-          console.log(`[Google Drive] Deleted linked folder for invitation ${id}:`, res);
-        }).catch(err => {
-          console.warn(`[Google Drive] Failed to delete linked folder for invitation ${id}:`, err);
-        });
-      }
+    if (!inv) return false;
+
+    // RULE: Paid marked invitations are strictly protected and MUST remain untouched!
+    if (inv.isPaid) {
+      console.warn(`[Store] Protected paid invitation "${id}" cannot be deleted or modified.`);
+      return false;
     }
+
+    this.archiveItem('invitation', inv, inv.title || 'Invitation');
+
+    // Automatically delete linked Google Drive folder from snierxgameplay@gmail.com Drive
+    const folderId = inv.driveStorage?.folderId;
+    const folderName = inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title);
+    deleteDriveFolder(folderId, token, folderName).then(res => {
+      console.log(`[Google Drive] Deleted linked folder for invitation ${id}:`, res);
+    }).catch(err => {
+      console.warn(`[Google Drive] Failed to delete linked folder for invitation ${id}:`, err);
+    });
+
     db.invitations = db.invitations.filter(inv => inv.id !== id);
     saveDb(db);
     dispatchDbSynced();
