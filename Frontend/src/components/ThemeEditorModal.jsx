@@ -1486,6 +1486,19 @@ export default function ThemeEditorModal({ isOpen, preset, onClose, onSave, show
                 </div>
 
                 <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs">
+                  <div className="flex items-center justify-between py-1 border-t border-slate-800">
+                    <span className="text-[10px] font-bold text-slate-300 uppercase">Hide Amount on Preset Card</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox"
+                        checked={formData.hidePrice || false}
+                        onChange={(e) => setFormData(prev => ({ ...prev, hidePrice: e.target.checked }))}
+                        className="sr-only peer"
+                      />
+                      <div className="w-8 h-4 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-amber-500 peer-checked:after:bg-slate-950"></div>
+                    </label>
+                  </div>
+
                   <span className="text-slate-300 font-medium">Discounted Price to Display:</span>
                   <div className="flex items-center space-x-2">
                     <span className="line-through text-slate-400">₹{formData.price !== undefined ? formData.price : 999}</span>

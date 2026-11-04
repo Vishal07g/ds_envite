@@ -283,6 +283,8 @@ const DEFAULT_CONFIG = {
   scroll3DPerspective: 900,
   
   // Editable Envelope Configurations
+  envelopeBackdropBgColor: "",
+  envelopeBackdropImage: "",
   envelopeBgColor: "#5a0e1c", // Deep rich burgundy/wine (Pinterest match)
   envelopeFlapBgStart: "rgba(184, 146, 84, 0.25)",
   envelopeFlapBgEnd: "rgba(90, 14, 28, 0.9)",
@@ -1991,15 +1993,18 @@ export const dbStore = {
     const db = getDb();
     const timestamp = Date.now();
     
-    // For new draft invitations, if no names provided or using static default, generate random bride/groom and hero character
+    // For new draft invitations, if no names provided or using static default or generic title, generate random bride/groom and hero character
     let fullConfig = { ...DEFAULT_CONFIG, ...(config || {}) };
     let bride = (fullConfig.coverBrideText || fullConfig.brideName || "").trim();
     let groom = (fullConfig.coverGroomText || fullConfig.groomName || "").trim();
     let hero = (fullConfig.heroCharacter || fullConfig.characterName || fullConfig.heroName || "").trim();
 
-    if ((!bride && !groom && !hero) || (bride === "Suman" && groom === "Vishal" && !title)) {
+    const isGenericTitle = !title || title === "New Wedding Invitation" || title === "New Invitation";
+    const isDefaultNames = (!bride && !groom && !hero) || (bride === "Suman" && groom === "Vishal");
+
+    if (isDefaultNames || isGenericTitle) {
       const randomCfg = generateRandomDraftConfig(fullConfig.eventType || 'wedding', fullConfig);
-      fullConfig = randomCfg;
+      fullConfig = { ...fullConfig, ...randomCfg };
       bride = randomCfg.brideName;
       groom = randomCfg.groomName;
       hero = randomCfg.heroCharacter;
@@ -2008,7 +2013,7 @@ export const dbStore = {
     const defaultTitle = (bride && groom)
       ? `${bride} & ${groom}'s Wedding`
       : (hero ? `${hero} Invitation` : "New Invitation");
-    const finalTitle = title || defaultTitle;
+    const finalTitle = isGenericTitle ? defaultTitle : (title || defaultTitle);
 
     const namePart = (bride && groom) ? `${bride}-${groom}` : (hero ? this.slugify(hero) : this.slugify(finalTitle));
     const nameSlug = this.slugify(namePart) || "wedding";

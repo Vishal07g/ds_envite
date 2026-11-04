@@ -40,16 +40,40 @@ export default function PaymentModal({
 
     setTimeout(() => {
       // Mark order / invitation as paid and set payment details in dbStore
+      const currentUser = dbStore.getCurrentUser ? dbStore.getCurrentUser() : null;
+      const isAdmin = currentUser?.role === 'admin';
       if (targetObj.id && targetObj.id !== 'demo') {
-        dbStore.markOrderAsPaid(targetObj.id, {
-          transactionRef: transactionRef.trim() || `TXN-${Date.now().toString().slice(-6)}`,
-          paymentMethod: activeTab,
-          amountPaid: discountedPrice
-        });
+        if (isAdmin) {
+          dbStore.markOrderAsPaid(targetObj.id, {
+            transactionRef: transactionRef.trim() || `TXN-${Date.now().toString().slice(-6)}`,
+            paymentMethod: activeTab,
+            amountPaid: discountedPrice
+          });
+        } else {
+          // Normal customer submission: record payment proof, strictly wait for Admin approval
+          const ref = transactionRef.trim() || `TXN-${Date.now().toString().slice(-6)}`;
+          const allOrders = dbStore.getOrders();
+          const targetOrder = allOrders.find(o => o.id === targetObj.id || o.invitationId === targetObj.id);
+          if (targetOrder) {
+            dbStore.updateOrder(targetOrder.id, {
+              status: "payment_pending_verification",
+              paymentStatus: "submitted",
+              transactionRef: ref,
+              amountPaid: discountedPrice,
+              isPaid: false
+            });
+          }
+        }
       }
 
       setIsSubmitting(false);
-      if (showToast) showToast(`Payment completed! Watermark has been automatically removed.`, 'success');
+      if (showToast) {
+        if (isAdmin) {
+          showToast(`Payment verified! Watermark has been automatically removed.`, 'success');
+        } else {
+          showToast(`Payment details submitted! Admin will verify and activate your HD watermark-free invitation.`, 'success');
+        }
+      }
       if (onPaymentSubmitted) onPaymentSubmitted();
       if (onClose) onClose();
     }, 600);

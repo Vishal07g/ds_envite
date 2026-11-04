@@ -339,7 +339,8 @@ export function formatDriveDirectUrl(url, type = "image") {
     }
     return trimmed;
   }
-  return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
+  // Universal high-res thumbnail endpoint: cross-origin safe & works in all browsers without Google login cookies
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w2560`;
 }
 
 
