@@ -17,6 +17,12 @@ import {
   formatDriveFolderName,
   GOOGLE_DRIVE_ROOT_FOLDER_URL,
   GOOGLE_DRIVE_ROOT_FOLDER_ID,
+  GOOGLE_DRIVE_OWNER_EMAIL,
+  getDriveClientId,
+  setDriveClientId,
+  getDriveApiKey,
+  setDriveApiKey,
+  clearGoogleDriveAuth,
   getDriveWebhookUrl,
   setDriveWebhookUrl,
   syncDriveFolder,
@@ -1063,6 +1069,9 @@ export default function AdminDashboard() {
   const [paymentModalOrder, setPaymentModalOrder] = useState(null);
   const [invoiceModalTarget, setInvoiceModalTarget] = useState(null);
   const [driveWebhookInput, setDriveWebhookInput] = useState(() => getDriveWebhookUrl());
+  const [driveClientIdInput, setDriveClientIdInput] = useState(() => getDriveClientId());
+  const [driveApiKeyInput, setDriveApiKeyInput] = useState(() => getDriveApiKey());
+  const [hasStoredOAuth, setHasStoredOAuth] = useState(() => Boolean(getStoredOAuthToken()));
   const [isSyncingAllDrive, setIsSyncingAllDrive] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
   const [isMigratingImages, setIsMigratingImages] = useState(false);
@@ -1115,6 +1124,7 @@ export default function AdminDashboard() {
       let totalTransferred = 0;
       for (let i = 0; i < invitations.length; i++) {
         const inv = invitations[i];
+        if (inv.isPaid) continue; // RULE: Paid invitations are strictly untouched!
         const res = await transferInvitationToGoogleDriveOAuth({
           invitation: inv,
           token,
@@ -1270,7 +1280,16 @@ export default function AdminDashboard() {
         try {
           let token = getStoredOAuthToken();
           if (!token && !getDriveWebhookUrl()) {
-            token = await requestGoogleDriveAuth();
+            if (getDriveClientId()) {
+              try {
+                token = await requestGoogleDriveAuth();
+                setHasStoredOAuth(Boolean(token));
+              } catch (authErr) {
+                console.warn("Drive OAuth skipped or failed:", authErr);
+              }
+            } else {
+              showToast("To sync Drive folder, please add your snierxgameplay@gmail.com Webhook URL or Client ID in the Google Drive tab.", "info");
+            }
           }
           const res = await syncDriveFolder({ invitation: inv, customFolderName: folderName, token });
           if (res && res.folderId) {
@@ -2316,6 +2335,36 @@ export default function AdminDashboard() {
                           </span>
                         </div>
 
+                        {/* Pricing & Discount Controls on Preset Card */}
+                        <div className="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                          {!preset.hidePrice ? (
+                            <div className="flex items-center space-x-2">
+                              <span className="text-xs line-through text-slate-500 font-mono">₹{preset.price || 999}</span>
+                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 font-bold">
+                                {preset.discountPercent !== undefined ? preset.discountPercent : 30}% OFF
+                              </span>
+                              <span className="text-sm font-black text-amber-300 font-mono">
+                                ₹{Math.round((preset.price || 999) * (1 - (preset.discountPercent !== undefined ? preset.discountPercent : 30) / 100))}
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 italic">Price: Hidden on cards</span>
+                          )}
+
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              dbStore.updatePreset(preset.id, { hidePrice: !preset.hidePrice });
+                              setTick(t => t + 1);
+                              showToast(preset.hidePrice ? "Amount is now visible on preset cards" : "Amount hidden on preset cards", "info");
+                            }}
+                            className="px-2 py-0.5 rounded text-[9px] font-bold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
+                            title={preset.hidePrice ? "Unhide price" : "Hide price"}
+                          >
+                            {preset.hidePrice ? "👁 Unhide" : "🚫 Hide Price"}
+                          </button>
+                        </div>
+
                         <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
                           <Link
                             to={`/invite/demo?preset=${preset.id}&preview=true`}
@@ -2798,6 +2847,100 @@ export default function AdminDashboard() {
                       })}
                     </tbody>
                   </table>
+                </div>
+              </div>
+
+              {/* Dedicated snierxgameplay@gmail.com Account & OAuth Settings */}
+              <div className="p-5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-850 pb-3">
+                  <div>
+                    <h4 className="font-bold text-slate-100 text-sm flex items-center space-x-2">
+                      <span>🔒 Google Account Binding</span>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        {GOOGLE_DRIVE_OWNER_EMAIL}
+                      </span>
+                    </h4>
+                    <p className="text-xs text-slate-400">
+                      All Google Drive syncing is strictly locked to <strong>{GOOGLE_DRIVE_OWNER_EMAIL}</strong> and root folder <code className="text-amber-300">{GOOGLE_DRIVE_ROOT_FOLDER_ID}</code>.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={async () => {
+                        try {
+                          const tok = await requestGoogleDriveAuth();
+                          setHasStoredOAuth(Boolean(tok));
+                          showToast(`Successfully authorized with ${GOOGLE_DRIVE_OWNER_EMAIL}!`, "success");
+                        } catch (err) {
+                          showToast(err.message, "error");
+                        }
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition flex items-center space-x-1"
+                    >
+                      <span>{hasStoredOAuth ? "✓ Drive Authorized" : "🔑 Authorize OAuth"}</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        clearGoogleDriveAuth();
+                        setHasStoredOAuth(false);
+                        showToast("Cleared cached Google tokens & credentials successfully!", "info");
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-400 text-xs font-bold transition"
+                      title="Clear stored tokens from memory"
+                    >
+                      <span>Purge Cached Tokens</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-bold text-amber-300 block mb-1">
+                      OAuth Client ID (Optional for Direct Popup OAuth)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={driveClientIdInput}
+                        onChange={(e) => setDriveClientIdInput(e.target.value)}
+                        placeholder="e.g. 123456789-xyz.apps.googleusercontent.com"
+                        className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-amber-400 font-mono"
+                      />
+                      <button
+                        onClick={() => {
+                          setDriveClientId(driveClientIdInput);
+                          showToast("Client ID updated!", "success");
+                        }}
+                        className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold rounded-xl border border-slate-700 transition"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-amber-300 block mb-1">
+                      Google Drive API Key (Optional)
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={driveApiKeyInput}
+                        onChange={(e) => setDriveApiKeyInput(e.target.value)}
+                        placeholder="e.g. AIzaSy..."
+                        className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-amber-400 font-mono"
+                      />
+                      <button
+                        onClick={() => {
+                          setDriveApiKey(driveApiKeyInput);
+                          showToast("API Key updated!", "success");
+                        }}
+                        className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-amber-300 text-xs font-bold rounded-xl border border-slate-700 transition"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
 

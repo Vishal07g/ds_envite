@@ -77,13 +77,16 @@ const ScratchCardShield = React.memo(
     scratchShieldBadgeBorderColor,
     scratchShieldBadgeWidth,
     scratchShieldBadgeHeight,
-    scratchShieldBadgeRadius
+    scratchShieldBadgeRadius,
+    scratchCompletionThreshold = 40,
+    scratchBrushSize = 48
   }) {
     const canvasRef = useRef(null);
     const [debugText, setDebugText] = useState("paint not called");
     const isScratchingRef = useRef(false);
     const lastScratchPosRef = useRef({ x: 0, y: 0 });
     const hasTriggeredScratchRef = useRef(false);
+    const strokeCountRef = useRef(0);
 
     const shapeStyles = useMemo(() => getScratchCardShapeStyles(shape), [shape]);
 
@@ -264,6 +267,7 @@ const ScratchCardShield = React.memo(
       setIsScratchFinished(false);
       setScratchedPercentage(0);
       hasTriggeredScratchRef.current = false;
+      strokeCountRef.current = 0;
 
       // Ensure canvas is completely wiped clean before any repaint
       ctx.clearRect(0, 0, width, height);
@@ -291,47 +295,61 @@ const ScratchCardShield = React.memo(
       console.log("🎨 HAS CUSTOM IMAGE?", hasCustomImage, scratchImage);
 
       if (hasCustomImage) {
-        const img = new Image();
-        if (!scratchImage.startsWith('data:') && !scratchImage.startsWith('blob:')) {
-          img.crossOrigin = 'anonymous';
-        }
-        img.onload = () => {
-          try {
-            ctx.globalCompositeOperation = 'source-over';
-            const scale = (scratchImageScale || 100) / 100;
-            const xOff = (scratchImageXOffset ?? 50) / 100;
-            const yOff = (scratchImageYOffset ?? 50) / 100;
-
-            const imgAspect = img.width / img.height;
-            const canvasAspect = width / height;
-            let drawW, drawH;
-            if (imgAspect > canvasAspect) {
-              drawH = height * scale;
-              drawW = drawH * imgAspect;
-            } else {
-              drawW = width * scale;
-              drawH = drawW / imgAspect;
-            }
-            const drawX = (width - drawW) * xOff;
-            const drawY = (height - drawH) * yOff;
-
-            // Fill deep opaque background first
-            ctx.clearRect(0, 0, width, height);
-            ctx.fillStyle = '#0f172a';
-            ctx.fillRect(0, 0, width, height);
-            ctx.drawImage(img, drawX, drawY, drawW, drawH);
-
-            // Overlay foil border and badge
-            drawShieldOverlays(ctx, width, height);
-          } catch (err) {
-            console.warn("Could not draw custom scratch image, retained luxury shield:", err);
-            drawDefaultMetallicShield(ctx, width, height);
+        let retriedWithoutCors = false;
+        const loadAndDrawImage = (allowCors = true, targetUrl = null) => {
+          const img = new Image();
+          img.referrerPolicy = 'no-referrer';
+          const srcUrl = targetUrl || formatDriveDirectUrl(scratchImage, "image");
+          if (allowCors && !srcUrl.startsWith('data:') && !srcUrl.startsWith('blob:')) {
+            img.crossOrigin = 'anonymous';
           }
+          img.onload = () => {
+            try {
+              ctx.globalCompositeOperation = 'source-over';
+              const scale = (scratchImageScale || 100) / 100;
+              const xOff = (scratchImageXOffset ?? 50) / 100;
+              const yOff = (scratchImageYOffset ?? 50) / 100;
+
+              const imgAspect = img.width / img.height;
+              const canvasAspect = width / height;
+              let drawW, drawH;
+              if (imgAspect > canvasAspect) {
+                drawH = height * scale;
+                drawW = drawH * imgAspect;
+              } else {
+                drawW = width * scale;
+                drawH = drawW / imgAspect;
+              }
+              const drawX = (width - drawW) * xOff;
+              const drawY = (height - drawH) * yOff;
+
+              ctx.clearRect(0, 0, width, height);
+              ctx.fillStyle = '#0f172a';
+              ctx.fillRect(0, 0, width, height);
+              ctx.drawImage(img, drawX, drawY, drawW, drawH);
+
+              drawShieldOverlays(ctx, width, height);
+            } catch (err) {
+              console.warn("Could not draw custom scratch image, retained luxury shield:", err);
+              drawDefaultMetallicShield(ctx, width, height);
+            }
+          };
+          img.onerror = () => {
+            if (allowCors && !retriedWithoutCors) {
+              retriedWithoutCors = true;
+              loadAndDrawImage(false, srcUrl);
+              return;
+            }
+            const fid = extractDriveFileId(scratchImage);
+            if (fid && !srcUrl.includes('drive.google.com/thumbnail')) {
+              loadAndDrawImage(false, `https://drive.google.com/thumbnail?id=${fid}&sz=w2000`);
+              return;
+            }
+            drawDefaultMetallicShield(ctx, width, height);
+          };
+          img.src = srcUrl;
         };
-        img.onerror = () => {
-          drawDefaultMetallicShield(ctx, width, height);
-        };
-        img.src = formatDriveDirectUrl(scratchImage, "image");
+        loadAndDrawImage(true);
       }
     }, [
       scratchImage,
@@ -373,13 +391,54 @@ const ScratchCardShield = React.memo(
         setIsScratchFinished(true);
         setScratchedPercentage(100);
       };
+      const handleSetWipeProgress = (e) => {
+        const targetPct = Math.min(100, Math.max(0, Number(e.detail) || 0));
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const threshold = ((scratchCompletionThreshold !== undefined && scratchCompletionThreshold !== null && !isNaN(scratchCompletionThreshold)) ? Number(scratchCompletionThreshold) : 40);
+
+        if (targetPct === 0) {
+          paintShield();
+          return;
+        }
+
+        if (targetPct >= threshold) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          hasTriggeredScratchRef.current = true;
+          setIsScratchFinished(true);
+          setScratchedPercentage(targetPct);
+          if (triggerCelebration && !isScratchFinished) triggerCelebration();
+        } else {
+          paintShield();
+          setTimeout(() => {
+            if (!canvasRef.current) return;
+            const c = canvasRef.current;
+            const cx = c.getContext('2d');
+            cx.globalCompositeOperation = 'destination-out';
+            const maxRx = c.width * 0.58;
+            const maxRy = c.height * 0.58;
+            const currentRx = maxRx * Math.sqrt(targetPct / 100);
+            const currentRy = maxRy * Math.sqrt(targetPct / 100);
+            cx.beginPath();
+            cx.ellipse(c.width / 2, c.height / 2, currentRx, currentRy, 0, 0, Math.PI * 2);
+            cx.fill();
+            setIsScratchFinished(false);
+            hasTriggeredScratchRef.current = false;
+            setScratchedPercentage(targetPct);
+          }, 30);
+        }
+      };
+
       window.addEventListener('resetScratchCard', handleReset);
       window.addEventListener('instantRevealScratchCard', handleInstantReveal);
+      window.addEventListener('setWipeProgress', handleSetWipeProgress);
       return () => {
         window.removeEventListener('resetScratchCard', handleReset);
         window.removeEventListener('instantRevealScratchCard', handleInstantReveal);
+        window.removeEventListener('setWipeProgress', handleSetWipeProgress);
       };
-    }, [paintShield, setIsScratchFinished, setScratchedPercentage]);
+    }, [paintShield, setIsScratchFinished, setScratchedPercentage, scratchCompletionThreshold, triggerCelebration]);
 
     const getCoordinates = (e) => {
       const canvas = canvasRef.current;
@@ -411,7 +470,8 @@ const ScratchCardShield = React.memo(
         const ratio = transparent / (pixels.length / 16);
         setScratchedPercentage(Math.round(ratio * 100));
 
-        if (ratio > 0.40 && !isScratchFinished && !hasTriggeredScratchRef.current) {
+        const thresholdRatio = ((scratchCompletionThreshold !== undefined && scratchCompletionThreshold !== null && !isNaN(scratchCompletionThreshold)) ? Number(scratchCompletionThreshold) : 40) / 100;
+        if (ratio > thresholdRatio && !isScratchFinished && !hasTriggeredScratchRef.current) {
           hasTriggeredScratchRef.current = true;
           setIsScratchFinished(true);
           ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -439,7 +499,7 @@ const ScratchCardShield = React.memo(
       ctx.globalCompositeOperation = 'destination-out';
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
-      ctx.lineWidth = 48;
+      ctx.lineWidth = Number(scratchBrushSize) || 48;
 
       ctx.beginPath();
       ctx.moveTo(lastScratchPosRef.current.x, lastScratchPosRef.current.y);
@@ -500,6 +560,7 @@ export default function InvitationRenderer({
   isPrintMode = false,
   isPaid = false
 }) {
+  const isInEditor = Boolean(onChangeField || onSelectElement);
   const config = useMemo(() => {
     const base = propConfig || {};
     if (!base.syncColorThemeWithEnvelope) return base;
@@ -1201,9 +1262,14 @@ export default function InvitationRenderer({
     };
   }, [hasStartingSong, hasMainSong, config.autoPlayMusic]);
 
-  // Ensure the page is completely non-scrollable while the envelope is unopened
+  // Ensure the page is completely non-scrollable while the envelope is unopened on live public view
   useEffect(() => {
     if (!isEnvelopeOpened && config.showEnvelope !== false) {
+      // In editor mode, NEVER prevent window wheel scrolling so admin panel & tools scroll freely!
+      if (onChangeField || isInEditor) {
+        return;
+      }
+
       const prevBodyOverflow = document.body.style.overflow;
       const prevHtmlOverflow = document.documentElement.style.overflow;
       document.body.style.overflow = 'hidden';
@@ -1216,6 +1282,10 @@ export default function InvitationRenderer({
       }
 
       const preventScroll = (e) => {
+        // Never prevent scrolling inside the admin sidebar, dialogs, modals, or scroll containers
+        if (e.target && (e.target.closest('#admin-sidebar') || e.target.closest('.admin-sidebar') || e.target.closest('[role="dialog"]') || e.target.closest('.overflow-y-auto'))) {
+          return;
+        }
         if (e.type === 'wheel' || e.type === 'touchmove') {
           e.preventDefault();
         }
@@ -1234,7 +1304,7 @@ export default function InvitationRenderer({
         window.removeEventListener('touchmove', preventScroll);
       };
     }
-  }, [isEnvelopeOpened, config.showEnvelope]);
+  }, [isEnvelopeOpened, config.showEnvelope, onChangeField, isInEditor]);
 
   const handleEnvelopeOpen = () => {
     // Keep isEnvelopeOpenedRef false during opening sequence so Song 1 continues playing; only trigger opening animation
@@ -1845,8 +1915,8 @@ export default function InvitationRenderer({
       {/* Envelope Opener Screen Overlay — Fixed to full page, non-scrollable, responsive on all devices */}
       {!isEnvelopeOpened && config.showEnvelope !== false && !isPrintMode && (
         <div 
-          className="fixed inset-0 z-[60] w-full h-full h-dvh max-h-screen overflow-hidden select-none"
-          style={{ touchAction: 'none', overscrollBehavior: 'none' }}
+          className={(onChangeField || isInEditor) ? "absolute inset-0 z-20 w-full h-full overflow-hidden select-none" : "fixed inset-0 z-[60] w-full h-full h-dvh max-h-screen overflow-hidden select-none"}
+          style={{ touchAction: (onChangeField || isInEditor) ? 'pan-y' : 'none', overscrollBehavior: (onChangeField || isInEditor) ? 'auto' : 'none' }}
         >
           <EnvelopeOpener 
             config={config} 
@@ -2796,11 +2866,12 @@ export default function InvitationRenderer({
             id="scratch-section" 
             className="py-12 px-4 sm:px-5 text-center w-full mx-auto rounded-3xl relative overflow-hidden"
             style={{
+              backgroundColor: config.scratchSectionBgColor || (config.scratchSectionBg && config.scratchSectionBg.startsWith('#') ? config.scratchSectionBg : undefined),
               backgroundImage: isVideoUrl(config.scratchSectionBgImage)
                 ? 'none'
                 : (config.scratchSectionBgImage 
                   ? `linear-gradient(${config.scratchSectionBgImageOverlayStart || 'rgba(5,7,13,0.7)'}, ${config.scratchSectionBgImageOverlayEnd || 'rgba(4,6,10,0.9)'}), url("${formatDriveDirectUrl(config.scratchSectionBgImage, "image")}")` 
-                  : (config.scratchSectionBg || 'linear-gradient(180deg, #05070D 0%, #09111D 45%, #04060A 100%)')),
+                  : (config.scratchSectionBgColor ? 'none' : (config.scratchSectionBg || 'linear-gradient(180deg, #05070D 0%, #09111D 45%, #04060A 100%)'))),
               backgroundSize: config.scratchSectionBgImageScale ? `${config.scratchSectionBgImageScale}%` : 'cover',
               backgroundPosition: `${config.scratchSectionBgImageXOffset ?? 50}% ${config.scratchSectionBgImageYOffset ?? 50}%`,
               opacity: config.scratchSectionBgImageOpacity !== undefined ? config.scratchSectionBgImageOpacity : 1,
@@ -2844,35 +2915,80 @@ export default function InvitationRenderer({
               background: `radial-gradient(ellipse at center top, ${config.scratchCardGlow || 'rgba(255,215,120,0.08)'}, transparent 70%)`
             }} />
             <div className="max-w-2xl mx-auto relative z-10">
-              {/* Gold Ornamental Subtitle */}
-              <div className="flex items-center justify-center gap-3 mb-3">
-                <span className="h-px flex-1 max-w-[60px]" style={{ background: 'linear-gradient(90deg, transparent, rgba(220,185,90,0.5))' }} />
-                <span className="text-[10px] sm:text-xs uppercase tracking-[0.3em] font-bold" style={{ color: config.scratchSubtitleColor || (isLightBackground ? '#8a2b3f' : '#C89B3C'), fontFamily: 'Cinzel, serif' }}>
-                  {config.scratchSubtitle || "An Exclusive Interactive Reveal"}
-                </span>
-                <span className="h-px flex-1 max-w-[60px]" style={{ background: 'linear-gradient(90deg, rgba(220,185,90,0.5), transparent)' }} />
-              </div>
+              {/* Gold Ornamental Subtitle (Eyebrow) */}
+              {config.showScratchSubtitle !== false && (
+                <div 
+                  className="flex items-center justify-center gap-3 mb-3 cursor-pointer group"
+                  onClick={(e) => { e.stopPropagation(); onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchSubtitle' }); }}
+                  style={{
+                    transform: `translate(${config.scratchSubtitleX || 0}px, ${config.scratchSubtitleY || 0}px)`,
+                    opacity: config.scratchSubtitleOpacity !== undefined ? config.scratchSubtitleOpacity : 1,
+                    justifyContent: config.scratchSubtitleAlign === 'left' ? 'flex-start' : config.scratchSubtitleAlign === 'right' ? 'flex-end' : 'center'
+                  }}
+                >
+                  <span className="h-px flex-1 max-w-[60px]" style={{ background: 'linear-gradient(90deg, transparent, rgba(220,185,90,0.5))' }} />
+                  <span 
+                    className={`transition-all ${config.scratchSubtitleFont || 'font-cinzel'} ${(!config.scratchSubtitleSize || typeof config.scratchSubtitleSize === 'string') ? (config.scratchSubtitleSize || 'text-[10px] sm:text-xs') : ''} ${config.scratchSubtitleWeight || 'font-bold'}`} 
+                    style={{ 
+                      color: config.scratchSubtitleColor || (isLightBackground ? '#8a2b3f' : '#C89B3C'),
+                      letterSpacing: config.scratchSubtitleTracking !== undefined ? `${config.scratchSubtitleTracking}em` : '0.3em',
+                      textTransform: config.scratchSubtitleTransform || 'uppercase',
+                      textAlign: config.scratchSubtitleAlign || 'center',
+                      lineHeight: config.scratchSubtitleLineHeight || 'normal',
+                      fontSize: (config.scratchSubtitleSize && !isNaN(Number(config.scratchSubtitleSize))) ? `${Number(config.scratchSubtitleSize)}px` : undefined,
+                      textShadow: config.scratchSubtitleShadowColor ? `0 ${config.scratchSubtitleShadowY || 1}px ${config.scratchSubtitleShadowBlur || 4}px ${config.scratchSubtitleShadowColor}` : undefined
+                    }}
+                  >
+                    {config.scratchSubtitle || config.scratchSubtitleText || "An Exclusive Interactive Reveal"}
+                  </span>
+                  <span className="h-px flex-1 max-w-[60px]" style={{ background: 'linear-gradient(90deg, rgba(220,185,90,0.5), transparent)' }} />
+                </div>
+              )}
 
-              {/* Main Heading */}
-              <h2 
-                className={`text-2xl sm:text-3xl md:text-4xl mb-4 ${config.headerFontClass || 'font-serif'}`}
-                style={{ 
-                  color: config.scratchHeadingColor || (isLightBackground ? '#1e293b' : '#F7E8C5'),
-                  textShadow: '0 2px 12px rgba(200,155,60,0.25)'
-                }}
-              >
-                {config.scratchHeading || "Our Secret Wedding Calendar"}
-              </h2>
+              {/* Main Heading: "Our Secret Wedding Calendar" */}
+              {config.showScratchHeading !== false && (
+                <h2 
+                  onClick={(e) => { e.stopPropagation(); onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchHeading' }); }}
+                  className={`mb-4 cursor-pointer group transition-all ${config.scratchHeadingFont || config.headerFontClass || 'font-serif'} ${(!config.scratchHeadingSize || typeof config.scratchHeadingSize === 'string') ? (config.scratchHeadingSize || 'text-2xl sm:text-3xl md:text-4xl') : ''} ${config.scratchHeadingWeight || 'font-normal'}`}
+                  style={{ 
+                    color: config.scratchHeadingColor || (isLightBackground ? '#1e293b' : '#F7E8C5'),
+                    fontSize: (config.scratchHeadingSize && !isNaN(Number(config.scratchHeadingSize))) ? `${Number(config.scratchHeadingSize)}px` : undefined,
+                    textTransform: config.scratchHeadingTransform || 'none',
+                    letterSpacing: config.scratchHeadingTracking !== undefined ? `${config.scratchHeadingTracking}em` : undefined,
+                    lineHeight: config.scratchHeadingLineHeight || '1.2',
+                    textAlign: config.scratchHeadingAlign || 'center',
+                    textShadow: config.scratchHeadingShadowColor ? `0 ${config.scratchHeadingShadowY || 2}px ${config.scratchHeadingShadowBlur || 12}px ${config.scratchHeadingShadowColor}` : '0 2px 12px rgba(200,155,60,0.25)',
+                    transform: `translate(${config.scratchHeadingX || 0}px, ${config.scratchHeadingY || 0}px)`,
+                    opacity: config.scratchHeadingOpacity !== undefined ? config.scratchHeadingOpacity : 1
+                  }}
+                >
+                  {config.scratchHeading || config.scratchHeadingText || "Our Secret Wedding Calendar"}
+                </h2>
+              )}
 
-              {/* Description */}
-              {!isPrintMode && (
-                <p className="text-xs sm:text-sm max-w-md mx-auto mb-5 leading-relaxed font-serif" style={{ color: config.scratchDescColor || (isLightBackground ? '#475569' : '#C8B78D') }}>
-                  We've kept the date a romantic surprise. Use your mouse or touchscreen to wipe off the gold metallic shield to discover the ceremony timings and live countdown!
+              {/* Surprise Romance Description */}
+              {!isPrintMode && config.showScratchDescription !== false && (
+                <p 
+                  onClick={(e) => { e.stopPropagation(); onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchDescription' }); }}
+                  className={`max-w-md mx-auto mb-5 leading-relaxed cursor-pointer group transition-all ${config.scratchDescriptionFont || config.scratchDescFont || 'font-serif'} ${(!config.scratchDescriptionSize || typeof config.scratchDescriptionSize === 'string') ? (config.scratchDescriptionSize || config.scratchDescSize || 'text-xs sm:text-sm') : ''} ${config.scratchDescriptionWeight || 'font-normal'}`} 
+                  style={{ 
+                    color: config.scratchDescriptionColor || config.scratchDescColor || (isLightBackground ? '#475569' : '#C8B78D'),
+                    fontSize: (config.scratchDescriptionSize && !isNaN(Number(config.scratchDescriptionSize))) ? `${Number(config.scratchDescriptionSize)}px` : undefined,
+                    textTransform: config.scratchDescriptionTransform || 'none',
+                    letterSpacing: config.scratchDescriptionTracking !== undefined ? `${config.scratchDescriptionTracking}em` : undefined,
+                    lineHeight: config.scratchDescriptionLineHeight || '1.6',
+                    textAlign: config.scratchDescriptionAlign || 'center',
+                    textShadow: config.scratchDescriptionShadowColor ? `0 ${config.scratchDescriptionShadowY || 1}px ${config.scratchDescriptionShadowBlur || 4}px ${config.scratchDescriptionShadowColor}` : undefined,
+                    transform: `translate(${config.scratchDescriptionX || 0}px, ${config.scratchDescriptionY || 0}px)`,
+                    opacity: config.scratchDescriptionOpacity !== undefined ? config.scratchDescriptionOpacity : 1
+                  }}
+                >
+                  {config.scratchDescription || config.scratchDesc || "We've kept the date a romantic surprise. Use your mouse or touchscreen to wipe off the gold metallic shield to discover the ceremony timings and live countdown!"}
                 </p>
               )}
 
-              {/* Premium Reveal & Reset Buttons */}
-              {!isPrintMode && (
+              {/* Premium Reveal Action Button */}
+              {!isPrintMode && config.showScratchRevealBtn !== false && (
                 <div className="mb-6 flex items-center justify-center gap-3 flex-wrap">
                   {!isScratchFinished ? (
                     <>
@@ -2887,17 +3003,26 @@ export default function InvitationRenderer({
                             triggerCelebration();
                           }
                         }}
-                        className="glass-btn-hover px-6 py-3 rounded-xl text-[10px] sm:text-xs tracking-wider font-bold flex items-center space-x-2 uppercase cursor-pointer transition-all duration-300 shadow-lg"
+                        className={`glass-btn-hover tracking-wider font-bold flex items-center space-x-2 cursor-pointer transition-all duration-300 shadow-lg ${config.scratchBtnFont || 'font-cinzel'} ${config.scratchBtnWeight || 'font-bold'}`}
                         style={{
                           background: config.scratchBtnBg || 'linear-gradient(180deg, #C89B3C, #9B7428)',
-                          color: config.scratchBtnText || '#05070D',
+                          color: config.scratchBtnTextColor || config.scratchBtnText || '#05070D',
                           border: `1px solid ${config.scratchBtnBorder || 'rgba(243,211,138,0.5)'}`,
-                          boxShadow: `0 4px 16px ${config.scratchBtnGlow || 'rgba(200,155,60,0.3)'}`,
-                          fontFamily: 'Cinzel, serif'
+                          boxShadow: `0 4px ${config.scratchBtnGlowBlur || 16}px ${config.scratchBtnGlow || 'rgba(200,155,60,0.3)'}`,
+                          borderRadius: config.scratchBtnRadius !== undefined ? `${config.scratchBtnRadius}px` : '12px',
+                          fontSize: (config.scratchBtnSize && !isNaN(Number(config.scratchBtnSize))) ? `${Number(config.scratchBtnSize)}px` : '11px',
+                          paddingLeft: config.scratchBtnPaddingX !== undefined ? `${config.scratchBtnPaddingX}px` : '24px',
+                          paddingRight: config.scratchBtnPaddingX !== undefined ? `${config.scratchBtnPaddingX}px` : '24px',
+                          paddingTop: config.scratchBtnPaddingY !== undefined ? `${config.scratchBtnPaddingY}px` : '12px',
+                          paddingBottom: config.scratchBtnPaddingY !== undefined ? `${config.scratchBtnPaddingY}px` : '12px',
+                          textTransform: config.scratchBtnTransform || 'uppercase',
+                          letterSpacing: config.scratchBtnTracking !== undefined ? `${config.scratchBtnTracking}em` : '0.1em',
+                          transform: `translate(${config.scratchBtnX || 0}px, ${config.scratchBtnY || 0}px)`,
+                          opacity: config.scratchBtnOpacity !== undefined ? config.scratchBtnOpacity : 1
                         }}
                       >
                         <SvgSparkles className="w-3.5 h-3.5" />
-                        <span>{config.revealEffect && config.revealEffect !== 'scratch' ? 'Play Reveal Animation' : 'Instant Reveal Calendar'}</span>
+                        <span>{config.scratchBtnText || config.scratchBtnLabel || (config.revealEffect && config.revealEffect !== 'scratch' ? 'Play Reveal Animation' : 'Instant Reveal Calendar')}</span>
                       </button>
                       {scratchedPercentage > 0 && (
                         <button
@@ -2983,7 +3108,7 @@ export default function InvitationRenderer({
                     style={{
                       border: `2px solid ${config.scratchCardBorder || 'rgba(220,185,90,0.45)'}`,
                       boxShadow: `0 12px 40px rgba(0,0,0,0.45), 0 0 35px ${config.scratchCardGlow || 'rgba(233,190,86,0.18)'}`,
-                      background: config.scratchCardBg || '#0D1322',
+                      background: config.scratchCardBg || config.scratchSectionBgColor || '#23152c',
                       ...shapeStyles,
                       isolation: 'isolate',
                       transformStyle: 'flat'
@@ -2998,11 +3123,12 @@ export default function InvitationRenderer({
                           ? 'none'
                           : (config.scratchCardBgImage 
                             ? `linear-gradient(${config.scratchCardBgImageOverlayStart || 'rgba(5,7,13,0.5)'}, ${config.scratchCardBgImageOverlayEnd || 'rgba(5,7,13,0.85)'}), url("${config.scratchCardBgImage}")` 
-                            : `linear-gradient(180deg, ${config.scratchCardBg || '#0D1322'}, #05070D)`),
+                            : (config.scratchCardBg ? `linear-gradient(180deg, ${config.scratchCardBg}, ${config.scratchCardBg})` : 'linear-gradient(180deg, #2b1738, #180e21)')),
                         backgroundSize: config.scratchCardBgImageScale ? `${config.scratchCardBgImageScale}%` : 'cover',
                         backgroundPosition: `${config.scratchCardBgImageXOffset ?? 50}% ${config.scratchCardBgImageYOffset ?? 50}%`,
                         opacity: config.scratchCardBgImageOpacity !== undefined ? config.scratchCardBgImageOpacity : (config.scratchCardOpacity !== undefined ? config.scratchCardOpacity : 1),
                         backdropFilter: config.scratchCardBlur ? `blur(${config.scratchCardBlur}px)` : undefined,
+                        WebkitBackdropFilter: config.scratchCardBlur ? `blur(${config.scratchCardBlur}px)` : undefined,
                         ...shapeStyles,
                         zIndex: 10
                       }}
@@ -3064,6 +3190,7 @@ export default function InvitationRenderer({
                           }}
                         />
                         {/* Title Bar with Gold Ornament */}
+                        {config.showScratchTitle !== false && (
                         <div 
                           onClick={(e) => { e.stopPropagation(); onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchTitle' }); }}
                           className="px-3 py-1.5 rounded-lg flex justify-center items-center gap-2 cursor-pointer hover:outline hover:outline-1 hover:outline-amber-500/50 transition-all select-none"
@@ -3089,17 +3216,30 @@ export default function InvitationRenderer({
                           </span>
                           <span className="h-px w-6 hidden sm:block" style={{ background: 'linear-gradient(90deg, rgba(220,185,90,0.5), transparent)' }} />
                         </div>
+                        )}
 
                         {/* Central Content Block */}
-                        <div 
-                          className="my-auto text-center space-y-2 py-3 px-3 rounded-xl my-2"
-                          style={{
-                            background: `rgba(13,19,34,0.65)`,
-                            border: `1px solid ${config.scratchCardBorder || 'rgba(220,185,90,0.25)'}`,
-                            backdropFilter: 'blur(8px)'
-                          }}
-                        >
+                        {(() => {
+                          const centralBlur = (config.scratchDateCountdownBlur !== undefined)
+                            ? config.scratchDateCountdownBlur
+                            : (config.scratchCentralBoxBlur !== undefined ? config.scratchCentralBoxBlur : 8);
+                          const blurCss = centralBlur === 0 ? 'none' : `blur(${centralBlur}px)`;
+                          const centralBg = config.scratchDateCountdownBg || config.scratchCentralBoxBg || 'rgba(13,19,34,0.65)';
+                          const centralBorder = config.scratchDateCountdownBorder || config.scratchCentralBoxBorder || config.scratchCardBorder || 'rgba(220,185,90,0.25)';
+                          return (
+                            <div 
+                              id="scratch-central-content-block"
+                              onClick={(e) => { e.stopPropagation(); onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchDateCountdown' }); }}
+                              className="my-auto text-center space-y-2 py-3 px-3 rounded-xl my-2 cursor-pointer hover:ring-1 hover:ring-amber-500/40 transition-all select-none"
+                              style={{
+                                background: centralBg,
+                                border: `1px solid ${centralBorder}`,
+                                backdropFilter: blurCss,
+                                WebkitBackdropFilter: blurCss
+                              }}
+                            >
                           {/* Couple Names */}
+                          {config.showScratchCouple !== false && (
                           <span 
                             onClick={(e) => { e.stopPropagation(); onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchCoupleText' }); }}
                             className={`text-2xl sm:text-3xl block cursor-pointer hover:outline hover:outline-1 hover:outline-amber-500/50 rounded transition-all select-none ${config.scratchCoupleTextFont || config.scratchCoupleFont || config.cursiveFontClass || 'font-cursive'} ${config.scratchCoupleTextSize || config.scratchCoupleSize || ''}`} 
@@ -3115,9 +3255,11 @@ export default function InvitationRenderer({
                           >
                             {config.scratchCoupleText || `${config.brideName} & ${config.groomName}`}
                           </span>
+                          )}
                           
                           {/* Wedding Date */}
                           <div className="py-1">
+                            {config.showScratchMarriedLabel !== false && (
                             <p 
                               onClick={(e) => { e.stopPropagation(); onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchMarriedLabel' }); }}
                               className={`tracking-wider uppercase cursor-pointer hover:text-amber-300 transition-all select-none ${config.scratchMarriedLabelFont || config.scratchMarriedLabelTextFont || 'font-sans'} ${config.scratchMarriedLabelSize || config.scratchMarriedLabelTextSize || 'text-[9px] sm:text-[10px]'}`}
@@ -3131,6 +3273,8 @@ export default function InvitationRenderer({
                             >
                               {config.scratchMarriedLabel || "Are getting married on"}
                             </p>
+                            )}
+                            {config.showScratchDate !== false && (
                             <p 
                               onClick={(e) => { e.stopPropagation(); onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchDateText' }); }}
                               className={`font-bold tracking-wide uppercase px-2 mt-1 cursor-pointer hover:outline hover:outline-1 hover:outline-amber-500/50 rounded transition-all select-none ${config.scratchDateTextFont || config.scratchDateFont || 'font-cinzel'} ${config.scratchDateTextSize || config.scratchDateSize || 'text-lg sm:text-xl'}`}
@@ -3145,8 +3289,11 @@ export default function InvitationRenderer({
                             >
                               {config.scratchDateText ? formatWeddingDateDmy(config.scratchDateText) : formatWeddingDateDmy(config.weddingDate)}
                             </p>
+                            )}
                           </div>
 
+                          {config.showScratchCountdown !== false && (
+                          <>
                           {/* Countdown Label */}
                           <div 
                             onClick={(e) => { e.stopPropagation(); onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchCountdownLabel' }); }}
@@ -3187,7 +3334,9 @@ export default function InvitationRenderer({
                                   style={{
                                     background: config.scratchCountdownBoxBg || '#121827',
                                     border: `1.5px solid ${config.scratchCountdownBoxBorder || 'rgba(220,185,90,0.4)'}`,
-                                    boxShadow: `inset 0 1px 3px rgba(0,0,0,0.3), 0 0 12px ${config.scratchCardGlow || 'rgba(233,190,86,0.08)'}`
+                                    boxShadow: `inset 0 1px 3px rgba(0,0,0,0.3), 0 0 12px ${config.scratchCardGlow || 'rgba(233,190,86,0.08)'}`,
+                                    backdropFilter: config.scratchCountdownBoxBlur ? `blur(${config.scratchCountdownBoxBlur}px)` : undefined,
+                                    WebkitBackdropFilter: config.scratchCountdownBoxBlur ? `blur(${config.scratchCountdownBoxBlur}px)` : undefined
                                   }}
                                 >
                                   <span 
@@ -3205,9 +3354,14 @@ export default function InvitationRenderer({
                               ))}
                             </div>
                           )}
+                          </>
+                          )}
                         </div>
+                          );
+                        })()}
 
                         {/* Secret Message */}
+                        {config.showScratchSecretMessage !== false && (
                         <div 
                           onClick={(e) => { e.stopPropagation(); onSelectElement && onSelectElement({ tabId: 'scratch', field: 'scratchSecretMessage' }); }}
                           className="rounded-lg px-3.5 py-2 mt-1 shrink-0 cursor-pointer hover:border-amber-500/60 transition-all select-none"
@@ -3216,7 +3370,19 @@ export default function InvitationRenderer({
                             borderLeft: `3px solid ${config.scratchMsgBorderColor || 'rgba(200,155,60,0.45)'}`,
                             border: `1px solid rgba(220,185,90,0.2)`,
                             transform: (config.scratchSecretMessageYOffset || config.scratchSecretMessageTextYOffset) ? `translateY(${config.scratchSecretMessageYOffset || config.scratchSecretMessageTextYOffset}px)` : undefined,
-                            opacity: (config.scratchSecretMessageOpacity !== undefined ? config.scratchSecretMessageOpacity : config.scratchSecretMessageTextOpacity) !== undefined ? (config.scratchSecretMessageOpacity !== undefined ? config.scratchSecretMessageOpacity : config.scratchSecretMessageTextOpacity) : 1,
+                            opacity: (() => {
+                              const baseOpacity = (config.scratchSecretMessageOpacity !== undefined ? config.scratchSecretMessageOpacity : config.scratchSecretMessageTextOpacity) !== undefined ? (config.scratchSecretMessageOpacity !== undefined ? config.scratchSecretMessageOpacity : config.scratchSecretMessageTextOpacity) : 1;
+                              const revealMode = config.scratchSecretMsgRevealMode || 'progressive';
+                              if (revealMode === 'immediate' || isScratchFinished) return baseOpacity;
+                              if (revealMode === 'threshold') {
+                                const th = ((config.scratchCompletionThreshold !== undefined && config.scratchCompletionThreshold !== null) ? Number(config.scratchCompletionThreshold) : 40);
+                                return (scratchedPercentage >= th) ? baseOpacity : 0.08;
+                              }
+                              // 'progressive': progressively reveal as user wipes
+                              const th = ((config.scratchCompletionThreshold !== undefined && config.scratchCompletionThreshold !== null) ? Number(config.scratchCompletionThreshold) : 40);
+                              const progressRatio = Math.min(1, Math.max(0.12, (scratchedPercentage / Math.max(1, th))));
+                              return baseOpacity * progressRatio;
+                            })(),
                             filter: (config.scratchSecretMessageGlow !== undefined ? config.scratchSecretMessageGlow : config.scratchSecretMessageTextGlow) !== undefined ? `brightness(${config.scratchSecretMessageGlow !== undefined ? config.scratchSecretMessageGlow : config.scratchSecretMessageTextGlow}%)` : undefined
                           }}
                         >
@@ -3230,6 +3396,7 @@ export default function InvitationRenderer({
                             "{config.scratchSecretMessage || "We have booked a private stargazing toast after the reception! Make sure to grab a custom lantern at the main exit."}"
                           </p>
                         </div>
+                        )}
                     </div>
 
                     {/* Cover Canvas with Synchronized Shape — ALWAYS ON TOP OF ALL MATERIALS */}
@@ -3256,6 +3423,8 @@ export default function InvitationRenderer({
                         scratchShieldBadgeWidth={config.scratchShieldBadgeWidth}
                         scratchShieldBadgeHeight={config.scratchShieldBadgeHeight}
                         scratchShieldBadgeRadius={config.scratchShieldBadgeRadius}
+                        scratchCompletionThreshold={config.scratchCompletionThreshold}
+                        scratchBrushSize={config.scratchBrushSize}
                       />
                     )}
 
@@ -4185,8 +4354,20 @@ export default function InvitationRenderer({
                             className="absolute w-full h-full flex flex-col items-center justify-center select-none"
                             style={slideStyle}
                           >
-                            <div className={`overflow-hidden relative w-full h-full transition-all duration-700 ${frameClasses}`}>
-                              {config.gallerySlideEffect === 'parallax' ? (
+                            <div 
+                              className={`overflow-hidden relative w-full h-full transition-all duration-700 ${frameClasses}`}
+                              style={config.galleryFrameColor ? { borderColor: config.galleryFrameColor, ringColor: config.galleryFrameColor, outlineColor: config.galleryFrameColor } : undefined}
+                            >
+                              {isVideoUrl(imgUrl) ? (
+                                <video 
+                                  src={imgUrl}
+                                  autoPlay
+                                  loop
+                                  muted
+                                  playsInline
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : config.gallerySlideEffect === 'parallax' ? (
                                 <img 
                                   src={imgUrl} 
                                   alt={caption || `Gallery ${idx}`}

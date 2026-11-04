@@ -341,6 +341,11 @@ export default function PresetGallery() {
                     {cfg.customSacredSymbol || '✦'}
                   </span>
                   <div className="flex items-center space-x-1.5">
+                    {!preset.hidePrice && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full font-black tracking-wider bg-amber-500 text-slate-950 shadow-md">
+                        ₹{Math.round((preset.price || cfg.price || 999) * (1 - (preset.discountPercent !== undefined ? preset.discountPercent : (cfg.discountPercent !== undefined ? cfg.discountPercent : 30)) / 100))}
+                      </span>
+                    )}
                     <span 
                       className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider backdrop-blur-md shadow"
                       style={{
@@ -421,6 +426,39 @@ export default function PresetGallery() {
                   <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 font-extrabold border border-amber-500/25 uppercase tracking-wider">
                     {preset.religion || 'Secular'}
                   </span>
+                </div>
+
+                {/* Official Price Tag with Selling Price, Strikethrough MRP & Discount % */}
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between shadow-xs">
+                  {!preset.hidePrice ? (
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs line-through text-slate-400 font-mono">
+                        ₹{preset.price || cfg.price || 999}
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">
+                        {preset.discountPercent !== undefined ? preset.discountPercent : (cfg.discountPercent !== undefined ? cfg.discountPercent : 30)}% OFF
+                      </span>
+                      <span className="text-sm font-black text-amber-600 dark:text-amber-300 font-mono">
+                        ₹{Math.round((preset.price || cfg.price || 999) * (1 - (preset.discountPercent !== undefined ? preset.discountPercent : (cfg.discountPercent !== undefined ? cfg.discountPercent : 30)) / 100))}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-slate-400 italic">Price: Contact for pricing</span>
+                  )}
+
+                  {currentUser?.role === 'admin' && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        dbStore.updatePreset(preset.id, { hidePrice: !preset.hidePrice });
+                        showToast(preset.hidePrice ? "Price tag is now visible on preset cards" : "Price tag hidden on preset cards", "info");
+                      }}
+                      className="px-2 py-0.5 rounded text-[9px] font-bold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
+                      title={preset.hidePrice ? "Unhide price" : "Hide price"}
+                    >
+                      {preset.hidePrice ? "👁 Unhide" : "🚫 Hide"}
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-2 pt-1">

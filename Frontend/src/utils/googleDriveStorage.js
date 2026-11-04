@@ -12,15 +12,74 @@ export const GOOGLE_DRIVE_ROOT_FOLDER_URL =
   env.VITE_GOOGLE_DRIVE_FOLDER_URL || 
   `https://drive.google.com/drive/folders/${GOOGLE_DRIVE_ROOT_FOLDER_ID}?usp=drive_link`;
 
-export const GOOGLE_DRIVE_API_KEY = 
-  env.VITE_GOOGLE_DRIVE_API_KEY || "AIzaSyDQTB_jBNM85-QwmJtVSfxne1V4BmoOe6Y";
-
-export const GOOGLE_DRIVE_CLIENT_ID = 
-  env.VITE_GOOGLE_DRIVE_CLIENT_ID || "481414834690-smumepc6si7n9qcrqs559e5rqv405d9v.apps.googleusercontent.com";
-
 // Designated Google Drive Owner Account - strictly sync all Drive assets to this account
-export const GOOGLE_DRIVE_OWNER_EMAIL = 
-  env.VITE_GOOGLE_DRIVE_OWNER_EMAIL || "snierxgameplay@gmail.com";
+export const GOOGLE_DRIVE_OWNER_EMAIL = "snierxgameplay@gmail.com";
+
+export function getDriveClientId() {
+  const custom = typeof localStorage !== "undefined" ? localStorage.getItem("google_drive_client_id") : null;
+  if (custom && custom.trim() && !custom.includes("481414834690")) return custom.trim();
+  const envVal = env.VITE_GOOGLE_DRIVE_CLIENT_ID || "";
+  if (envVal && !envVal.includes("481414834690")) return envVal.trim();
+  return "";
+}
+
+export function setDriveClientId(clientId) {
+  if (typeof localStorage !== "undefined") {
+    if (clientId && clientId.trim() && !clientId.includes("481414834690")) {
+      localStorage.setItem("google_drive_client_id", clientId.trim());
+    } else {
+      localStorage.removeItem("google_drive_client_id");
+    }
+  }
+}
+
+export function getDriveApiKey() {
+  const custom = typeof localStorage !== "undefined" ? localStorage.getItem("google_drive_api_key") : null;
+  if (custom && custom.trim() && !custom.includes("AIzaSyDQTB")) return custom.trim();
+  const envVal = env.VITE_GOOGLE_DRIVE_API_KEY || "";
+  if (envVal && !envVal.includes("AIzaSyDQTB")) return envVal.trim();
+  return "";
+}
+
+export function setDriveApiKey(apiKey) {
+  if (typeof localStorage !== "undefined") {
+    if (apiKey && apiKey.trim() && !apiKey.includes("AIzaSyDQTB")) {
+      localStorage.setItem("google_drive_api_key", apiKey.trim());
+    } else {
+      localStorage.removeItem("google_drive_api_key");
+    }
+  }
+}
+
+export function clearGoogleDriveAuth() {
+  if (typeof sessionStorage !== "undefined") {
+    sessionStorage.removeItem("gdrive_oauth_token");
+    sessionStorage.removeItem("gdrive_oauth_expires_at");
+  }
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem("gdrive_oauth_token");
+    localStorage.removeItem("gdrive_oauth_expires_at");
+    const storedClient = localStorage.getItem("google_drive_client_id");
+    if (storedClient && (storedClient.includes("481414834690") || storedClient.includes("drawdstory"))) {
+      localStorage.removeItem("google_drive_client_id");
+    }
+  }
+}
+
+// Purge any stale drawdstoryofficial credentials on initialization
+if (typeof localStorage !== "undefined") {
+  const storedClient = localStorage.getItem("google_drive_client_id");
+  if (storedClient && (storedClient.includes("481414834690") || storedClient.includes("drawdstory"))) {
+    localStorage.removeItem("google_drive_client_id");
+  }
+  const storedApi = localStorage.getItem("google_drive_api_key");
+  if (storedApi && storedApi.includes("AIzaSyDQTB")) {
+    localStorage.removeItem("google_drive_api_key");
+  }
+}
+
+export const GOOGLE_DRIVE_API_KEY = getDriveApiKey();
+export const GOOGLE_DRIVE_CLIENT_ID = getDriveClientId();
 
 /**
  * Get active stored OAuth access token
@@ -45,6 +104,15 @@ export function getStoredOAuthToken() {
  */
 export function requestGoogleDriveAuth() {
   return new Promise((resolve, reject) => {
+    const clientId = getDriveClientId();
+    if (!clientId) {
+      return reject(new Error(
+        `Google Drive Client ID is not configured for ${GOOGLE_DRIVE_OWNER_EMAIL}.\n` +
+        `Please enter your Google Cloud OAuth Client ID in Admin Dashboard -> Google Drive tab, ` +
+        `or use the 1-Click Apps Script Webhook for ${GOOGLE_DRIVE_OWNER_EMAIL} (which requires zero OAuth setup!).`
+      ));
+    }
+
     if (typeof window === "undefined" || !window.google?.accounts?.oauth2) {
       return reject(new Error("Google Identity Services script is still loading. Please wait 2 seconds and try again."));
     }
@@ -55,13 +123,26 @@ export function requestGoogleDriveAuth() {
         isSettled = true;
         reject(new Error("Google Drive authorization timed out or popup was closed/blocked."));
       }
-    }, 30000);
+    }, 45000);
 
     try {
       const client = window.google.accounts.oauth2.initTokenClient({
-        client_id: GOOGLE_DRIVE_CLIENT_ID,
+        client_id: clientId,
         scope: "https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive",
         hint: GOOGLE_DRIVE_OWNER_EMAIL,
+        prompt: "select_account",
+        error_callback: (err) => {
+          if (isSettled) return;
+          isSettled = true;
+          clearTimeout(timeoutId);
+          if (err && (err.type === "popup_closed" || err.type === "user_closed")) {
+            reject(new Error("Google sign-in popup was closed before completing authorization."));
+          } else if (err && err.type === "popup_blocked_by_browser") {
+            reject(new Error("Google sign-in popup was blocked by browser. Please allow popups for localhost:5173."));
+          } else {
+            reject(new Error(err?.message || err?.type || "Google authorization failed."));
+          }
+        },
         callback: async (tokenResponse) => {
           if (isSettled) return;
 
@@ -461,12 +542,14 @@ export async function transferInvitationToGoogleDriveOAuth({ invitation, token, 
   const folderName = formatDriveFolderName(config, invitation.title);
 
   if (onProgress) onProgress({ message: `Creating or finding Drive folder: "${folderName}"...`, percent: 20 });
-  const folder = await getOrCreateDriveFolderOAuth(folderName, GOOGLE_DRIVE_ROOT_FOLDER_ID, authToken);
+  const categoryFolderName = getCategoryFolderName(config, invitation);
+  const categoryFolder = await getOrCreateDriveFolderOAuth(categoryFolderName, GOOGLE_DRIVE_ROOT_FOLDER_ID, authToken);
+  const folder = await getOrCreateDriveFolderOAuth(folderName, categoryFolder.id, authToken);
 
   // 2. Identify all media fields to upload
   const MEDIA_FIELDS = [
-    "heroImage", "storyImage", "scratchSectionBgImage", "scratchImage",
-    "customSacredSymbolImg", "envelopeWaxSealImg", "envelopeSymbolImg", "envelopeBgImage",
+    "heroImage", "storyImage", "scratchSectionBgImage", "scratchImage", "scratchCardBgImage", "scratchCardBgVideo",
+    "customSacredSymbolImg", "envelopeWaxSealImg", "envelopeSymbolImg", "envelopeBgImage", "envelopeBgVideo", "envelopeBackdropImage", "envelopeBackdropVideo", "envelopeNameBgImage", "envelopeNameBgVideo",
     "galleryImage1", "galleryImage2", "galleryImage3", "galleryImage4", "galleryImage5",
     "galleryImage6", "galleryImage7", "galleryImage8", "galleryImage9", "galleryImage10",
     "startingMusicUrl", "musicUrl"
@@ -714,7 +797,7 @@ export function formatDriveDirectUrl(url, type = "image") {
     }
     return trimmed;
   }
-  return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w2560`;
 }
 
 /**
@@ -745,7 +828,7 @@ export function getDriveDirectFileUrl(fileId, mimeType = "") {
   if (isAudio) {
     return `https://drive.google.com/uc?export=download&id=${fileId}`;
   }
-  return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w2560`;
 }
 
 /**
@@ -782,8 +865,8 @@ export async function syncInvitationMediaFromDrive(invitation) {
     const directUrl = getDriveDirectFileUrl(file.id, file.mimeType);
 
     const candidateKeys = [
-      "heroImage", "storyImage", "scratchSectionBgImage", "scratchImage",
-      "customSacredSymbolImg", "envelopeWaxSealImg", "envelopeSymbolImg", "envelopeBgImage",
+      "heroImage", "storyImage", "scratchSectionBgImage", "scratchImage", "scratchCardBgImage", "scratchCardBgVideo",
+      "customSacredSymbolImg", "envelopeWaxSealImg", "envelopeSymbolImg", "envelopeBgImage", "envelopeBgVideo", "envelopeBackdropImage", "envelopeBackdropVideo", "envelopeNameBgImage", "envelopeNameBgVideo",
       "galleryImage1", "galleryImage2", "galleryImage3", "galleryImage4", "galleryImage5",
       "galleryImage6", "galleryImage7", "galleryImage8", "galleryImage9", "galleryImage10",
       "startingMusicUrl", "musicUrl"
@@ -870,6 +953,36 @@ export function formatDriveFolderName(config = {}, fallbackTitle = "") {
 /**
  * Get active Webhook URL (from .env or localStorage configuration)
  */
+/**
+ * Determine Sacred / Category Folder Name according to invitation type & religion
+ * Hierarchy: Root Folder (DS_Envite_DataCentre) -> Sacred / Category Folder -> Hero Couple / Hero Name Folder
+ */
+export function getCategoryFolderName(config = {}, invitation = {}) {
+  const religion = (config.religionKey || config.religion || "").toLowerCase().trim();
+  const eventType = (config.eventType || invitation.eventType || config.category || "").toLowerCase().trim();
+  const title = (invitation.title || config.title || "").toLowerCase();
+
+  // 1. Religion / Sacred Categories
+  if (religion === "hindu") return "Hindu";
+  if (religion === "muslim" || religion === "islamic") return "Muslim";
+  if (religion === "christian") return "Christian";
+  if (religion === "sikh" || religion === "sikhism") return "Sikhism";
+  if (religion === "jain") return "Jain";
+  if (religion === "buddhist") return "Buddhist";
+  if (religion === "jewish") return "Jewish";
+
+  // 2. Specific Event Types
+  if (eventType === "birthday" || eventType === "birthday_invite" || title.includes("birthday")) return "Birthday Invitation";
+  if (eventType === "naming" || eventType === "naming_ceremony" || title.includes("naming")) return "Naming Ceremony";
+  if (eventType === "anniversary" || title.includes("anniversary")) return "Anniversary";
+  if (eventType === "baby_shower" || title.includes("baby shower")) return "Baby Shower";
+  if (eventType === "theme" || eventType === "kids" || eventType === "superhero" || config.heroCharacter) return "Theme & Superhero";
+
+  // 3. Secular & General
+  if (religion === "secular") return "Secular";
+  return "General Invitations";
+}
+
 export function getDriveWebhookUrl() {
   return env.VITE_GOOGLE_DRIVE_WEBHOOK_URL || (typeof localStorage !== "undefined" ? localStorage.getItem("google_drive_webhook_url") : "") || "";
 }
@@ -890,14 +1003,22 @@ export function setDriveWebhookUrl(url) {
  */
 export async function syncDriveFolder({ invitation, oldFolderName, customFolderName = null, token = null }) {
   if (!invitation) return null;
+
+  // RULE: Paid invitations MUST NEVER be modified or touched in Google Drive
+  if (invitation.isPaid && invitation.driveStorage?.folderId) {
+    return invitation.driveStorage;
+  }
+
   const config = invitation.config || {};
   const expectedFolderName = customFolderName || invitation.driveStorage?.folderName || formatDriveFolderName(config, invitation.title);
+  const categoryName = getCategoryFolderName(config, invitation);
   const webhookUrl = getDriveWebhookUrl();
   const authToken = token || getStoredOAuthToken();
 
   const folderState = {
     rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
     rootFolderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
+    categoryName,
     folderName: expectedFolderName,
     folderId: invitation.driveStorage?.folderId || null,
     folderUrl: invitation.driveStorage?.folderUrl || `${GOOGLE_DRIVE_ROOT_FOLDER_URL}`,
@@ -915,6 +1036,7 @@ export async function syncDriveFolder({ invitation, oldFolderName, customFolderN
         body: JSON.stringify({
           action: "syncFolder",
           rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
+          categoryName,
           folderName: expectedFolderName,
           folderId: invitation.driveStorage?.folderId || null,
           invitationId: invitation.id,
@@ -959,9 +1081,20 @@ export async function syncDriveFolder({ invitation, oldFolderName, customFolderN
         } catch (e) {}
       }
 
-      // If folder does not have folderId, create it in ROOT_FOLDER_ID
+      // If folder does not have folderId, create it inside Sacred / Category Folder
       if (!folderState.folderId) {
-        const folder = await getOrCreateDriveFolderOAuth(expectedFolderName, GOOGLE_DRIVE_ROOT_FOLDER_ID, authToken);
+        let parentFolderId = GOOGLE_DRIVE_ROOT_FOLDER_ID;
+        try {
+          const catFolder = await getOrCreateDriveFolderOAuth(categoryName, GOOGLE_DRIVE_ROOT_FOLDER_ID, authToken);
+          if (catFolder && catFolder.id) {
+            parentFolderId = catFolder.id;
+            folderState.categoryFolderId = catFolder.id;
+          }
+        } catch(e) {
+          console.warn("Category folder creation fallback to root:", e);
+        }
+
+        const folder = await getOrCreateDriveFolderOAuth(expectedFolderName, parentFolderId, authToken);
         if (folder && folder.id) {
           folderState.folderId = folder.id;
           folderState.folderUrl = folder.webViewLink || `https://drive.google.com/drive/folders/${folder.id}`;
@@ -1086,7 +1219,9 @@ export async function uploadInvitationFileToDrive({
         if (found) {
           targetFolderId = found.id;
         } else {
-          const f = await getOrCreateDriveFolderOAuth(folderName, GOOGLE_DRIVE_ROOT_FOLDER_ID, oauthToken);
+          const categoryFolderName = getCategoryFolderName(config, invitation);
+          const categoryFolder = await getOrCreateDriveFolderOAuth(categoryFolderName, GOOGLE_DRIVE_ROOT_FOLDER_ID, oauthToken);
+          const f = await getOrCreateDriveFolderOAuth(folderName, categoryFolder.id, oauthToken);
           targetFolderId = f.id;
         }
       }
@@ -1215,6 +1350,7 @@ export async function uploadInvitationFileToDrive({
           rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
           folderId: invitation?.driveStorage?.folderId || null,
           folderName: folderName,
+          categoryName: getCategoryFolderName(config, invitation),
           fileName: fileName,
           previousFileId: previousFileId || null,
           mimeType: file.type || (isVideo ? "video/mp4" : isAudio ? "audio/mpeg" : "image/jpeg"),
@@ -1702,9 +1838,13 @@ function doPost(e) {
     var action = contents.action;
     var root = DriveApp.getFolderById(contents.rootFolderId || ROOT_FOLDER_ID);
     
-    // ACTION 1: Create or automatically rename folder
+    // ACTION 1: Create or automatically rename folder with Sacred/Category Hierarchy
     if (action === "syncFolder") {
       var folderName = contents.folderName;
+      var parentFolder = root;
+      if (contents.categoryName) {
+        parentFolder = getOrCreateFolderByName(root, contents.categoryName);
+      }
       var folder;
       
       if (contents.folderId) {
@@ -1714,10 +1854,10 @@ function doPost(e) {
             folder.setName(folderName);
           }
         } catch(err) {
-          folder = getOrCreateFolderByName(root, folderName);
+          folder = getOrCreateFolderByName(parentFolder, folderName);
         }
       } else {
-        folder = getOrCreateFolderByName(root, folderName);
+        folder = getOrCreateFolderByName(parentFolder, folderName);
       }
       
       // Ensure anyone with link can view files

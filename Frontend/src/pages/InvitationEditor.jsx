@@ -478,7 +478,7 @@ export default function InvitationEditor() {
       {/* Collapsible Customization Sidebar Panel */}
       <div 
         id="admin-sidebar"
-        className={`admin-sidebar border-slate-800 transition-all duration-300 shrink-0 z-10 order-last md:order-first flex flex-col min-h-0 overflow-hidden ${
+        className={`admin-sidebar border-slate-800 transition-all duration-300 shrink-0 z-30 order-last md:order-first flex flex-col min-h-0 overflow-hidden ${
           sidebarOpen 
             ? `w-full ${
                 mobilePanelMode === 'expanded' 

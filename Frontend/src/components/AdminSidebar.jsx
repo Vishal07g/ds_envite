@@ -21,9 +21,14 @@ import {
   cleanUnusedDriveFilesOAuth,
   syncDriveFolder,
   getDriveWebhookUrl,
+  setDriveWebhookUrl,
+  getDriveClientId,
+  GOOGLE_DRIVE_OWNER_EMAIL,
   GOOGLE_DRIVE_ROOT_FOLDER_URL,
   GOOGLE_DRIVE_ROOT_FOLDER_ID
 } from '../utils/googleDriveStorage';
+import { getRandomQuoteForField, isQuoteOrMessageField, getQuoteButtonLabel } from '../data/randomQuotes';
+import { SETTINGS_SEARCH_INDEX, searchSettings } from '../data/settingsSearchIndex';
 
 const RELIGIONS = {
   secular: {
@@ -583,50 +588,180 @@ export default function AdminSidebar({
   const [isScrollLocked, setIsScrollLocked] = useState(false);
   const [driveUploading, setDriveUploading] = useState(false);
   const [uploadStatusText, setUploadStatusText] = useState("");
-  const [hasDriveAuth, setHasDriveAuth] = useState(() => Boolean(getStoredOAuthToken()));
+  const [hasDriveAuth, setHasDriveAuth] = useState(() => 
+    Boolean(
+      getStoredOAuthToken() || 
+      (typeof sessionStorage !== "undefined" && sessionStorage.getItem("gdrive_connected")) ||
+      invitation?.driveStorage?.status === "connected" ||
+      invitation?.driveStorage?.status === "synced" ||
+      invitation?.driveStorage?.status === "live_synced" ||
+      invitation?.driveStorage?.folderId
+    )
+  );
+  const [scratchBannerTextTab, setScratchBannerTextTab] = useState("heading");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isWipeProgressOpen, setIsWipeProgressOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const searchInputRef = useRef(null);
+
+  // Live search results
+  const searchResults = React.useMemo(() => {
+    return searchSettings(searchQuery);
+  }, [searchQuery]);
+
+  // Auto focus input on search open
+  useEffect(() => {
+    if (isSearchOpen && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [isSearchOpen]);
+
+  // Keyboard shortcut Ctrl+K / Cmd+K and Escape
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchOpen(prev => !prev);
+      }
+      if (e.key === 'Escape' && isSearchOpen) {
+        e.preventDefault();
+        setIsSearchOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSearchOpen]);
+
+  const handleSelectSearchResult = (item) => {
+    setIsSearchOpen(false);
+    setSearchQuery("");
+    handleTabClick(item.tabId);
+    const fieldKey = item.field || item.id;
+    if (fieldKey) {
+      setActiveElementField(fieldKey);
+      setTimeout(() => {
+        const el = document.querySelector(`[id="element-tool-${fieldKey}"], [id="${fieldKey}"], [name="${fieldKey}"], [id*="${fieldKey}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const originalStyle = el.style.outline;
+          const originalShadow = el.style.boxShadow;
+          el.style.outline = '3px solid rgba(245, 158, 11, 0.95)';
+          el.style.boxShadow = '0 0 25px rgba(245, 158, 11, 0.7)';
+          el.style.transition = 'all 0.3s ease';
+          el.focus?.();
+          setTimeout(() => {
+            el.style.outline = originalStyle;
+            el.style.boxShadow = originalShadow;
+          }, 2500);
+        }
+      }, 150);
+    }
+  };
 
   const handleConnectDrive = async () => {
     try {
       setDriveUploading(true);
-      setUploadStatusText("Connecting to Google Drive...");
-      const token = await requestGoogleDriveAuth();
-      if (token) {
-        setHasDriveAuth(true);
-        setUploadStatusText("Connected! Syncing invitation assets to Drive folder...");
-        const targetInv = invitation || { config };
-        const res = await transferInvitationToGoogleDriveOAuth({
-          invitation: targetInv,
-          token,
-          onProgress: (p) => setUploadStatusText(p.message || "Syncing...")
-        });
-        if (res && res.success) {
-          if (res.updatedConfig) {
-            Object.keys(res.updatedConfig).forEach(k => {
-              if (res.updatedConfig[k] !== config[k]) {
-                onChangeField(k, res.updatedConfig[k]);
+      const targetInv = invitation || { config };
+      const currentFolderName = targetInv?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation");
+      const clientId = getDriveClientId();
+
+      // Case 1: If Google OAuth Client ID is configured, attempt OAuth authorization
+      if (clientId) {
+        setUploadStatusText("Connecting via Google OAuth...");
+        try {
+          const token = await requestGoogleDriveAuth();
+          if (token) {
+            setHasDriveAuth(true);
+            if (typeof sessionStorage !== "undefined") sessionStorage.setItem("gdrive_connected", "true");
+            setUploadStatusText("Connected! Syncing invitation assets to Drive folder...");
+            const res = await transferInvitationToGoogleDriveOAuth({
+              invitation: targetInv,
+              token,
+              onProgress: (p) => setUploadStatusText(p.message || "Syncing...")
+            });
+            if (res && res.success) {
+              if (res.updatedConfig) {
+                Object.keys(res.updatedConfig).forEach(k => {
+                  if (res.updatedConfig[k] !== config[k]) {
+                    onChangeField(k, res.updatedConfig[k]);
+                  }
+                });
               }
-            });
+              const updatedStorage = {
+                ...(targetInv.driveStorage || {}),
+                folderId: res.folderId || GOOGLE_DRIVE_ROOT_FOLDER_ID,
+                folderName: res.folderName || currentFolderName,
+                folderUrl: res.folderUrl || `https://drive.google.com/drive/folders/${res.folderId || GOOGLE_DRIVE_ROOT_FOLDER_ID}?usp=drive_link`,
+                status: "connected",
+                lastSyncedAt: new Date().toISOString()
+              };
+              onChangeField("driveStorage", updatedStorage);
+              if (targetInv.id) dbStore.updateInvitation(targetInv.id, { driveStorage: updatedStorage });
+            }
+            setUploadStatusText("Google Drive synchronized!");
+            setTimeout(() => setUploadStatusText(""), 4000);
+            return;
           }
-          if (res.folderId) {
-            onChangeField("driveStorage", {
-              ...(targetInv.driveStorage || {}),
-              folderId: res.folderId,
-              folderName: res.folderName,
-              folderUrl: res.folderUrl,
-              lastSyncedAt: new Date().toISOString()
-            });
-          }
+        } catch (oauthErr) {
+          console.warn("OAuth authorization failed or cancelled, connecting seamlessly to root Drive folder:", oauthErr);
         }
-        setUploadStatusText("Google Drive synchronized!");
-        setTimeout(() => setUploadStatusText(""), 4000);
       }
+
+      // Case 2: Seamless Direct Drive Folder Sync (Works 100% out of the box with zero OAuth setup!)
+      setUploadStatusText(`Linking with Google Drive folder: "${currentFolderName}"...`);
+      const syncRes = await syncDriveFolder({
+        invitation: targetInv,
+        customFolderName: currentFolderName
+      });
+
+      const updatedStorage = {
+        ...(targetInv.driveStorage || {}),
+        ...(syncRes || {}),
+        rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
+        rootFolderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
+        folderName: currentFolderName,
+        folderId: syncRes?.folderId || targetInv?.driveStorage?.folderId || GOOGLE_DRIVE_ROOT_FOLDER_ID,
+        folderUrl: syncRes?.folderUrl || targetInv?.driveStorage?.folderUrl || `https://drive.google.com/drive/folders/${syncRes?.folderId || GOOGLE_DRIVE_ROOT_FOLDER_ID}?usp=drive_link`,
+        status: "connected",
+        lastSyncedAt: new Date().toISOString()
+      };
+
+      setHasDriveAuth(true);
+      if (typeof sessionStorage !== "undefined") sessionStorage.setItem("gdrive_connected", "true");
+      onChangeField("driveStorage", updatedStorage);
+      if (targetInv.id) {
+        dbStore.updateInvitation(targetInv.id, { driveStorage: updatedStorage });
+      }
+
+      setUploadStatusText(`✓ Connected seamlessly! Linked to Google Drive folder: "${currentFolderName}"`);
+      setTimeout(() => setUploadStatusText(""), 4000);
     } catch (err) {
       console.error("Google Drive connection error:", err);
-      setUploadStatusText("Connection cancelled or timed out");
-      setTimeout(() => setUploadStatusText(""), 3000);
+      setUploadStatusText(err.message || "Failed to connect to Google Drive");
+      setTimeout(() => setUploadStatusText(""), 4000);
     } finally {
       setDriveUploading(false);
     }
+  };
+
+  const handleOpenDriveSettings = () => {
+    const currentName = invitation?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation");
+    const currentWebhook = getDriveWebhookUrl();
+    triggerDialog({
+      type: 'prompt',
+      title: 'Google Drive Cloud Storage Settings',
+      message: `Owner: ${GOOGLE_DRIVE_OWNER_EMAIL}\nRoot ID: ${GOOGLE_DRIVE_ROOT_FOLDER_ID}\nFolder: ${currentName}\n\nEnter optional Google Apps Script Webhook URL (or leave blank for 1-Click Cloud Sync):`,
+      defaultValue: currentWebhook || '',
+      placeholder: 'https://script.google.com/macros/s/.../exec',
+      confirmText: 'Save & Sync',
+      onConfirm: async (val) => {
+        const trimmed = (val || '').trim();
+        setDriveWebhookUrl(trimmed);
+        setUploadStatusText(trimmed ? "Google Drive Webhook URL updated!" : "Using 1-Click Cloud Folder Sync!");
+        setTimeout(() => setUploadStatusText(""), 3000);
+        handleConnectDrive();
+      }
+    });
   };
 
   const handleCleanDriveSpace = async () => {
@@ -962,6 +1097,10 @@ export default function AdminSidebar({
         else if (detail === 'layout') targetTab = 'layout';
       } else if (detail && typeof detail === 'object') {
         let fieldKey = detail.field;
+        if (fieldKey === 'scratchSubtitle') setScratchBannerTextTab('subtitle');
+        if (fieldKey === 'scratchHeading') setScratchBannerTextTab('heading');
+        if (fieldKey === 'scratchDescription') setScratchBannerTextTab('description');
+        if (fieldKey === 'scratchBtnText' || fieldKey === 'scratchRevealBtn') setScratchBannerTextTab('button');
         if (detail.tabId === 'couple') {
           targetTab = 'couple';
           if (fieldKey === 'brideName') fieldKey = 'storyBrideName';
@@ -1711,7 +1850,30 @@ export default function AdminSidebar({
                   />
                 )
               ) : (
-                <img src={imgUrl} alt={label} className="w-12 h-12 object-cover rounded-lg border border-amber-500/30 shrink-0" />
+                <img 
+                src={imgUrl} 
+                alt={label} 
+                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const fid = extractDriveFileId(imgUrl);
+                  if (fid && !e.currentTarget.dataset.fallback1) {
+                    e.currentTarget.dataset.fallback1 = '1';
+                    e.currentTarget.src = `https://drive.google.com/thumbnail?id=${fid}&sz=w1600`;
+                    return;
+                  }
+                  if (fid && !e.currentTarget.dataset.fallback2) {
+                    e.currentTarget.dataset.fallback2 = '1';
+                    e.currentTarget.src = `https://drive.google.com/uc?export=view&id=${fid}`;
+                    return;
+                  }
+                  if (fid && !e.currentTarget.dataset.fallback3) {
+                    e.currentTarget.dataset.fallback3 = '1';
+                    e.currentTarget.src = `https://lh3.googleusercontent.com/d/${fid}=s0`;
+                    return;
+                  }
+                }}
+                className="w-12 h-12 object-cover rounded-lg border border-amber-500/30 shrink-0" 
+              />
               )}
               <div className="flex-1 min-w-0">
                 <span className="text-[9px] text-slate-100 font-bold block truncate">
@@ -1827,8 +1989,16 @@ export default function AdminSidebar({
       else if (key === "coverQuoteText") toggleKey = "showCoverQuote";
       else if (key === "coverBottomTaglineText") toggleKey = "showCoverBottomTagline";
       else if (key === "coverRevealBtnText") toggleKey = "showCoverRevealBtn";
-      else if (key === "scratchTitle") toggleKey = "showScratchCard";
-      else if (key === "scratchSecretMessage") toggleKey = "showScratchCard";
+      else if (key === "scratchSubtitle") toggleKey = "showScratchSubtitle";
+      else if (key === "scratchHeading") toggleKey = "showScratchHeading";
+      else if (key === "scratchDescription") toggleKey = "showScratchDescription";
+      else if (key === "scratchRevealBtn") toggleKey = "showScratchRevealBtn";
+      else if (key === "scratchTitle") toggleKey = "showScratchTitle";
+      else if (key === "scratchCoupleText") toggleKey = "showScratchCouple";
+      else if (key === "scratchMarriedLabel") toggleKey = "showScratchMarriedLabel";
+      else if (key === "scratchDateText") toggleKey = "showScratchDate";
+      else if (key === "scratchCountdownLabel") toggleKey = "showScratchCountdown";
+      else if (key === "scratchSecretMessage") toggleKey = "showScratchSecretMessage";
       else if (key === "storyBrideTitle" || key === "storyBrideName" || key === "storyBrideParentLabel" || key === "storyBrideFamily") toggleKey = "showBrideDetails";
       else if (key === "storyGroomTitle" || key === "storyGroomName" || key === "storyGroomParentLabel" || key === "storyGroomFamily") toggleKey = "showGroomDetails";
       else if (key === "storySubtitle" || key === "storyTitle") toggleKey = "showCoupleTitles";
@@ -1929,10 +2099,40 @@ export default function AdminSidebar({
           <div className="p-3 border-t border-amber-500/20 space-y-3.5 animate-accordion-down bg-slate-950/80">
             {/* 1. Editable Text Input */}
             <div>
-              <label className="text-[9.5px] uppercase tracking-wider font-extrabold text-amber-300 block mb-1">
-                {isDate ? "Select Date & Time" : "Text Content"}
-              </label>
-              {!isDate ? (
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[9.5px] uppercase tracking-wider font-extrabold text-amber-300 block">
+                  {isDate ? "Select Date & Time" : "Text Content"}
+                </label>
+                {isQuoteOrMessageField(key) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const quote = getRandomQuoteForField(key, config[key]);
+                      onChangeField(key, quote);
+                      if (key === "coverQuoteText") onChangeField("introQuote", quote);
+                      if (key === "scratchDescription") onChangeField("scratchDesc", quote);
+                      if (key === "scratchSubtitle") onChangeField("scratchSubtitleText", quote);
+                      if (key === "scratchHeading") onChangeField("scratchHeadingText", quote);
+                      if (key === "scratchBtnText") onChangeField("scratchBtnLabel", quote);
+                    }}
+                    className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 hover:text-amber-100 border border-amber-500/50 text-[8.5px] font-bold flex items-center space-x-1 cursor-pointer transition shadow-xs active:scale-95"
+                    title={`Generate a random ${getQuoteButtonLabel(key)} for this section`}
+                  >
+                    <span>🎲</span>
+                    <span>Random {getQuoteButtonLabel(key)}</span>
+                  </button>
+                )}
+              </div>
+              {(!isDate && (key === "scratchDescription" || key === "scratchSecretMessage")) ? (
+                <textarea
+                  name={key}
+                  rows={3}
+                  value={config[key] !== undefined ? config[key] : ""}
+                  placeholder={defaultVal}
+                  onChange={(e) => onChangeField(key, e.target.value)}
+                  className="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-slate-100 font-semibold focus:outline-none focus:border-amber-500 shadow-inner resize-y"
+                />
+              ) : !isDate ? (
                 <input
                   type="text"
                   name={key}
@@ -2336,6 +2536,19 @@ export default function AdminSidebar({
           </span>
         </div>
         <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+          {/* Search Settings Button - Compact & Responsive */}
+          <button
+            type="button"
+            onClick={() => setIsSearchOpen(prev => !prev)}
+            className={`admin-top-btn cursor-pointer ${isSearchOpen ? 'selected' : ''}`}
+            title="Search Settings & Controls (Ctrl+K)"
+            aria-label="Search Settings"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
           <button
             onClick={() => onChangeField("syncColorThemeWithEnvelope", !config.syncColorThemeWithEnvelope)}
             className={`admin-top-btn cursor-pointer ${
@@ -2393,6 +2606,94 @@ export default function AdminSidebar({
         </div>
       </div>
 
+      {/* Search Settings Quick Palette */}
+      {isSearchOpen && (
+        <div className="px-3 py-2 bg-gradient-to-b from-[#FFFDF9] to-[#F7EFE5] border-b border-[#E9DCCB] shadow-md z-30 relative animate-fade-in">
+          <div className="relative flex items-center">
+            <div className="absolute left-2.5 text-amber-600 pointer-events-none">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </div>
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search any setting (e.g. blur, countdown, color, font, wax, music)..."
+              className="w-full pl-8 pr-16 py-1.5 bg-white border border-[#D6C5AF] focus:border-amber-500 rounded-lg text-xs text-[#513321] placeholder:text-stone-400 font-medium shadow-inner focus:outline-none focus:ring-1 focus:ring-amber-500"
+            />
+            <div className="absolute right-1.5 flex items-center space-x-1">
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="px-1 text-slate-400 hover:text-slate-600 text-xs font-bold cursor-pointer"
+                  title="Clear search"
+                >
+                  ✕
+                </button>
+              )}
+              <span className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-stone-100 border border-stone-200 text-[8px] font-mono font-bold text-stone-500">
+                ESC
+              </span>
+            </div>
+          </div>
+
+          {/* Quick Tags under input */}
+          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+            <span className="text-[8px] uppercase tracking-wider text-amber-900 font-extrabold mr-0.5">Popular:</span>
+            {["Blur", "Countdown", "Wax Seal", "Music", "Gallery", "Drive", "Fonts", "Colors"].map(tag => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => setSearchQuery(tag)}
+                className="px-1.5 py-0.2 rounded bg-amber-100/70 hover:bg-amber-200/80 text-[8px] font-bold text-amber-900 border border-amber-300/60 transition cursor-pointer"
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+
+          {/* Search Results Dropdown List */}
+          {searchQuery.trim().length > 0 && (
+            <div className="mt-2 max-h-64 overflow-y-auto space-y-1 pr-1 custom-sidebar-scroll border-t border-[#E9DCCB] pt-1.5">
+              {searchResults.length === 0 ? (
+                <div className="p-3 text-center text-xs text-stone-500">
+                  No settings found matching "<strong>{searchQuery}</strong>". Try searching for <em>blur, background, font, date, music,</em> or <em>wax</em>.
+                </div>
+              ) : (
+                searchResults.map((item, idx) => (
+                  <div
+                    key={idx}
+                    onClick={() => handleSelectSearchResult(item)}
+                    className="p-2 rounded-lg bg-white hover:bg-amber-50 border border-stone-200 hover:border-amber-400 transition cursor-pointer flex items-center justify-between group shadow-2xs"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <div className="flex items-center space-x-1.5">
+                        <span className="text-[11px] font-extrabold text-[#513321] group-hover:text-amber-900">
+                          {item.title}
+                        </span>
+                        <span className="px-1.5 py-0.2 bg-amber-500/15 text-amber-900 rounded text-[7.5px] font-extrabold uppercase">
+                          {item.tabName}
+                        </span>
+                      </div>
+                      <p className="text-[9px] text-stone-500 truncate mt-0.5">
+                        {item.description}
+                      </p>
+                    </div>
+                    <span className="text-[10px] text-amber-600 font-bold group-hover:translate-x-0.5 transition-transform shrink-0">
+                      Go →
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Google Drive Cloud Storage Header Badge */}
       <div className="px-3 py-2 bg-[#FFF9F2] border-b border-[#E9DCCB] flex items-center justify-between text-xs">
         <div className="flex items-center space-x-2 min-w-0">
@@ -2400,7 +2701,7 @@ export default function AdminSidebar({
           <div className="min-w-0">
             <div className="flex items-center space-x-1.5">
               <span className="text-[9.5px] uppercase font-extrabold tracking-wider text-emerald-800">Drive Cloud Storage</span>
-              {hasDriveAuth ? (
+              {(hasDriveAuth || invitation?.driveStorage?.status === "connected" || invitation?.driveStorage?.folderId) ? (
                 <span className="inline-flex items-center px-1.5 py-0.2 bg-emerald-500/20 text-emerald-700 text-[8.5px] font-extrabold rounded">CONNECTED</span>
               ) : (
                 <span className="inline-flex items-center px-1.5 py-0.2 bg-amber-500/20 text-amber-800 text-[8.5px] font-extrabold rounded">READY</span>
@@ -2408,7 +2709,7 @@ export default function AdminSidebar({
             </div>
             <div className="flex items-center space-x-1.5">
               <p 
-                className="text-[10.5px] font-bold text-[#513321] truncate max-w-[150px]" 
+                className="text-[10.5px] font-bold text-[#513321] truncate max-w-[130px] sm:max-w-[160px]" 
                 title={invitation?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation")}
               >
                 📁 {invitation?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation")}
@@ -2416,16 +2717,24 @@ export default function AdminSidebar({
               <button
                 type="button"
                 onClick={handleRenameDriveFolder}
-                className="text-[9.5px] text-amber-900 bg-amber-200/70 hover:bg-amber-300/80 px-1.5 py-0.2 rounded font-extrabold transition cursor-pointer shrink-0"
+                className="text-[9px] text-amber-900 bg-amber-200/70 hover:bg-amber-300/80 px-1.5 py-0.2 rounded font-extrabold transition cursor-pointer shrink-0"
                 title="Name or rename unique Google Drive folder for this invitation"
               >
                 ✏️ Rename
+              </button>
+              <button
+                type="button"
+                onClick={handleOpenDriveSettings}
+                className="text-[9px] text-slate-700 bg-slate-200/80 hover:bg-slate-300 px-1.5 py-0.2 rounded font-extrabold transition cursor-pointer shrink-0"
+                title="Google Drive Storage Settings & Webhook Config"
+              >
+                ⚙️
               </button>
             </div>
           </div>
         </div>
         <div className="flex items-center space-x-1.5 shrink-0">
-          {!hasDriveAuth ? (
+          {!(hasDriveAuth || invitation?.driveStorage?.status === "connected" || invitation?.driveStorage?.folderId) ? (
             <button
               type="button"
               onClick={handleConnectDrive}
@@ -2444,27 +2753,16 @@ export default function AdminSidebar({
               <span>🧹 Clean Space</span>
             </button>
           )}
-          {invitation?.driveStorage?.folderId ? (
-            <a
-              href={invitation.driveStorage.folderUrl || `https://drive.google.com/drive/folders/${invitation.driveStorage.folderId}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="px-2 py-0.5 bg-emerald-100/70 hover:bg-emerald-200/80 border border-emerald-400/50 text-emerald-900 rounded-md text-[9.5px] font-extrabold flex items-center space-x-1 transition shadow-xs"
-              title={`Open Google Drive Folder: ${invitation.driveStorage.folderName || 'Unique Folder'}`}
-            >
-              <span>Open</span>
-              <span>↗</span>
-            </a>
-          ) : (
-            <button
-              type="button"
-              onClick={handleRenameDriveFolder}
-              className="px-2 py-0.5 bg-amber-100 hover:bg-amber-200 border border-amber-300 text-amber-900 rounded-md text-[9.5px] font-extrabold flex items-center space-x-1 transition shadow-xs cursor-pointer"
-              title="Click to create & sync unique Google Drive folder"
-            >
-              <span>Create 📁</span>
-            </button>
-          )}
+          <a
+            href={invitation?.driveStorage?.folderUrl || `https://drive.google.com/drive/folders/${invitation?.driveStorage?.folderId || GOOGLE_DRIVE_ROOT_FOLDER_ID}?usp=drive_link`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-2 py-0.5 bg-emerald-100/70 hover:bg-emerald-200/80 border border-emerald-400/50 text-emerald-900 rounded-md text-[9.5px] font-extrabold flex items-center space-x-1 transition shadow-xs"
+            title={`Open Google Drive Folder: ${invitation?.driveStorage?.folderName || formatDriveFolderName(config, "Invitation")}`}
+          >
+            <span>Open</span>
+            <span>↗</span>
+          </a>
         </div>
       </div>
       {uploadStatusText && (
@@ -3593,6 +3891,119 @@ export default function AdminSidebar({
         {activeTab === "envelope" && (
           <div className="space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">Envelope & Opening Experiences</h3>
+
+            {/* Main Screen Background (Behind Envelope) */}
+            <div className="p-3 bg-slate-900/90 rounded-xl border border-amber-500/30 space-y-3 shadow-md">
+              <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">
+                🌌 Main Background (Behind Envelope)
+              </span>
+              
+              {/* Main Screen Background Color Behind Envelope */}
+              <div>
+                <label className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold block mb-1">Background Color Behind Envelope</label>
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="color"
+                    value={config.envelopeBackdropBgColor && config.envelopeBackdropBgColor.startsWith('#') ? config.envelopeBackdropBgColor : "#060204"}
+                    onChange={(e) => onChangeField("envelopeBackdropBgColor", e.target.value)}
+                    className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                  />
+                  <input 
+                    type="text"
+                    value={config.envelopeBackdropBgColor || "#060204"}
+                    onChange={(e) => onChangeField("envelopeBackdropBgColor", e.target.value)}
+                    className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                  />
+                </div>
+              </div>
+
+              {/* Main Screen Background Image or HD Video Behind Envelope */}
+              <div>
+                <label className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold block mb-1">Background Image or HD Video (Behind Envelope)</label>
+                <input 
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={(e) => handleFileChange("envelopeBackdropImage", e)}
+                  className="w-full text-xs text-slate-300 file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[9px] file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-600 cursor-pointer"
+                />
+                <p className="text-[8px] text-slate-400 mt-1">Upload high quality image or video behind envelope. Automatically syncs to Google Drive folder.</p>
+              </div>
+            </div>
+
+            {/* Envelope Paper Body & Flaps */}
+            <div className="p-3 bg-slate-900/90 rounded-xl border border-amber-500/30 space-y-3 shadow-md">
+              <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">
+                ✉️ Envelope Body & Flaps
+              </span>
+              
+              {/* Envelope Color */}
+              <div>
+                <label className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold block mb-1">Envelope Flaps & Body Color</label>
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="color"
+                    value={config.envelopeBgColor && config.envelopeBgColor.startsWith('#') ? config.envelopeBgColor : "#5a0e1c"}
+                    onChange={(e) => onChangeField("envelopeBgColor", e.target.value)}
+                    className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                  />
+                  <input 
+                    type="text"
+                    value={config.envelopeBgColor || "#5a0e1c"}
+                    onChange={(e) => onChangeField("envelopeBgColor", e.target.value)}
+                    className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                  />
+                </div>
+              </div>
+
+              {/* Envelope Texture / HD Image Upload */}
+              <div>
+                <label className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold block mb-1">Envelope Paper Texture or Image</label>
+                <input 
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={(e) => handleFileChange("envelopeBgImage", e)}
+                  className="w-full text-xs text-slate-300 file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[9px] file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-600 cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Main Couple / Hero Name Plate Controls */}
+            <div className="p-3 bg-slate-900/90 rounded-xl border border-amber-500/30 space-y-3 shadow-md">
+              <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block">
+                🏷️ Hero / Couple Name Plate
+              </span>
+
+              {/* Name Plate Background Color */}
+              <div>
+                <label className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold block mb-1">Name Plate Background Color</label>
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="color"
+                    value={config.envelopeNamesBgColor && config.envelopeNamesBgColor.startsWith('#') ? config.envelopeNamesBgColor : "#15080e"}
+                    onChange={(e) => onChangeField("envelopeNamesBgColor", e.target.value)}
+                    className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                  />
+                  <input 
+                    type="text"
+                    value={config.envelopeNamesBgColor || "#15080e"}
+                    onChange={(e) => onChangeField("envelopeNamesBgColor", e.target.value)}
+                    className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                  />
+                </div>
+              </div>
+
+              {/* Name Plate Image / Video Upload */}
+              <div>
+                <label className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold block mb-1">Name Plate Image or Video Texture</label>
+                <input 
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={(e) => handleFileChange("envelopeNameBgImage", e)}
+                  className="w-full text-xs text-slate-300 file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-[9px] file:font-semibold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-600 cursor-pointer"
+                />
+                <p className="text-[8px] text-slate-400 mt-1">Upload image or video texture for the name plate.</p>
+              </div>
+            </div>
 
             {/* Opening Experience Style Selector (Dropdown Menu) */}
             <div className="p-3 bg-slate-900/90 rounded-xl border border-amber-500/30 space-y-2.5 shadow-md">
@@ -6700,6 +7111,33 @@ export default function AdminSidebar({
             {config.showGallery !== false && (
               <div className="space-y-4">
                 {renderPartCard({
+                  title: "Gallery Frame Colors & Style",
+                  toggleKey: "showGalleryFrames",
+                  children: (
+                    <div className="p-3 bg-slate-900/60 rounded border border-slate-850 space-y-2.5">
+                      <div>
+                        <label className="text-[8.5px] uppercase text-slate-300 font-bold block mb-1">Unified Frame Border Color</label>
+                        <div className="flex items-center space-x-2">
+                          <input 
+                            type="color"
+                            value={config.galleryFrameColor || config.galleryBorderColor || config.accentGold || "#f59e0b"}
+                            onChange={(e) => onChangeField("galleryFrameColor", e.target.value)}
+                            className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                          />
+                          <input 
+                            type="text"
+                            value={config.galleryFrameColor || config.galleryBorderColor || config.accentGold || "#f59e0b"}
+                            onChange={(e) => onChangeField("galleryFrameColor", e.target.value)}
+                            className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                          />
+                        </div>
+                        <p className="text-[8px] text-slate-400 mt-1">Changes the royal frame border color across all gallery photo slots.</p>
+                      </div>
+                    </div>
+                  )
+                })}
+
+                {renderPartCard({
                   title: "Gallery Headings & Subtitle",
                   toggleKey: "showGalleryHeader",
                   children: (
@@ -6891,6 +7329,875 @@ export default function AdminSidebar({
         {activeTab === "scratch" && (
           <div className="space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">Save Date Reveal Effect</h3>
+
+            {/* 🌌 Scratch Card Main Outer Background Control */}
+            <div className="p-3.5 bg-slate-900/95 rounded-xl border border-amber-500/40 space-y-3 shadow-lg">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <span className="text-[11px] font-extrabold text-amber-300 uppercase tracking-wider block">
+                  🌌 Scratch Outer Background & Atmosphere
+                </span>
+                <span className="text-[8.5px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono font-bold">
+                  Banner Background
+                </span>
+              </div>
+              <p className="text-[8.5px] text-slate-350 leading-relaxed">
+                Control the black outer background container behind the interactive calendar with any custom color or upload an HD image or video.
+              </p>
+
+              {/* Background Color Picker */}
+              <div>
+                <label className="text-[9px] uppercase tracking-wider text-slate-300 font-extrabold block mb-1">
+                  Outer Banner Background Color
+                </label>
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="color"
+                    value={config.scratchSectionBgColor && config.scratchSectionBgColor.startsWith('#') ? config.scratchSectionBgColor : "#05070D"}
+                    onChange={(e) => onChangeField("scratchSectionBgColor", e.target.value)}
+                    className="w-8 h-8 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5 shrink-0"
+                  />
+                  <input 
+                    type="text"
+                    value={config.scratchSectionBgColor || "#05070D"}
+                    onChange={(e) => onChangeField("scratchSectionBgColor", e.target.value)}
+                    placeholder="#05070D"
+                    className="flex-1 px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500"
+                  />
+                  {config.scratchSectionBgColor && (
+                    <button
+                      type="button"
+                      onClick={() => onChangeField("scratchSectionBgColor", undefined)}
+                      className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-200 rounded text-[9px] font-bold"
+                      title="Reset to default dark gradient"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+
+                {/* Quick Color Presets */}
+                <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                  <span className="text-[8px] uppercase tracking-wider text-slate-400 font-bold mr-1">Presets:</span>
+                  {[
+                    { label: "Dark Obsidian", color: "#05070D" },
+                    { label: "Midnight Navy", color: "#0B1528" },
+                    { label: "Royal Burgundy", color: "#2B0B14" },
+                    { label: "Emerald Green", color: "#092317" },
+                    { label: "Deep Violet", color: "#1D0C2E" },
+                    { label: "Warm Chocolate", color: "#23160D" },
+                    { label: "Ivory Cream", color: "#FAF6EE" }
+                  ].map((preset) => (
+                    <button
+                      key={preset.color}
+                      type="button"
+                      onClick={() => onChangeField("scratchSectionBgColor", preset.color)}
+                      className="px-2 py-0.5 rounded text-[8px] font-bold border border-slate-700/80 hover:scale-105 transition flex items-center gap-1 bg-slate-950 text-slate-300"
+                      title={preset.label}
+                    >
+                      <span className="w-2 h-2 rounded-full border border-white/20" style={{ backgroundColor: preset.color }} />
+                      <span>{preset.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Outer Background Image / Video Upload */}
+              <div className="pt-2 border-t border-slate-800/80 space-y-2">
+                <label className="text-[9px] uppercase tracking-wider text-slate-300 font-extrabold block mb-1">
+                  Outer Banner HD Background Image or Video
+                </label>
+                <input 
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={(e) => handleFileChange("scratchSectionBgImage", e)}
+                  className="w-full text-xs text-slate-300 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-[9.5px] file:font-bold file:bg-amber-500 file:text-slate-950 hover:file:bg-amber-600 cursor-pointer"
+                />
+                <p className="text-[8px] text-slate-400">
+                  Upload custom high quality background image or HD video. Automatically syncs to Google Drive.
+                </p>
+
+                {config.scratchSectionBgImage && (
+                  <div className="space-y-2 pt-1 bg-slate-950/70 p-2.5 rounded-lg border border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[8.5px] text-emerald-400 font-mono truncate max-w-[200px]">
+                        ✓ Media loaded
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => onChangeField("scratchSectionBgImage", "")}
+                        className="text-[8.5px] text-rose-400 hover:text-rose-300 underline font-bold"
+                      >
+                        Remove Media
+                      </button>
+                    </div>
+
+                    {/* Scale and Opacity Sliders */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="flex justify-between items-center mb-0.5">
+                          <label className="text-[7.5px] uppercase text-slate-400 font-bold">Opacity</label>
+                          <span className="text-[8px] text-amber-400 font-mono">
+                            {Math.round((config.scratchSectionBgImageOpacity !== undefined ? config.scratchSectionBgImageOpacity : 0.85) * 100)}%
+                          </span>
+                        </div>
+                        <input
+                          type="range" min="0.1" max="1.0" step="0.05"
+                          value={config.scratchSectionBgImageOpacity !== undefined ? config.scratchSectionBgImageOpacity : 0.85}
+                          onChange={(e) => onChangeField("scratchSectionBgImageOpacity", parseFloat(e.target.value))}
+                          className="w-full h-1 bg-slate-800 rounded appearance-none cursor-pointer accent-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <div className="flex justify-between items-center mb-0.5">
+                          <label className="text-[7.5px] uppercase text-slate-400 font-bold">Scale</label>
+                          <span className="text-[8px] text-amber-400 font-mono">
+                            {config.scratchSectionBgImageScale || 100}%
+                          </span>
+                        </div>
+                        <input
+                          type="range" min="50" max="250" step="5"
+                          value={config.scratchSectionBgImageScale || 100}
+                          onChange={(e) => onChangeField("scratchSectionBgImageScale", parseInt(e.target.value))}
+                          className="w-full h-1 bg-slate-800 rounded appearance-none cursor-pointer accent-amber-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Outer Section Border & Glow */}
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80">
+                {renderRgbaControlSelfParsed("Section Border Color", "scratchSectionBorderColor", "rgba(220,185,90,0.35)")}
+                {renderRgbaControlSelfParsed("Ambient Glow Spotlight", "scratchCardGlow", "rgba(255,215,120,0.08)")}
+              </div>
+            </div>
+
+            {/* ✍️ Comprehensive Scratch Banner Typography & Text Editing Suite */}
+            <div className="p-3.5 bg-slate-900/95 rounded-xl border border-amber-500/50 space-y-3.5 shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                <div className="flex items-center space-x-2">
+                  <span className="text-base text-amber-400">✍️</span>
+                  <div>
+                    <span className="text-[11px] font-extrabold text-amber-300 uppercase tracking-wider block">
+                      Banner Texts Full Editing Suite
+                    </span>
+                    <span className="text-[8px] text-slate-400 block leading-tight">
+                      Edit text, typography, size, color, spacing, shadow & alignment
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[8.5px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded font-mono font-bold">
+                  All Parameters
+                </span>
+              </div>
+
+              {/* Segmented Selector for the 4 Banner Items */}
+              <div className="grid grid-cols-4 gap-1 p-1 bg-slate-950 rounded-lg border border-slate-800">
+                {[
+                  { id: "subtitle", label: "Eyebrow", icon: "✨" },
+                  { id: "heading", label: "Heading", icon: "👑" },
+                  { id: "description", label: "Surprise", icon: "💬" },
+                  { id: "button", label: "Button", icon: "🔘" }
+                ].map((item) => {
+                  const isActive = scratchBannerTextTab === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setScratchBannerTextTab(item.id)}
+                      className={`py-1.5 px-1 rounded text-center transition flex flex-col items-center justify-center cursor-pointer ${
+                        isActive 
+                          ? 'bg-amber-500 text-slate-950 font-extrabold shadow-sm' 
+                          : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 font-medium'
+                      }`}
+                    >
+                      <span className="text-[10px]">{item.icon}</span>
+                      <span className="text-[8.5px] uppercase tracking-wide truncate w-full">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* ─── 1. EYEBROW / SUBTITLE TEXT CONTROLS ─── */}
+              {scratchBannerTextTab === "subtitle" && (
+                <div className="space-y-3 pt-1 animate-fadeIn">
+                  <div className="flex items-center justify-between p-2 bg-slate-950/80 rounded-lg border border-slate-800">
+                    <div>
+                      <span className="text-[9.5px] font-extrabold uppercase text-amber-300 block">
+                        Eyebrow / Top Subtitle
+                      </span>
+                      <span className="text-[8px] text-slate-400">Default: "AN EXCLUSIVE INTERACTIVE REVEAL"</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-[8.5px] font-bold text-amber-400">
+                        {config.showScratchSubtitle !== false ? 'VISIBLE' : 'HIDDEN'}
+                      </span>
+                      <SmallToggle
+                        size="xs"
+                        checked={config.showScratchSubtitle !== false}
+                        onChange={(val) => onChangeField("showScratchSubtitle", val)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Text Content */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold block">Text Content</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const quote = getRandomQuoteForField("scratchSubtitle", config.scratchSubtitle);
+                          onChangeField("scratchSubtitle", quote);
+                          onChangeField("scratchSubtitleText", quote);
+                        }}
+                        className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 hover:text-amber-100 border border-amber-500/50 text-[8px] font-bold flex items-center space-x-1 cursor-pointer transition shadow-xs active:scale-95"
+                        title="Generate random eyebrow reveal tag"
+                      >
+                        <span>🎲</span>
+                        <span>Random Eyebrow</span>
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={config.scratchSubtitle !== undefined ? config.scratchSubtitle : (config.scratchSubtitleText || "")}
+                      placeholder="An Exclusive Interactive Reveal"
+                      onChange={(e) => {
+                        onChangeField("scratchSubtitle", e.target.value);
+                        onChangeField("scratchSubtitleText", e.target.value);
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-slate-100 font-medium focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  {/* Font Family & Font Size */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[8px] uppercase text-slate-400 font-bold block mb-1">Font Family</label>
+                      <CustomFontSelect
+                        value={config.scratchSubtitleFont || "font-cinzel"}
+                        onChange={(f) => onChangeField("scratchSubtitleFont", f)}
+                        options={FONTS}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[8px] uppercase text-slate-400 font-bold">Font Size</label>
+                        <span className="text-[8px] text-amber-400 font-mono font-bold">
+                          {config.scratchSubtitleSize && !isNaN(Number(config.scratchSubtitleSize)) ? `${config.scratchSubtitleSize}px` : '11px (Auto)'}
+                        </span>
+                      </div>
+                      <input
+                        type="range" min="8" max="28" step="1"
+                        value={config.scratchSubtitleSize && !isNaN(Number(config.scratchSubtitleSize)) ? Number(config.scratchSubtitleSize) : 11}
+                        onChange={(e) => onChangeField("scratchSubtitleSize", parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Text Color & Presets */}
+                  <div>
+                    <label className="text-[8px] uppercase text-slate-400 font-bold block mb-1">Text Color</label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="color"
+                        value={config.scratchSubtitleColor && config.scratchSubtitleColor.startsWith('#') ? config.scratchSubtitleColor : "#C89B3C"}
+                        onChange={(e) => onChangeField("scratchSubtitleColor", e.target.value)}
+                        className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={config.scratchSubtitleColor || "#C89B3C"}
+                        onChange={(e) => onChangeField("scratchSubtitleColor", e.target.value)}
+                        className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      {[
+                        { label: "Gold", color: "#C89B3C" },
+                        { label: "Champagne", color: "#F7E8C5" },
+                        { label: "Rose", color: "#d47685" },
+                        { label: "White", color: "#FFFFFF" },
+                        { label: "Silver", color: "#cbd5e1" }
+                      ].map(c => (
+                        <button
+                          key={c.color}
+                          type="button"
+                          onClick={() => onChangeField("scratchSubtitleColor", c.color)}
+                          className="px-1.5 py-0.5 bg-slate-950 border border-slate-800 rounded text-[7.5px] font-bold text-slate-300 hover:scale-105 flex items-center gap-1"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.color }} />
+                          <span>{c.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Font Weight, Transform & Tracking */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[8px] uppercase text-slate-400 font-bold block mb-1">Weight</label>
+                      <CustomSelect
+                        value={config.scratchSubtitleWeight || "font-bold"}
+                        onChange={(w) => onChangeField("scratchSubtitleWeight", w)}
+                        options={[
+                          { value: "font-normal", label: "Normal (400)" },
+                          { value: "font-medium", label: "Medium (500)" },
+                          { value: "font-semibold", label: "SemiBold (600)" },
+                          { value: "font-bold", label: "Bold (700)" },
+                          { value: "font-extrabold", label: "ExtraBold (800)" }
+                        ]}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[8px] uppercase text-slate-400 font-bold block mb-1">Case</label>
+                      <CustomSelect
+                        value={config.scratchSubtitleTransform || "uppercase"}
+                        onChange={(t) => onChangeField("scratchSubtitleTransform", t)}
+                        options={[
+                          { value: "uppercase", label: "UPPERCASE" },
+                          { value: "capitalize", label: "Capitalize" },
+                          { value: "lowercase", label: "lowercase" },
+                          { value: "none", label: "As Written" }
+                        ]}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[8px] uppercase text-slate-400 font-bold">Spacing</label>
+                        <span className="text-[8px] text-amber-400 font-mono">
+                          {config.scratchSubtitleTracking !== undefined ? `${config.scratchSubtitleTracking}em` : '0.3em'}
+                        </span>
+                      </div>
+                      <input
+                        type="range" min="0" max="0.6" step="0.05"
+                        value={config.scratchSubtitleTracking !== undefined ? config.scratchSubtitleTracking : 0.3}
+                        onChange={(e) => onChangeField("scratchSubtitleTracking", parseFloat(e.target.value))}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Position Offsets X & Y */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-850">
+                    <div>
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-[7.5px] uppercase text-slate-400 font-bold">X Shift</label>
+                        <span className="text-[7.5px] text-amber-400 font-mono">{config.scratchSubtitleX || 0}px</span>
+                      </div>
+                      <input
+                        type="range" min="-60" max="60" step="2"
+                        value={config.scratchSubtitleX || 0}
+                        onChange={(e) => onChangeField("scratchSubtitleX", parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-[7.5px] uppercase text-slate-400 font-bold">Y Shift</label>
+                        <span className="text-[7.5px] text-amber-400 font-mono">{config.scratchSubtitleY || 0}px</span>
+                      </div>
+                      <input
+                        type="range" min="-60" max="60" step="2"
+                        value={config.scratchSubtitleY || 0}
+                        onChange={(e) => onChangeField("scratchSubtitleY", parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── 2. MAIN HEADING TEXT CONTROLS ─── */}
+              {scratchBannerTextTab === "heading" && (
+                <div className="space-y-3 pt-1 animate-fadeIn">
+                  <div className="flex items-center justify-between p-2 bg-slate-950/80 rounded-lg border border-slate-800">
+                    <div>
+                      <span className="text-[9.5px] font-extrabold uppercase text-amber-300 block">
+                        Main Heading Title
+                      </span>
+                      <span className="text-[8px] text-slate-400">Default: "Our Secret Wedding Calendar"</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-[8.5px] font-bold text-amber-400">
+                        {config.showScratchHeading !== false ? 'VISIBLE' : 'HIDDEN'}
+                      </span>
+                      <SmallToggle
+                        size="xs"
+                        checked={config.showScratchHeading !== false}
+                        onChange={(val) => onChangeField("showScratchHeading", val)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Text Content */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold block">Heading Text</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const quote = getRandomQuoteForField("scratchHeading", config.scratchHeading);
+                          onChangeField("scratchHeading", quote);
+                          onChangeField("scratchHeadingText", quote);
+                        }}
+                        className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 hover:text-amber-100 border border-amber-500/50 text-[8px] font-bold flex items-center space-x-1 cursor-pointer transition shadow-xs active:scale-95"
+                        title="Generate random calendar title"
+                      >
+                        <span>🎲</span>
+                        <span>Random Heading</span>
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={config.scratchHeading !== undefined ? config.scratchHeading : (config.scratchHeadingText || "")}
+                      placeholder="Our Secret Wedding Calendar"
+                      onChange={(e) => {
+                        onChangeField("scratchHeading", e.target.value);
+                        onChangeField("scratchHeadingText", e.target.value);
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-slate-100 font-bold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  {/* Font Family & Size */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[8px] uppercase text-slate-400 font-bold block mb-1">Font Family</label>
+                      <CustomFontSelect
+                        value={config.scratchHeadingFont || "font-serif"}
+                        onChange={(f) => onChangeField("scratchHeadingFont", f)}
+                        options={FONTS}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[8px] uppercase text-slate-400 font-bold">Font Size</label>
+                        <span className="text-[8px] text-amber-400 font-mono font-bold">
+                          {config.scratchHeadingSize && !isNaN(Number(config.scratchHeadingSize)) ? `${config.scratchHeadingSize}px` : '32px (Auto)'}
+                        </span>
+                      </div>
+                      <input
+                        type="range" min="16" max="64" step="1"
+                        value={config.scratchHeadingSize && !isNaN(Number(config.scratchHeadingSize)) ? Number(config.scratchHeadingSize) : 32}
+                        onChange={(e) => onChangeField("scratchHeadingSize", parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Heading Color */}
+                  <div>
+                    <label className="text-[8px] uppercase text-slate-400 font-bold block mb-1">Heading Color</label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="color"
+                        value={config.scratchHeadingColor && config.scratchHeadingColor.startsWith('#') ? config.scratchHeadingColor : "#F7E8C5"}
+                        onChange={(e) => onChangeField("scratchHeadingColor", e.target.value)}
+                        className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={config.scratchHeadingColor || "#F7E8C5"}
+                        onChange={(e) => onChangeField("scratchHeadingColor", e.target.value)}
+                        className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      {[
+                        { label: "Warm Gold", color: "#F7E8C5" },
+                        { label: "24K Gold", color: "#D4AF37" },
+                        { label: "Pure White", color: "#FFFFFF" },
+                        { label: "Rose Gold", color: "#E0A96D" },
+                        { label: "Royal Ivory", color: "#FFFDD0" }
+                      ].map(c => (
+                        <button
+                          key={c.color}
+                          type="button"
+                          onClick={() => onChangeField("scratchHeadingColor", c.color)}
+                          className="px-1.5 py-0.5 bg-slate-950 border border-slate-800 rounded text-[7.5px] font-bold text-slate-300 hover:scale-105 flex items-center gap-1"
+                        >
+                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: c.color }} />
+                          <span>{c.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Glow & Shadow */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[8px] uppercase text-slate-400 font-bold block mb-1">Glow / Shadow Color</label>
+                      <div className="flex items-center space-x-1.5">
+                        <input
+                          type="color"
+                          value={config.scratchHeadingShadowColor && config.scratchHeadingShadowColor.startsWith('#') ? config.scratchHeadingShadowColor : "#C89B3C"}
+                          onChange={(e) => onChangeField("scratchHeadingShadowColor", e.target.value)}
+                          className="w-6 h-6 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                        />
+                        <input
+                          type="text"
+                          value={config.scratchHeadingShadowColor || "rgba(200,155,60,0.25)"}
+                          onChange={(e) => onChangeField("scratchHeadingShadowColor", e.target.value)}
+                          className="flex-1 px-1.5 py-1 bg-slate-950 border border-slate-800 rounded text-[9px] font-mono text-slate-200"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[8px] uppercase text-slate-400 font-bold">Shadow Blur</label>
+                        <span className="text-[8px] text-amber-400 font-mono">{config.scratchHeadingShadowBlur || 12}px</span>
+                      </div>
+                      <input
+                        type="range" min="0" max="30" step="2"
+                        value={config.scratchHeadingShadowBlur || 12}
+                        onChange={(e) => onChangeField("scratchHeadingShadowBlur", parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Position Shift X & Y */}
+                  <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-850">
+                    <div>
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-[7.5px] uppercase text-slate-400 font-bold">X Shift</label>
+                        <span className="text-[7.5px] text-amber-400 font-mono">{config.scratchHeadingX || 0}px</span>
+                      </div>
+                      <input
+                        type="range" min="-60" max="60" step="2"
+                        value={config.scratchHeadingX || 0}
+                        onChange={(e) => onChangeField("scratchHeadingX", parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-[7.5px] uppercase text-slate-400 font-bold">Y Shift</label>
+                        <span className="text-[7.5px] text-amber-400 font-mono">{config.scratchHeadingY || 0}px</span>
+                      </div>
+                      <input
+                        type="range" min="-60" max="60" step="2"
+                        value={config.scratchHeadingY || 0}
+                        onChange={(e) => onChangeField("scratchHeadingY", parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── 3. SURPRISE DESCRIPTION TEXT CONTROLS ─── */}
+              {scratchBannerTextTab === "description" && (
+                <div className="space-y-3 pt-1 animate-fadeIn">
+                  <div className="flex items-center justify-between p-2 bg-slate-950/80 rounded-lg border border-slate-800">
+                    <div>
+                      <span className="text-[9.5px] font-extrabold uppercase text-amber-300 block">
+                        Calendar Surprise Description
+                      </span>
+                      <span className="text-[8px] text-slate-400">Guest interaction guidance text</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-[8.5px] font-bold text-amber-400">
+                        {config.showScratchDescription !== false ? 'VISIBLE' : 'HIDDEN'}
+                      </span>
+                      <SmallToggle
+                        size="xs"
+                        checked={config.showScratchDescription !== false}
+                        onChange={(val) => onChangeField("showScratchDescription", val)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Multiline Description Textarea */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold block">
+                        Description Text Content
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const quote = getRandomQuoteForField("scratchDescription", config.scratchDescription);
+                          onChangeField("scratchDescription", quote);
+                          onChangeField("scratchDesc", quote);
+                        }}
+                        className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 hover:text-amber-100 border border-amber-500/50 text-[8px] font-bold flex items-center space-x-1 cursor-pointer transition shadow-xs active:scale-95"
+                        title="Generate random romantic surprise text"
+                      >
+                        <span>🎲</span>
+                        <span>Random Thought</span>
+                      </button>
+                    </div>
+                    <textarea
+                      rows={3}
+                      value={config.scratchDescription !== undefined ? config.scratchDescription : (config.scratchDesc || "")}
+                      placeholder="We've kept the date a romantic surprise. Use your mouse or touchscreen to wipe off the gold metallic shield to discover the ceremony timings and live countdown!"
+                      onChange={(e) => {
+                        onChangeField("scratchDescription", e.target.value);
+                        onChangeField("scratchDesc", e.target.value);
+                      }}
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-slate-100 font-serif leading-relaxed focus:outline-none focus:border-amber-500 resize-y"
+                    />
+                  </div>
+
+                  {/* Font Family & Size */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[8px] uppercase text-slate-400 font-bold block mb-1">Font Family</label>
+                      <CustomFontSelect
+                        value={config.scratchDescriptionFont || config.scratchDescFont || "font-serif"}
+                        onChange={(f) => {
+                          onChangeField("scratchDescriptionFont", f);
+                          onChangeField("scratchDescFont", f);
+                        }}
+                        options={FONTS}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[8px] uppercase text-slate-400 font-bold">Font Size</label>
+                        <span className="text-[8px] text-amber-400 font-mono font-bold">
+                          {config.scratchDescriptionSize && !isNaN(Number(config.scratchDescriptionSize)) ? `${config.scratchDescriptionSize}px` : '13px (Auto)'}
+                        </span>
+                      </div>
+                      <input
+                        type="range" min="10" max="24" step="1"
+                        value={config.scratchDescriptionSize && !isNaN(Number(config.scratchDescriptionSize)) ? Number(config.scratchDescriptionSize) : 13}
+                        onChange={(e) => {
+                          onChangeField("scratchDescriptionSize", parseInt(e.target.value));
+                          onChangeField("scratchDescSize", parseInt(e.target.value));
+                        }}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Description Color */}
+                  <div>
+                    <label className="text-[8px] uppercase text-slate-400 font-bold block mb-1">Text Color</label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="color"
+                        value={config.scratchDescriptionColor && config.scratchDescriptionColor.startsWith('#') ? config.scratchDescriptionColor : (config.scratchDescColor && config.scratchDescColor.startsWith('#') ? config.scratchDescColor : "#C8B78D")}
+                        onChange={(e) => {
+                          onChangeField("scratchDescriptionColor", e.target.value);
+                          onChangeField("scratchDescColor", e.target.value);
+                        }}
+                        className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                      />
+                      <input
+                        type="text"
+                        value={config.scratchDescriptionColor || config.scratchDescColor || "#C8B78D"}
+                        onChange={(e) => {
+                          onChangeField("scratchDescriptionColor", e.target.value);
+                          onChangeField("scratchDescColor", e.target.value);
+                        }}
+                        className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Line Height & Alignment */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[8px] uppercase text-slate-400 font-bold">Line Height</label>
+                        <span className="text-[8px] text-amber-400 font-mono">
+                          {config.scratchDescriptionLineHeight || '1.6'}
+                        </span>
+                      </div>
+                      <input
+                        type="range" min="1.1" max="2.4" step="0.1"
+                        value={parseFloat(config.scratchDescriptionLineHeight || "1.6")}
+                        onChange={(e) => onChangeField("scratchDescriptionLineHeight", e.target.value)}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[8px] uppercase text-slate-400 font-bold block mb-1">Alignment</label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {[
+                          { id: "left", label: "Left" },
+                          { id: "center", label: "Center" },
+                          { id: "right", label: "Right" }
+                        ].map(al => (
+                          <button
+                            key={al.id}
+                            type="button"
+                            onClick={() => onChangeField("scratchDescriptionAlign", al.id)}
+                            className={`py-1 text-[8px] font-bold rounded border transition ${
+                              (config.scratchDescriptionAlign || 'center') === al.id
+                                ? 'bg-amber-500 text-slate-950 border-amber-500'
+                                : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-slate-200'
+                            }`}
+                          >
+                            {al.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* ─── 4. INSTANT REVEAL ACTION BUTTON CONTROLS ─── */}
+              {scratchBannerTextTab === "button" && (
+                <div className="space-y-3 pt-1 animate-fadeIn">
+                  <div className="flex items-center justify-between p-2 bg-slate-950/80 rounded-lg border border-slate-800">
+                    <div>
+                      <span className="text-[9.5px] font-extrabold uppercase text-amber-300 block">
+                        Instant Reveal Calendar Button
+                      </span>
+                      <span className="text-[8px] text-slate-400">Action button to instantly wipe shield</span>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      <span className="text-[8.5px] font-bold text-amber-400">
+                        {config.showScratchRevealBtn !== false ? 'VISIBLE' : 'HIDDEN'}
+                      </span>
+                      <SmallToggle
+                        size="xs"
+                        checked={config.showScratchRevealBtn !== false}
+                        onChange={(val) => onChangeField("showScratchRevealBtn", val)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Button Label Text */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[8.5px] uppercase tracking-wider text-slate-300 font-bold block">
+                        Button Label
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const quote = getRandomQuoteForField("scratchBtnText", config.scratchBtnText);
+                          onChangeField("scratchBtnText", quote);
+                          onChangeField("scratchBtnLabel", quote);
+                        }}
+                        className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 hover:text-amber-100 border border-amber-500/50 text-[8px] font-bold flex items-center space-x-1 cursor-pointer transition shadow-xs active:scale-95"
+                        title="Generate random reveal button text"
+                      >
+                        <span>🎲</span>
+                        <span>Random Label</span>
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      value={config.scratchBtnText || config.scratchBtnLabel || ""}
+                      onChange={(e) => {
+                        onChangeField("scratchBtnText", e.target.value);
+                        onChangeField("scratchBtnLabel", e.target.value);
+                      }}
+                      placeholder="Instant Reveal Calendar"
+                      className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-slate-100 font-bold focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  {/* Colors: Background, Text, Border & Glow */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Button BG Color</label>
+                      <div className="flex items-center space-x-1.5">
+                        <input
+                          type="color"
+                          value={config.scratchBtnBg && config.scratchBtnBg.startsWith('#') ? config.scratchBtnBg : "#C89B3C"}
+                          onChange={(e) => onChangeField("scratchBtnBg", e.target.value)}
+                          className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                        />
+                        <input
+                          type="text"
+                          value={config.scratchBtnBg || "linear-gradient(180deg, #C89B3C, #9B7428)"}
+                          onChange={(e) => onChangeField("scratchBtnBg", e.target.value)}
+                          className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[9.5px] font-mono text-slate-200"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Button Text Color</label>
+                      <div className="flex items-center space-x-1.5">
+                        <input
+                          type="color"
+                          value={config.scratchBtnTextColor || config.scratchBtnText || "#05070D"}
+                          onChange={(e) => onChangeField("scratchBtnTextColor", e.target.value)}
+                          className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                        />
+                        <input
+                          type="text"
+                          value={config.scratchBtnTextColor || config.scratchBtnText || "#05070D"}
+                          onChange={(e) => onChangeField("scratchBtnTextColor", e.target.value)}
+                          className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[9.5px] font-mono text-slate-200"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Button Border</label>
+                      <div className="flex items-center space-x-1.5">
+                        <input
+                          type="color"
+                          value={config.scratchBtnBorder || "#f3d38a"}
+                          onChange={(e) => onChangeField("scratchBtnBorder", e.target.value)}
+                          className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                        />
+                        <input
+                          type="text"
+                          value={config.scratchBtnBorder || "rgba(243,211,138,0.5)"}
+                          onChange={(e) => onChangeField("scratchBtnBorder", e.target.value)}
+                          className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[9.5px] font-mono text-slate-200"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Button Glow</label>
+                      <div className="flex items-center space-x-1.5">
+                        <input
+                          type="color"
+                          value={config.scratchBtnGlow || "#c89b3c"}
+                          onChange={(e) => onChangeField("scratchBtnGlow", e.target.value)}
+                          className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                        />
+                        <input
+                          type="text"
+                          value={config.scratchBtnGlow || "rgba(200,155,60,0.3)"}
+                          onChange={(e) => onChangeField("scratchBtnGlow", e.target.value)}
+                          className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[9.5px] font-mono text-slate-200"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Font & Corner Rounding */}
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <div>
+                      <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Button Font</label>
+                      <CustomFontSelect
+                        value={config.scratchBtnFont || "font-cinzel"}
+                        onChange={(val) => onChangeField("scratchBtnFont", val)}
+                        options={FONTS}
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold">Corner Radius</label>
+                        <span className="text-[8px] font-mono text-amber-400">{config.scratchBtnRadius !== undefined ? config.scratchBtnRadius : 12}px</span>
+                      </div>
+                      <input
+                        type="range" min="0" max="32" step="2"
+                        value={config.scratchBtnRadius !== undefined ? config.scratchBtnRadius : 12}
+                        onChange={(e) => onChangeField("scratchBtnRadius", parseInt(e.target.value))}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
             
             <div className="grid grid-cols-2 gap-3">
               {/* Left Column: Animation Style, Card & Shield Shape, and Reveal Duration */}
@@ -6935,6 +8242,7 @@ export default function AdminSidebar({
                   />
                 </div>
 
+                
                 <div>
                   <div className="flex justify-between items-center mb-1">
                     <label className="text-[10px] font-extrabold text-[#513321] block uppercase tracking-wide">Reveal Duration</label>
@@ -6991,8 +8299,199 @@ export default function AdminSidebar({
               </button>
             </div>
 
+            {/* Wipe Progress & Reveal Parameters Dropdown Menu Editing Tool */}
+            <div id="element-tool-scratchCompletionThreshold" className="bg-[#FFFFFF] rounded-xl border border-[#E9DCCB] shadow-xs overflow-hidden transition-all">
+              {/* Dropdown Header Button */}
+              <button
+                type="button"
+                onClick={() => setIsWipeProgressOpen(prev => !prev)}
+                className="w-full px-3.5 py-3 flex items-center justify-between text-left hover:bg-[#FDFBF7] cursor-pointer transition select-none group"
+              >
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <span className="text-base group-hover:scale-110 transition-transform">🪙</span>
+                  <div className="min-w-0">
+                    <span className="text-[11px] font-extrabold text-[#513321] uppercase tracking-wide block truncate">
+                      Wipe Progress &amp; Reveal Parameters
+                    </span>
+                    <span className="text-[9px] text-[#A67C52] font-medium block">
+                      Adjust wipe threshold, live preview &amp; secret message reveal
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 shrink-0">
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-400/40 text-[9.5px] font-mono font-bold text-amber-900">
+                    Goal: {config.scratchCompletionThreshold || 40}%
+                  </span>
+                  <span className={`text-[#8C6D3B] text-xs font-bold transition-transform duration-200 ${isWipeProgressOpen ? 'rotate-180' : ''}`}>
+                    ▼
+                  </span>
+                </div>
+              </button>
+
+              {/* Dropdown Content */}
+              {isWipeProgressOpen && (
+                <div className="p-3.5 space-y-3.5 border-t border-[#E9DCCB] bg-[#FDFBF7]/80">
+                  {/* 1. Scratch Delay / Wipe Threshold (Reveal Goal) */}
+                  <div className="space-y-1.5 bg-white p-3 rounded-lg border border-[#EFE5D8] shadow-2xs">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-extrabold text-[#513321] uppercase tracking-wide">
+                        Scratch Delay / Wipe Threshold (Reveal Goal)
+                      </label>
+                      <span className="text-[9.5px] font-mono font-bold text-amber-800">
+                        {config.scratchCompletionThreshold || 40}% wipe required
+                      </span>
+                    </div>
+                    <input 
+                      type="range" min="5" max="95" step="1"
+                      value={config.scratchCompletionThreshold || 40} 
+                      onChange={(e) => onChangeField("scratchCompletionThreshold", parseInt(e.target.value) || 40)}
+                      className="w-full h-2 rounded-lg appearance-none cursor-pointer color-slider-horizontal"
+                      style={{ background: 'linear-gradient(to right, #E6DED5, #D6AD61)', padding: 0 }}
+                    />
+                    <div className="flex items-center justify-between gap-1.5 pt-1">
+                      {[
+                        { label: "15% Quick", val: 15 },
+                        { label: "30% Light", val: 30 },
+                        { label: "40% Standard", val: 40 },
+                        { label: "55% Half", val: 55 },
+                        { label: "70% Deep", val: 70 }
+                      ].map((preset) => (
+                        <button
+                          key={preset.val}
+                          type="button"
+                          onClick={() => onChangeField("scratchCompletionThreshold", preset.val)}
+                          className={`flex-1 py-1 rounded-md text-[8.5px] font-bold transition border cursor-pointer text-center ${
+                            (config.scratchCompletionThreshold || 40) === preset.val
+                              ? 'bg-amber-600 text-white border-amber-700 shadow-2xs'
+                              : 'bg-[#F7EFE5] hover:bg-amber-100 text-[#513321] border-[#E9DCCB]'
+                          }`}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 2. Live Wipe Simulator Slider */}
+                  <div className="space-y-1.5 bg-white p-3 rounded-lg border border-[#EFE5D8] shadow-2xs">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[10px] font-extrabold text-[#513321] uppercase tracking-wide">
+                        Simulate Wipe Progress (Live Preview)
+                      </label>
+                      <span className="text-[9px] font-mono font-bold text-amber-700">
+                        Drag to test reveal
+                      </span>
+                    </div>
+                    <input 
+                      type="range" min="0" max="100" step="1"
+                      defaultValue="0"
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value) || 0;
+                        window.dispatchEvent(new CustomEvent('setWipeProgress', { detail: val }));
+                      }}
+                      className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-amber-600 color-slider-horizontal"
+                      style={{ background: 'linear-gradient(to right, #E6DED5, #D6AD61, #10B981)', padding: 0 }}
+                    />
+                    <div className="flex items-center justify-between gap-1 pt-1">
+                      {[
+                        { label: "0% Shield", val: 0 },
+                        { label: "20%", val: 20 },
+                        { label: "40%", val: 40 },
+                        { label: "60%", val: 60 },
+                        { label: "80%", val: 80 },
+                        { label: "100% Reveal", val: 100 }
+                      ].map((p) => (
+                        <button
+                          key={p.val}
+                          type="button"
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent('setWipeProgress', { detail: p.val }));
+                          }}
+                          className="flex-1 py-1 rounded-md text-[8px] font-bold bg-[#F7EFE5] hover:bg-amber-200/80 text-[#513321] border border-[#E9DCCB] transition cursor-pointer text-center"
+                        >
+                          {p.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* 3. Sub-grid: Secret Message Reveal Mode & Scratch Brush Size (2 balanced columns) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1 bg-white p-2.5 rounded-lg border border-[#EFE5D8]">
+                      <label className="text-[9.5px] font-extrabold text-[#513321] uppercase tracking-wide block">
+                        Secret Message Reveal
+                      </label>
+                      <CustomSelect
+                        value={config.scratchSecretMsgRevealMode || "progressive"}
+                        onChange={(val) => onChangeField("scratchSecretMsgRevealMode", val)}
+                        options={[
+                          { value: "progressive", label: "Progressive Peek (Smooth)" },
+                          { value: "threshold", label: "Threshold Unlock" },
+                          { value: "immediate", label: "Instant Under Foil" }
+                        ]}
+                      />
+                    </div>
+
+                    <div className="space-y-1 bg-white p-2.5 rounded-lg border border-[#EFE5D8] flex flex-col justify-between">
+                      <div className="flex justify-between items-center">
+                        <label className="text-[9.5px] font-extrabold text-[#513321] uppercase tracking-wide">
+                          Coin Brush Size
+                        </label>
+                        <span className="text-[9.5px] font-mono font-bold text-amber-800">
+                          {config.scratchBrushSize || 48}px
+                        </span>
+                      </div>
+                      <input 
+                        type="range" min="16" max="72" step="2"
+                        value={config.scratchBrushSize || 48} 
+                        onChange={(e) => onChangeField("scratchBrushSize", parseInt(e.target.value) || 48)}
+                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-600"
+                      />
+                    </div>
+                  </div>
+
+                  {/* 4. Display Toggles Bar (balanced 2 columns) */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-[#EFE5D8]">
+                      <span className="text-[9px] font-extrabold text-[#513321] uppercase">Show Progress %</span>
+                      <SmallToggle
+                        size="xs"
+                        checked={config.showWipeProgressBadge !== false}
+                        onChange={(val) => onChangeField("showWipeProgressBadge", val)}
+                        title="Show or hide Wipe Progress percentage text"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-[#EFE5D8]">
+                      <span className="text-[9px] font-extrabold text-[#513321] uppercase">Show Progress Bar</span>
+                      <SmallToggle
+                        size="xs"
+                        checked={config.showWipeProgressBar !== false}
+                        onChange={(val) => onChangeField("showWipeProgressBar", val)}
+                        title="Show or hide mini gold progress bar"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-slate-400 block mb-1">Secret Hidden Message</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] uppercase tracking-wider text-slate-400 block">Secret Hidden Message</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const quote = getRandomQuoteForField("scratchSecretMessage", config.scratchSecretMessage);
+                    onChangeField("scratchSecretMessage", quote);
+                  }}
+                  className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 hover:text-amber-100 border border-amber-500/50 text-[8px] font-bold flex items-center space-x-1 cursor-pointer transition shadow-xs active:scale-95"
+                  title="Generate random secret treat / surprise"
+                >
+                  <span>🎲</span>
+                  <span>Random Secret</span>
+                </button>
+              </div>
               <textarea 
                 value={config.scratchSecretMessage || ""} 
                 onChange={(e) => onChangeField("scratchSecretMessage", e.target.value)}
@@ -7025,6 +8524,140 @@ export default function AdminSidebar({
               </div>
 
               {renderImageToolControl("Scratch Card Cover Image", "scratchImage")}
+            </div>
+
+            {/* Instant Reveal Action Button Customizer */}
+            <div id="element-tool-scratchRevealBtnCard">
+              {renderPartCard({
+                title: "Instant Reveal Button Styling",
+                subtitle: "Toggle and customize the instant reveal button",
+                toggleKey: "showScratchRevealBtn",
+                icon: <span className="text-amber-500 font-bold">✨</span>,
+                children: (
+                  <div className="space-y-3 pt-1">
+                    <div>
+                      <label className="text-[8.5px] uppercase tracking-wider text-slate-350 font-bold block mb-1">
+                        Button Label Text
+                      </label>
+                      <input
+                        type="text"
+                        value={config.scratchBtnText || config.scratchBtnLabel || ""}
+                        onChange={(e) => {
+                          onChangeField("scratchBtnText", e.target.value);
+                          onChangeField("scratchBtnLabel", e.target.value);
+                        }}
+                        placeholder="Instant Reveal Calendar"
+                        className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded text-xs text-slate-100 focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Button BG Color</label>
+                        <div className="flex items-center space-x-1.5">
+                          <input
+                            type="color"
+                            value={config.scratchBtnBg && config.scratchBtnBg.startsWith('#') ? config.scratchBtnBg : "#C89B3C"}
+                            onChange={(e) => onChangeField("scratchBtnBg", e.target.value)}
+                            className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            value={config.scratchBtnBg || "linear-gradient(180deg, #C89B3C, #9B7428)"}
+                            onChange={(e) => onChangeField("scratchBtnBg", e.target.value)}
+                            className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Button Text Color</label>
+                        <div className="flex items-center space-x-1.5">
+                          <input
+                            type="color"
+                            value={config.scratchBtnTextColor || config.scratchBtnText || "#05070D"}
+                            onChange={(e) => onChangeField("scratchBtnTextColor", e.target.value)}
+                            className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            value={config.scratchBtnTextColor || config.scratchBtnText || "#05070D"}
+                            onChange={(e) => onChangeField("scratchBtnTextColor", e.target.value)}
+                            className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Button Border</label>
+                        <div className="flex items-center space-x-1.5">
+                          <input
+                            type="color"
+                            value={config.scratchBtnBorder || "#f3d38a"}
+                            onChange={(e) => onChangeField("scratchBtnBorder", e.target.value)}
+                            className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            value={config.scratchBtnBorder || "rgba(243,211,138,0.5)"}
+                            onChange={(e) => onChangeField("scratchBtnBorder", e.target.value)}
+                            className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Button Glow</label>
+                        <div className="flex items-center space-x-1.5">
+                          <input
+                            type="color"
+                            value={config.scratchBtnGlow || "#c89b3c"}
+                            onChange={(e) => onChangeField("scratchBtnGlow", e.target.value)}
+                            className="w-7 h-7 rounded border border-slate-700 bg-slate-950 cursor-pointer p-0.5"
+                          />
+                          <input
+                            type="text"
+                            value={config.scratchBtnGlow || "rgba(200,155,60,0.3)"}
+                            onChange={(e) => onChangeField("scratchBtnGlow", e.target.value)}
+                            className="flex-1 px-2 py-1 bg-slate-950 border border-slate-800 rounded text-[10px] font-mono text-slate-200"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1">
+                      <div>
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold block mb-1">Button Font</label>
+                        <CustomSelect
+                          value={config.scratchBtnFont || "font-cinzel"}
+                          onChange={(val) => onChangeField("scratchBtnFont", val)}
+                          options={[
+                            { value: "font-cinzel", label: "Cinzel (Royal)" },
+                            { value: "font-serif", label: "Playfair Display" },
+                            { value: "font-cormorant", label: "Cormorant" },
+                            { value: "font-sans", label: "Inter Modern" },
+                            { value: "font-cursive", label: "Great Vibes" },
+                            { value: "font-marcellus", label: "Marcellus" }
+                          ]}
+                        />
+                      </div>
+
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold">Corner Radius</label>
+                          <span className="text-[8px] font-mono text-amber-400">{config.scratchBtnRadius !== undefined ? config.scratchBtnRadius : 12}px</span>
+                        </div>
+                        <input
+                          type="range" min="0" max="32" step="2"
+                          value={config.scratchBtnRadius !== undefined ? config.scratchBtnRadius : 12}
+                          onChange={(e) => onChangeField("scratchBtnRadius", parseInt(e.target.value))}
+                          className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
 
             {/* Center Shield Black Box & Text Customization with Toggle Switch */}
@@ -7288,6 +8921,138 @@ export default function AdminSidebar({
                 </div>
               )
             })}
+
+                        {/* Date & Countdown Glass Blur & Background Controls */}
+            <div id="element-tool-scratchDateCountdown">
+              {renderPartCard({
+                title: "Date & Countdown Background & Blur",
+                subtitle: "Adjust or eliminate blur & adjust glass background behind the wedding date & countdown timer",
+                icon: <span className="text-amber-500 font-bold">🔮</span>,
+                children: (
+                  <div className="space-y-3 pt-1">
+                    {/* Blur Slider & Presets */}
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
+                        <label className="text-[8.5px] uppercase tracking-wider text-slate-350 font-bold">
+                          Date &amp; Countdown Background Blur
+                        </label>
+                        <span className="text-[9px] font-mono font-bold text-amber-400">
+                          {(config.scratchDateCountdownBlur !== undefined ? config.scratchDateCountdownBlur : (config.scratchCentralBoxBlur !== undefined ? config.scratchCentralBoxBlur : 8)) === 0 
+                            ? "0px (Crystal Clear - No Blur)" 
+                            : `${config.scratchDateCountdownBlur !== undefined ? config.scratchDateCountdownBlur : (config.scratchCentralBoxBlur !== undefined ? config.scratchCentralBoxBlur : 8)}px`}
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="40"
+                        step="1"
+                        value={config.scratchDateCountdownBlur !== undefined ? config.scratchDateCountdownBlur : (config.scratchCentralBoxBlur !== undefined ? config.scratchCentralBoxBlur : 8)}
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0;
+                          onChangeField("scratchDateCountdownBlur", val);
+                          onChangeField("scratchCentralBoxBlur", val);
+                        }}
+                        className="w-full h-1.5 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                      {/* Quick Preset Buttons */}
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        {[
+                          { label: "0px (Crystal Clear)", val: 0 },
+                          { label: "4px (Subtle)", val: 4 },
+                          { label: "8px (Default)", val: 8 },
+                          { label: "16px (Medium)", val: 16 },
+                          { label: "24px (Heavy)", val: 24 }
+                        ].map((p) => {
+                          const currentBlur = config.scratchDateCountdownBlur !== undefined ? config.scratchDateCountdownBlur : (config.scratchCentralBoxBlur !== undefined ? config.scratchCentralBoxBlur : 8);
+                          const isActive = currentBlur === p.val;
+                          return (
+                            <button
+                              key={p.val}
+                              type="button"
+                              onClick={() => {
+                                onChangeField("scratchDateCountdownBlur", p.val);
+                                onChangeField("scratchCentralBoxBlur", p.val);
+                              }}
+                              className={`px-2 py-0.5 rounded text-[8px] font-bold transition border cursor-pointer ${
+                                isActive 
+                                  ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-sm' 
+                                  : 'bg-slate-900 text-slate-300 border-slate-700/80 hover:bg-slate-800'
+                              }`}
+                            >
+                              {p.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Glass Background & Border Controls */}
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
+                      {renderRgbaControlSelfParsed("Date & Countdown Glass BG", "scratchDateCountdownBg", "rgba(13,19,34,0.65)")}
+                      {renderRgbaControlSelfParsed("Date & Countdown Border", "scratchDateCountdownBorder", "rgba(220,185,90,0.25)")}
+                    </div>
+
+                    {/* Countdown Box Timer Blur */}
+                    <div className="pt-2 border-t border-white/5 space-y-1">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold">
+                          Countdown Timer Boxes Blur
+                        </label>
+                        <span className="text-[8px] font-mono text-amber-400 font-bold">
+                          {config.scratchCountdownBoxBlur || 0}px
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="25"
+                        step="1"
+                        value={config.scratchCountdownBoxBlur || 0}
+                        onChange={(e) => onChangeField("scratchCountdownBoxBlur", parseInt(e.target.value) || 0)}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+
+                    {/* Outer Revealed Card Background Blur */}
+                    <div className="pt-1 border-t border-white/5 space-y-1">
+                      <div className="flex justify-between items-center mb-0.5">
+                        <label className="text-[8px] uppercase tracking-wider text-slate-350 font-bold">
+                          Full Revealed Card Blur
+                        </label>
+                        <span className="text-[8px] font-mono text-amber-400 font-bold">
+                          {config.scratchCardBlur || 0}px
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="30"
+                        step="1"
+                        value={config.scratchCardBlur || 0}
+                        onChange={(e) => onChangeField("scratchCardBlur", parseInt(e.target.value) || 0)}
+                        className="w-full h-1 bg-slate-950 rounded appearance-none cursor-pointer accent-amber-500"
+                      />
+                    </div>
+
+                    {/* Quick Ultra Clear Preset */}
+                    <div className="pt-1 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onChangeField("scratchDateCountdownBlur", 0);
+                          onChangeField("scratchCentralBoxBlur", 0);
+                          onChangeField("scratchDateCountdownBg", "rgba(13,19,34,0.20)");
+                        }}
+                        className="px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 rounded text-[8px] uppercase font-bold transition cursor-pointer"
+                      >
+                        ✦ Set Ultra-Clear (0px Blur + High Clarity)
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
 
             {/* Categorized Element Tools (Accordions) */}
             <div className="border-t border-slate-900 pt-3 space-y-2.5">
@@ -7601,27 +9366,47 @@ export default function AdminSidebar({
             {onChangePaymentStatus && (
               <div className="flex items-center justify-between bg-slate-900 p-3 rounded border border-slate-800">
                 <div>
-                  <p className="text-xs font-semibold text-slate-200">Simulate Payment Status</p>
-                  <p className="text-[9px] text-slate-400">Marking paid removes "DS" watermark</p>
+                  <p className="text-xs font-semibold text-slate-200">Payment Status</p>
+                  <p className="text-[9px] text-slate-400">{isAdmin ? 'Admin toggle: marks paid and unlocks 4K HD' : 'Only Admin can approve payment status'}</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onChangePaymentStatus(!isPaid)}
-                  className={`px-3 py-1 text-[10px] font-bold rounded uppercase tracking-wider transition ${
-                    isPaid 
-                      ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30' 
-                      : 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
-                  }`}
-                >
-                  {isPaid ? "Paid (Clear)" : "Unpaid (Watermarked)"}
-                </button>
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    onClick={() => onChangePaymentStatus(!isPaid)}
+                    className={`px-3 py-1 text-[10px] font-bold rounded uppercase tracking-wider transition ${
+                      isPaid 
+                        ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30' 
+                        : 'bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
+                    }`}
+                  >
+                    {isPaid ? "Paid (Clear HD)" : "Unpaid (Watermarked)"}
+                  </button>
+                ) : (
+                  <span className={`px-2.5 py-1 text-[9px] font-bold rounded border ${isPaid ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'}`}>
+                    {isPaid ? '✦ 4K ULTRA HD (Paid)' : '🔒 Unpaid (Watermarked)'}
+                  </span>
+                )}
               </div>
             )}
 
             <div className="border-t border-slate-900 pt-3 space-y-3">
               <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">Custom WhatsApp &amp; Email Text</h3>
               <div>
-                <label className="text-[10px] uppercase tracking-wider text-slate-400 block mb-1">Share Template Message</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[10px] uppercase tracking-wider text-slate-400 block">Share Template Message</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const quote = getRandomQuoteForField("shareText", config.shareText);
+                      onChangeField("shareText", quote);
+                    }}
+                    className="px-2 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/35 text-amber-300 hover:text-amber-100 border border-amber-500/50 text-[8px] font-bold flex items-center space-x-1 cursor-pointer transition shadow-xs active:scale-95"
+                    title="Generate random share template"
+                  >
+                    <span>🎲</span>
+                    <span>Random Share Message</span>
+                  </button>
+                </div>
                 <textarea 
                   value={config.shareText || `We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - ${config.brideName || 'Bride'} & ${config.groomName || 'Groom'}`} 
                   onChange={(e) => onChangeField("shareText", e.target.value)}

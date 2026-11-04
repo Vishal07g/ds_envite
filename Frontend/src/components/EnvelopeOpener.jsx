@@ -383,13 +383,13 @@ export default function EnvelopeOpener({
 
   return (
     <div 
-      className={`w-full h-screen h-dvh max-h-screen fixed inset-0 flex flex-col items-center justify-center overflow-hidden select-none transition-opacity duration-500 z-50 p-2 sm:p-4 md:p-6 ${animPhase >= 4 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} 
+      className={`w-full ${onChangeField ? 'absolute inset-0 z-20' : 'h-screen h-dvh max-h-screen fixed inset-0 z-50'} flex flex-col items-center justify-center overflow-hidden select-none transition-opacity duration-500 p-2 sm:p-4 md:p-6 ${animPhase >= 4 ? 'opacity-0 pointer-events-none' : 'opacity-100'}`} 
       style={{ 
-        background: sizingMode === "full-bleed" 
+        background: config.envelopeBackdropBgColor || config.envelopeBackdropColor || (sizingMode === "full-bleed" 
           ? envelopeBg 
-          : `radial-gradient(ellipse at 50% 50%, rgba(22, 5, 11, 0.96) 0%, #060204 100%)`,
-        touchAction: 'none',
-        overscrollBehavior: 'none',
+          : `radial-gradient(ellipse at 50% 50%, rgba(22, 5, 11, 0.96) 0%, #060204 100%)`),
+        touchAction: onChangeField ? 'pan-y' : 'none',
+        overscrollBehavior: onChangeField ? 'auto' : 'none',
       }}
       onClick={(e) => {
         // Tapping background or envelope triggers starting song playback directly in user gesture
@@ -623,6 +623,28 @@ export default function EnvelopeOpener({
           will-change: transform, filter;
         }
       `}</style>
+
+      {/* ─── Main Screen Backdrop Behind Envelope (Custom HD Image or Video) ─── */}
+      {config.envelopeBackdropImage && (
+        <div className="absolute inset-0 pointer-events-none z-[1] overflow-hidden">
+          {(config.envelopeBackdropImage.match(/\.(mp4|webm|mov|ogg)(\?.*)?$/i) || config.envelopeBackdropImage.startsWith('data:video/')) ? (
+            <video
+              src={config.envelopeBackdropImage}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div 
+              className="w-full h-full bg-cover bg-center"
+              style={{ backgroundImage: `url(${config.envelopeBackdropImage})` }}
+            />
+          )}
+          <div className="absolute inset-0 bg-black/35 pointer-events-none" />
+        </div>
+      )}
 
       {/* ─── Ambient Floating Gold Dust Particles (Float around the ambient room) ─── */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden z-[3]">
@@ -1473,7 +1495,7 @@ function DecoratedInvitationBox({
     <div 
       className="relative w-full max-w-sm sm:max-w-md md:max-w-lg mx-auto rounded-2xl px-5 py-4 sm:px-7 sm:py-5 text-center select-none shadow-2xl transition-all duration-300 pointer-events-auto"
       style={{
-        background: 'radial-gradient(ellipse at 50% 30%, rgba(24, 5, 11, 0.78) 0%, rgba(10, 2, 5, 0.90) 100%)',
+        background: config.envelopeNamesBgColor || config.envelopeNameBgColor || 'radial-gradient(ellipse at 50% 30%, rgba(24, 5, 11, 0.78) 0%, rgba(10, 2, 5, 0.90) 100%)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
         border: `1.5px solid ${accentGold}85`,
@@ -1486,6 +1508,27 @@ function DecoratedInvitationBox({
         }
       }}
     >
+      {/* Name Plate Background Image or Video Overlay */}
+      {config.envelopeNameBgImage && (
+        <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none z-[0]">
+          {(config.envelopeNameBgImage.match(/\.(mp4|webm|mov|ogg)(\?.*)?$/i) || config.envelopeNameBgImage.startsWith('data:video/')) ? (
+            <video
+              src={config.envelopeNameBgImage}
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover opacity-80"
+            />
+          ) : (
+            <div 
+              className="w-full h-full bg-cover bg-center opacity-85"
+              style={{ backgroundImage: `url(${config.envelopeNameBgImage})` }}
+            />
+          )}
+        </div>
+      )}
+
       {/* Inner Fine Hairline Border */}
       <div 
         className="absolute inset-1.5 sm:inset-2 rounded-xl border pointer-events-none" 
@@ -1508,7 +1551,7 @@ function DecoratedInvitationBox({
         </svg>
       </div>
 
-      <div className="space-y-1 sm:space-y-1.5">
+      <div className="space-y-1 sm:space-y-1.5 relative z-[2]">
         {/* Sacred Symbol */}
         {config.showEnvelopeSymbol !== false && (
           (config.envelopeSymbolType === "image" || (!config.envelopeSymbolText && config.envelopeSymbolImg)) && config.envelopeSymbolImg ? (
