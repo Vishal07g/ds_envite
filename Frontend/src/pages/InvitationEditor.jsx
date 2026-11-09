@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import dbStore, { DEFAULT_CONFIG, generateRandomDraftConfig } from '../data/store';
+import { getCategoryDefaultConfig } from '../data/categoryDefaultConfigs';
 import { useAuth } from '../context/AuthContext';
 import AdminSidebar from '../components/AdminSidebar';
 import InvitationRenderer from '../components/InvitationRenderer';
@@ -62,7 +63,9 @@ export default function InvitationEditor() {
 
   const [config, setConfig] = useState(() => {
     if (cachedInv?.config) {
-      const cleaned = { ...DEFAULT_CONFIG, ...cachedInv.config };
+      const cat = cachedInv.config.category;
+      const baseDefaults = (cat && cat !== "wedding") ? getCategoryDefaultConfig(cat, cachedInv.config) : DEFAULT_CONFIG;
+      const cleaned = { ...baseDefaults, ...cachedInv.config };
       if (cleaned.scratchImage && typeof cleaned.scratchImage === 'string' && cleaned.scratchImage.includes('photo-1519225495810-7512c696505a')) {
         cleaned.scratchImage = "";
       }
@@ -208,8 +211,10 @@ export default function InvitationEditor() {
 
         setInvitation(inv);
         const invConfig = inv.config || {};
+        const cat = invConfig.category;
+        const baseDefaults = (cat && cat !== "wedding") ? getCategoryDefaultConfig(cat, invConfig) : DEFAULT_CONFIG;
         const cleanedConfig = { 
-          ...DEFAULT_CONFIG, 
+          ...baseDefaults, 
           ...invConfig,
           brideName: invConfig.brideName || invConfig.coverBrideText || "",
           groomName: invConfig.groomName || invConfig.coverGroomText || "",
@@ -220,7 +225,10 @@ export default function InvitationEditor() {
           cleanedConfig.scratchImage = "";
         }
         setConfig(cleanedConfig);
-        setTitle(inv.title);
+        const effectiveTitle = isGenericInvitationTitle(inv.title)
+          ? getHeroCharacterTitle(cleanedConfig, inv.title)
+          : inv.title;
+        setTitle(effectiveTitle);
         setCustomerId(inv.customerId || "");
         setIsPaid(inv.isPaid || false);
         setStatus(inv.status || "draft");
@@ -240,7 +248,8 @@ export default function InvitationEditor() {
       if (field === 'coverBrideText') {
         next.brideName = val;
         const groom = next.coverGroomText || next.groomName || '';
-        next.envelopeNamesText = `${val}${groom ? ` & ${groom}` : ''}`;
+        const isWed = !prev.category || prev.category === 'wedding';
+        next.envelopeNamesText = isWed ? `${val}${groom ? ` & ${groom}` : ''}` : val;
         next.envelopeInitials = `${val.charAt(0)}${groom ? ` & ${groom.charAt(0)}` : ''}`;
       } else if (field === 'coverGroomText') {
         next.groomName = val;

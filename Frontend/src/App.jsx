@@ -51,7 +51,10 @@ function AppLayout({ children }) {
   }, []);
 
   // Dynamically update document body background color & CSS variable
-  const appBgColor = brandSettings?.appBgColor || '#FFF9F2';
+  const normalizedPath = (location.pathname || '').toLowerCase();
+  const isLandingPage = normalizedPath === '/' || normalizedPath === '';
+  const landingTheme = brandSettings?.landingTheme;
+  const appBgColor = isLandingPage && landingTheme?.colors?.primaryBg ? landingTheme.colors.primaryBg : (brandSettings?.appBgColor || '#F6E9E5');
   const appBgGradient = brandSettings?.appBgGradient || '';
   const appBgOverlayUrl = brandSettings?.appBgOverlayUrl || '';
   const appBgOverlayOpacity = brandSettings?.appBgOverlayOpacity !== undefined ? brandSettings.appBgOverlayOpacity : 0.35;
@@ -69,7 +72,6 @@ function AppLayout({ children }) {
   }, [appBgColor, appBgGradient]);
 
   // Hide header on client invite, editor, and printable PDF pages
-  const normalizedPath = (location.pathname || '').toLowerCase();
   const isInvitePage = normalizedPath.startsWith('/invite');
   const isEditorPage = normalizedPath.startsWith('/admin/editor');
   const isPrintPage = normalizedPath.startsWith('/print');
@@ -113,7 +115,13 @@ function AppLayout({ children }) {
       <div className="fixed inset-2 sm:inset-4 border border-[#C49A4A]/20 rounded-[18px] sm:rounded-[28px] pointer-events-none z-10" />
 
       {/* SaaS Branding Header */}
-      <header className="sticky top-0 z-30 backdrop-blur-md bg-[#FFFEFB]/90 py-3.5 px-6 border-b border-[#E9DCCB] shadow-sm flex items-center justify-between">
+      <header 
+        className="sticky top-0 z-50 backdrop-blur-md py-3.5 px-6 border-b shadow-xs flex items-center justify-between transition-all duration-300"
+        style={{
+          backgroundColor: isLandingPage && landingTheme?.colors?.softWhite ? `${landingTheme.colors.softWhite}F0` : 'rgba(255, 254, 251, 0.92)',
+          borderColor: isLandingPage && landingTheme?.colors?.champagneGold ? `${landingTheme.colors.champagneGold}40` : '#E9DCCB'
+        }}
+      >
         <Link to="/" className="flex items-center space-x-3 group">
           {brandSettings?.logoUrl ? (
             <div className={`w-9 h-9 flex items-center justify-center overflow-hidden border border-[#C49A4A]/40 shadow-sm ${

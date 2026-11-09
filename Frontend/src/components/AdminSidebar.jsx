@@ -2405,13 +2405,38 @@ export default function AdminSidebar({
     );
   };
 
+  const category = config.category || "wedding";
+  const isWedding = category === "wedding";
+
+  const coupleTabName = isWedding ? "Couple & Family"
+    : category === "birthday" ? "Birthday Star & Host"
+    : category === "first_birthday" ? "Baby & Parents"
+    : category === "baby_shower" ? "Mother & Family"
+    : category === "naming_ceremony" ? "Baby & Family"
+    : category === "housewarming" ? "Family & Hosts"
+    : category === "anniversary" ? "Couple & Story"
+    : category === "religious_ceremony" ? "Host & Devotees"
+    : category === "corporate_event" ? "Organization & Speakers"
+    : "Honoree & Host";
+
+  const timelineTabName = isWedding ? "Wedding Timeline"
+    : category === "birthday" ? "Party Schedule"
+    : category === "first_birthday" ? "Celebration Schedule"
+    : category === "baby_shower" ? "Shower Schedule"
+    : category === "naming_ceremony" ? "Ceremony Schedule"
+    : category === "housewarming" ? "Puja & Celebration Schedule"
+    : category === "anniversary" ? "Anniversary Program"
+    : category === "religious_ceremony" ? "Puja Timings & Schedule"
+    : category === "corporate_event" ? "Event Agenda"
+    : "Event Schedule";
+
   const tabs = [
     { id: "envelope", name: "Envelope Design", icon: <SvgBookOpen className="w-4 h-4" />, toggleKey: "showEnvelope" },
     { id: "cover", name: "Cover Design", icon: <SvgHeart className="w-4 h-4" />, toggleKey: "showCoverSection" },
     { id: "music", name: "Background Music", icon: <SvgVolume2 className="w-4 h-4" />, toggleKey: "showMusic" },
     { id: "scratch", name: "Scratch & Reveal", icon: <SvgEye className="w-4 h-4" />, toggleKey: "showScratchSection" },
-    { id: "couple", name: "Couple & Family", icon: <SvgUsers className="w-4 h-4" />, toggleKey: "showCoupleSection" },
-    { id: "timeline", name: "Wedding Timeline", icon: <SvgCalendar className="w-4 h-4" />, toggleKey: "showTimelineSection" },
+    { id: "couple", name: coupleTabName, icon: <SvgUsers className="w-4 h-4" />, toggleKey: "showCoupleSection" },
+    { id: "timeline", name: timelineTabName, icon: <SvgCalendar className="w-4 h-4" />, toggleKey: "showTimelineSection" },
     { id: "venue", name: "Event Venues", icon: <SvgMapPin className="w-4 h-4" />, toggleKey: "showVenueSection" },
     { id: "gallery", name: "Our Gallery", icon: <SvgLayers className="w-4 h-4" />, toggleKey: "showGallery" },
     { id: "rsvp", name: "RSVP & Wishes", icon: <SvgMessageSquare className="w-4 h-4" />, toggleKey: "showRsvpSection" },
@@ -3531,8 +3556,158 @@ export default function AdminSidebar({
       </div>
     )}
 
-        {/* COUPLE & FAMILY TAB */}
+        {/* COUPLE & FAMILY TAB (Category-aware: wedding 100% preserved, others customized) */}
         {activeTab === "couple" && (
+          !isWedding ? (
+            <div className="space-y-4">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">{coupleTabName} Details</h3>
+
+              {/* SECTION HEADERS */}
+              {renderPartCard({
+                title: "Section Titles & Subtitles",
+                toggleKey: "showCoupleTitles",
+                children: (
+                  <div className="space-y-3">
+                    {renderCategorizedElementTool("Section Subtitle", "storySubtitle", config.storySubtitle || "CELEBRATION DETAILS")}
+                    {renderCategorizedElementTool("Section Main Title", "storyTitle", config.storyTitle || `About ${config.heroName || 'Our Event'}`)}
+                  </div>
+                )
+              })}
+
+              {/* PRIMARY HONOREE / HOST DETAILS */}
+              <div className="p-3.5 bg-[#FFFEFB] rounded-xl border border-[#E9DCCB] space-y-3 shadow-sm">
+                <div className="border-b border-[#E9DCCB]/60 pb-2">
+                  <h4 className="text-[11px] font-extrabold text-[#513321] uppercase tracking-wider">
+                    {category === "birthday" ? "Birthday Star Details"
+                      : category === "first_birthday" ? "Baby & Parents Details"
+                      : category === "baby_shower" ? "Mother & Parents Details"
+                      : category === "naming_ceremony" ? "Naming & Baby Details"
+                      : category === "housewarming" ? "New Home & Family Details"
+                      : category === "anniversary" ? "Couple & Anniversary Details"
+                      : category === "religious_ceremony" ? "Sacred Puja & Host Details"
+                      : category === "corporate_event" ? "Company & Summit Details"
+                      : "Honoree Details"}
+                  </h4>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-[10px] font-bold text-[#745037] block mb-1 uppercase tracking-wider">
+                      {category === "birthday" ? "Birthday Person Name"
+                        : category === "first_birthday" ? "Baby Name"
+                        : category === "baby_shower" ? "Mother-to-be Name"
+                        : category === "naming_ceremony" ? "Baby Name"
+                        : category === "housewarming" ? "Family / Owner Name"
+                        : category === "anniversary" ? "Couple Names"
+                        : category === "religious_ceremony" ? "Ceremony / Puja Name"
+                        : category === "corporate_event" ? "Company / Organizer Name"
+                        : "Honoree Name"}
+                    </label>
+                    <input
+                      type="text"
+                      value={config.heroName || config.brideName || ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        onChangeField("heroName", val);
+                        onChangeField("brideName", val);
+                        onChangeField("coverBrideText", val);
+                        onChangeField("scratchCoupleText", val);
+                        onChangeField("scratchCardCouple", val);
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-[#E9DCCB] rounded-lg text-xs font-semibold text-[#513321] focus:outline-none focus:border-[#D6AD61]"
+                      placeholder="e.g. Aarav Sharma"
+                    />
+                  </div>
+
+                  {category === "birthday" && (
+                    <div>
+                      <label className="text-[10px] font-bold text-[#745037] block mb-1 uppercase tracking-wider">
+                        Age Milestone
+                      </label>
+                      <input
+                        type="text"
+                        value={config.age || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          onChangeField("age", val);
+                          if (val) {
+                            onChangeField("scratchMarriedLabel", `Celebrates ${val}th Birthday On`);
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-[#E9DCCB] rounded-lg text-xs font-semibold text-[#513321] focus:outline-none focus:border-[#D6AD61]"
+                        placeholder="e.g. 25"
+                      />
+                    </div>
+                  )}
+
+                  {category === "housewarming" && (
+                    <div>
+                      <label className="text-[10px] font-bold text-[#745037] block mb-1 uppercase tracking-wider">
+                        House / Villa Name
+                      </label>
+                      <input
+                        type="text"
+                        value={config.houseName || ""}
+                        onChange={(e) => onChangeField("houseName", e.target.value)}
+                        className="w-full px-3 py-2 bg-white border border-[#E9DCCB] rounded-lg text-xs font-semibold text-[#513321] focus:outline-none focus:border-[#D6AD61]"
+                        placeholder="e.g. Shanti Nilayam"
+                      />
+                    </div>
+                  )}
+
+                  {category === "anniversary" && (
+                    <div>
+                      <label className="text-[10px] font-bold text-[#745037] block mb-1 uppercase tracking-wider">
+                        Anniversary Milestone
+                      </label>
+                      <input
+                        type="text"
+                        value={config.anniversaryNumber || ""}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          onChangeField("anniversaryNumber", val);
+                          if (val) {
+                            onChangeField("scratchMarriedLabel", `Celebrating ${val} Anniversary On`);
+                          }
+                        }}
+                        className="w-full px-3 py-2 bg-white border border-[#E9DCCB] rounded-lg text-xs font-semibold text-[#513321] focus:outline-none focus:border-[#D6AD61]"
+                        placeholder="e.g. 10th or 25th Silver Jubilee"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-[10px] font-bold text-[#745037] block mb-1 uppercase tracking-wider">
+                      Hosted By / Organizers
+                    </label>
+                    <input
+                      type="text"
+                      value={config.hostName || ""}
+                      onChange={(e) => onChangeField("hostName", e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-[#E9DCCB] rounded-lg text-xs font-semibold text-[#513321] focus:outline-none focus:border-[#D6AD61]"
+                      placeholder="e.g. The Sharma Family"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-[#745037] block mb-1 uppercase tracking-wider">
+                      Personal Message / Story Note
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={config.storyContent || config.invitationMessage || ""}
+                      onChange={(e) => {
+                        onChangeField("storyContent", e.target.value);
+                        onChangeField("invitationMessage", e.target.value);
+                      }}
+                      className="w-full px-3 py-2 bg-white border border-[#E9DCCB] rounded-lg text-xs font-semibold text-[#513321] focus:outline-none focus:border-[#D6AD61]"
+                      placeholder="Share a warm welcome message, event background, or personal note for the guests."
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">Couple &amp; Family Details</h3>
 
@@ -3885,6 +4060,7 @@ export default function AdminSidebar({
               )
             })}
           </div>
+          )
         )}
 
         {/* ENVELOPE DESIGN TAB */}
@@ -6827,15 +7003,28 @@ export default function AdminSidebar({
               3. Cover Typography &amp; Element Tools
             </span>
 
-            {renderCategorizedElementTool("Top Tagline Sentiment", "coverTopTaglineText", "Under the Auspices of Love and Destiny")}
-            {renderCategorizedElementTool("Union Subheading Text", "coverSubheadingText", "The Union Ceremony of")}
-            {renderCategorizedElementTool("Bride Name Details", "coverBrideText", config.brideName || "Ananya")}
-            {renderCategorizedElementTool("Ampersand (&) Symbol", "coverAmpersandText", "&")}
-            {renderCategorizedElementTool("Groom Name Details", "coverGroomText", config.groomName || "Aarav")}
-            {renderCategorizedElementTool("Hero Character / Theme Name", "heroCharacter", config.heroCharacter || "Spider-Man")}
-            {renderCategorizedElementTool("Intro Love Quote", "coverQuoteText", config.introQuote || "Joined in holy matrimony, we celebrate a bond written in heaven and lived in faith.")}
-            {renderCategorizedElementTool("Bottom Tagline Banner", "coverBottomTaglineText", "Joined in holy matrimony, we celebrate a bond written in heaven and lived in faith.")}
-            {renderCategorizedElementTool("Cover Reveal Button", "coverRevealBtnText", "Reveal Secret Save the Date")}
+            {!isWedding ? (
+              <>
+                {renderCategorizedElementTool("Top Tagline Badge", "coverTopTaglineText", config.coverTopTaglineText || (category === "birthday" ? "✦ SPECIAL INVITATION ✦" : "✦ CORDIAL INVITATION ✦"))}
+                {renderCategorizedElementTool("Invitation Subheading", "coverSubheadingText", config.coverSubheadingText || (category === "birthday" ? "Celebrating the Birthday of" : "You Are Cordially Invited to Celebrate With Us"))}
+                {renderCategorizedElementTool(category === "birthday" ? "Birthday Star Name" : category === "first_birthday" ? "Baby Name" : category === "housewarming" ? "Family Name" : "Honoree Name", "coverBrideText", config.heroName || config.coverBrideText || "Honoree")}
+                {renderCategorizedElementTool("Event Message / Quote", "coverQuoteText", config.coverQuoteText || "Join us for an unforgettable celebration.")}
+                {renderCategorizedElementTool("Bottom Reveal Tagline", "coverBottomTaglineText", config.coverBottomTaglineText || "✦ WIPE BELOW TO REVEAL CELEBRATION TIMINGS & SECRET VENUE ✦")}
+                {renderCategorizedElementTool("Cover Reveal Button Text", "coverRevealBtnText", config.coverRevealBtnText || "Reveal Secret Save the Date")}
+              </>
+            ) : (
+              <>
+                {renderCategorizedElementTool("Top Tagline Sentiment", "coverTopTaglineText", "Under the Auspices of Love and Destiny")}
+                {renderCategorizedElementTool("Union Subheading Text", "coverSubheadingText", "The Union Ceremony of")}
+                {renderCategorizedElementTool("Bride Name Details", "coverBrideText", config.brideName || "Ananya")}
+                {renderCategorizedElementTool("Ampersand (&) Symbol", "coverAmpersandText", "&")}
+                {renderCategorizedElementTool("Groom Name Details", "coverGroomText", config.groomName || "Aarav")}
+                {renderCategorizedElementTool("Hero Character / Theme Name", "heroCharacter", config.heroCharacter || "Spider-Man")}
+                {renderCategorizedElementTool("Intro Love Quote", "coverQuoteText", config.introQuote || "Joined in holy matrimony, we celebrate a bond written in heaven and lived in faith.")}
+                {renderCategorizedElementTool("Bottom Tagline Banner", "coverBottomTaglineText", "Joined in holy matrimony, we celebrate a bond written in heaven and lived in faith.")}
+                {renderCategorizedElementTool("Cover Reveal Button", "coverRevealBtnText", "Reveal Secret Save the Date")}
+              </>
+            )}
           </div>
         )}
 
@@ -6851,10 +7040,32 @@ export default function AdminSidebar({
         {/* EVENT VENUES TAB */}
         {activeTab === "venue" && (
           <div className="space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">Event Timings &amp; Venues</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+              {isWedding ? "Event Timings & Venues"
+                : category === "birthday" ? "Party Timings & Venue"
+                : category === "first_birthday" ? "Celebration Timings & Venue"
+                : category === "baby_shower" ? "Shower Timings & Venue"
+                : category === "naming_ceremony" ? "Namkaran Timings & Venue"
+                : category === "housewarming" ? "Griha Pravesh Timings & Venue"
+                : category === "anniversary" ? "Anniversary Timings & Venue"
+                : category === "religious_ceremony" ? "Puja Timings & Venue"
+                : category === "corporate_event" ? "Summit Timings & Venue"
+                : "Event Timings & Venue"}
+            </h3>
 
             <div>
-              <label className="text-[10px] uppercase tracking-wider text-slate-400 block mb-1">Wedding Date &amp; Time</label>
+              <label className="text-[10px] uppercase tracking-wider text-slate-400 block mb-1">
+                {isWedding ? "Wedding Date & Time"
+                  : category === "birthday" ? "Party Date & Time"
+                  : category === "first_birthday" ? "Celebration Date & Time"
+                  : category === "baby_shower" ? "Shower Date & Time"
+                  : category === "naming_ceremony" ? "Ceremony Date & Time"
+                  : category === "housewarming" ? "Puja Date & Time"
+                  : category === "anniversary" ? "Anniversary Date & Time"
+                  : category === "religious_ceremony" ? "Puja Date & Time"
+                  : category === "corporate_event" ? "Summit Date & Time"
+                  : "Event Date & Time"}
+              </label>
               <input 
                 type="datetime-local" 
                 value={config.weddingDate ? config.weddingDate.slice(0, 16) : ""} 
@@ -6900,7 +7111,16 @@ export default function AdminSidebar({
 
             {/* CEREMONY CARD */}
             {renderPartCard({
-              title: "Ceremony Card Details",
+              title: isWedding ? "Ceremony Card Details"
+                : category === "birthday" ? "Party Venue Details"
+                : category === "first_birthday" ? "Celebration Venue Details"
+                : category === "baby_shower" ? "Shower Venue Details"
+                : category === "naming_ceremony" ? "Ceremony Venue Details"
+                : category === "housewarming" ? "Residence Details"
+                : category === "anniversary" ? "Celebration Venue Details"
+                : category === "religious_ceremony" ? "Sacred Venue Details"
+                : category === "corporate_event" ? "Conference Venue Details"
+                : "Primary Venue Details",
               toggleKey: "showCeremonyVenue",
               children: (
                 <div className="p-3 bg-slate-900/60 rounded border border-slate-850 space-y-3">
@@ -6990,7 +7210,16 @@ export default function AdminSidebar({
 
             {/* RECEPTION CARD */}
             {renderPartCard({
-              title: "Reception Card Details",
+              title: isWedding ? "Reception Card Details"
+                : category === "birthday" ? "After-Party Venue (Optional)"
+                : category === "first_birthday" ? "Secondary Venue (Optional)"
+                : category === "baby_shower" ? "High Tea / Reception Venue (Optional)"
+                : category === "naming_ceremony" ? "Mahaprasad & Feast Venue (Optional)"
+                : category === "housewarming" ? "Celebration Dinner Venue (Optional)"
+                : category === "anniversary" ? "Dinner & Banquet Venue (Optional)"
+                : category === "religious_ceremony" ? "Mahaprasad Venue (Optional)"
+                : category === "corporate_event" ? "Networking Dinner Venue (Optional)"
+                : "Secondary Venue Details",
               toggleKey: "showReceptionVenue",
               children: (
                 <div className="p-3 bg-slate-900/60 rounded border border-slate-850 space-y-3">
@@ -7093,7 +7322,18 @@ export default function AdminSidebar({
         {/* OUR GALLERY TAB */}
         {activeTab === "gallery" && (
           <div className="space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">Our Photo Gallery</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+              {isWedding ? "Our Photo Gallery"
+                : category === "birthday" ? "Birthday Photo Gallery"
+                : category === "first_birthday" ? "Little Star Photo Gallery"
+                : category === "baby_shower" ? "Baby Shower Photo Gallery"
+                : category === "naming_ceremony" ? "Namkaran Photo Gallery"
+                : category === "housewarming" ? "Home Tour Photo Gallery"
+                : category === "anniversary" ? "Anniversary Photo Gallery"
+                : category === "religious_ceremony" ? "Devotional Photo Gallery"
+                : category === "corporate_event" ? "Event Media & Photos"
+                : "Photo Gallery"}
+            </h3>
             
             <div className="flex items-center justify-between bg-slate-900/60 p-2.5 rounded border border-slate-850">
               <span className="text-xs text-slate-350">Show Gallery Section</span>
@@ -9232,7 +9472,12 @@ export default function AdminSidebar({
         {/* RSVP & BLESSINGS TAB */}
         {activeTab === "rsvp" && (
           <div className="space-y-4">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">RSVP &amp; Blessings Style</h3>
+            <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400">
+              {isWedding ? "RSVP & Blessings Style"
+                : category === "birthday" ? "RSVP & Birthday Wishes Style"
+                : category === "corporate_event" ? "RSVP & Guest Remarks Style"
+                : "RSVP & Wishes Style"}
+            </h3>
 
             {/* RSVP section details */}
             {renderPartCard({
