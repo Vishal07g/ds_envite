@@ -1,8 +1,8 @@
 import React from 'react';
 
-export default function Watermark({ isPaid = false, isDemo = false, demoText = "Demo Invitation — Replace Sample Details" }) {
+export default function Watermark({ isPaid = false }) {
   // If payment has been completed for this invitation, automatically remove watermark completely!
-  if (isPaid && !isDemo) return null;
+  if (isPaid) return null;
 
   const svgPattern = `
     <svg xmlns="http://www.w3.org/2000/svg" width="260" height="200" viewBox="0 0 260 200">
@@ -54,7 +54,7 @@ export default function Watermark({ isPaid = false, isDemo = false, demoText = "
       {/* Subtle top watermark ribbon badge */}
       <div className="fixed top-2 left-2 z-40 pointer-events-none select-none bg-amber-500/15 border border-amber-500/30 text-amber-300 backdrop-blur-sm px-2.5 py-1 rounded-full text-[9px] font-mono tracking-widest uppercase flex items-center space-x-1.5 shadow-sm">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-        <span>{isDemo ? demoText : "Preview Mode • Watermarked"}</span>
+        <span>Preview Mode • Watermarked</span>
       </div>
     </>
   );

@@ -141,36 +141,4 @@ runTest("9. Localhost Dev Server Active on Port 5173", async () => {
 
 console.log("\n=================================================");
 console.log(`SUMMARY: ${passedCount} / ${totalTests} TESTS PASSED`);
-// ---------------------------------------------------------------------
-// TEST 10: Guided Invitation Creation, 9 Categories & Strict Protection
-// ---------------------------------------------------------------------
-runTest("10. Guided Invitation Creation, 9 Categories & Strict Protection", () => {
-  const catCode = fs.readFileSync(path.resolve(__dirname, '../src/data/invitationCategoriesData.js'), 'utf8');
-  const modalCode = fs.readFileSync(path.resolve(__dirname, '../src/components/GuidedInvitationModal.jsx'), 'utf8');
-  const dashCode = fs.readFileSync(path.resolve(__dirname, '../src/pages/AdminDashboard.jsx'), 'utf8');
-
-  // Verify all 9 categories
-  assert(catCode.includes('"wedding"'), "Must include wedding category");
-  assert(catCode.includes('"birthday"'), "Must include birthday category");
-  assert(catCode.includes('"first_birthday"'), "Must include first_birthday category");
-  assert(catCode.includes('"baby_shower"'), "Must include baby_shower category");
-  assert(catCode.includes('"naming_ceremony"'), "Must include naming_ceremony category");
-  assert(catCode.includes('"housewarming"'), "Must include housewarming category");
-  assert(catCode.includes('"anniversary"'), "Must include anniversary category");
-  assert(catCode.includes('"religious_ceremony"'), "Must include religious_ceremony category");
-  assert(catCode.includes('"corporate_event"'), "Must include corporate_event category");
-
-  // Verify GuidedInvitationModal features
-  assert(modalCode.includes('handleCreateInvitation'), "Modal must have handleCreateInvitation");
-  assert(modalCode.includes('Reset to Sample Details'), "Modal must have reset sample details option");
-  assert(modalCode.includes('functions'), "Wedding must have celebration functions timeline");
-  assert(dashCode.includes('GuidedInvitationModal'), "AdminDashboard must mount GuidedInvitationModal");
-  assert(dashCode.includes('isDraftModalOpen'), "AdminDashboard must control isDraftModalOpen");
-});
-
-
-console.log("=================================================");
-
-console.log("\n=================================================");
-console.log(`SUMMARY: ${passedCount} / ${totalTests} TESTS PASSED`);
 console.log("=================================================");

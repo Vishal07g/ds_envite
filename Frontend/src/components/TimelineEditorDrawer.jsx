@@ -7,63 +7,7 @@ import {
   formatCeremonyDate,
   TIMELINE_CLIPARTS
 } from '../data/timelineDefaults';
-
-export const CATEGORY_EVENT_TEMPLATES = {
-  birthday: [
-    { title: "Guests Arrival & Welcome", category: "arrival", clipartId: "other-gift", time: "07:00 PM", showTime: true, description: "Welcome drinks & refreshments" },
-    { title: "Cake Cutting Ceremony", category: "cake", clipartId: "other-gift", time: "08:00 PM", showTime: true, description: "Gather around for birthday wishes, cake cutting & toasts" },
-    { title: "Grand Dinner Buffet", category: "dinner", clipartId: "other-gift", time: "08:45 PM", showTime: true, description: "Multi-cuisine dinner banquet" },
-    { title: "Live DJ & Dance Floor", category: "party", clipartId: "sangeet-dhol", time: "09:30 PM", showTime: true, description: "Turn up the music and hit the dance floor!" },
-    { title: "Party Games & Activities", category: "games", clipartId: "other-gift", time: "07:30 PM", showTime: true, description: "Fun party games & photo booth" },
-    { title: "Farewell & Return Gifts", category: "gifts", clipartId: "other-gift", time: "10:30 PM", showTime: true, description: "Warm goodbyes and token of gratitude" }
-  ],
-  first_birthday: [
-    { title: "Little Guests Welcome", category: "arrival", clipartId: "other-gift", time: "04:30 PM", showTime: true, description: "Soft play area and fun welcome" },
-    { title: "Cake Smash & Wishes", category: "cake", clipartId: "other-gift", time: "05:30 PM", showTime: true, description: "First birthday cake smash and cheer" },
-    { title: "Magic Show & Games", category: "entertainment", clipartId: "other-gift", time: "06:15 PM", showTime: true, description: "Interactive entertainment for toddlers" },
-    { title: "Celebration Feast & High Tea", category: "dinner", clipartId: "other-gift", time: "07:00 PM", showTime: true, description: "Delicious food & treats for everyone" }
-  ],
-  baby_shower: [
-    { title: "Warm Welcome & High Tea", category: "arrival", clipartId: "other-gift", time: "03:00 PM", showTime: true, description: "Tea, mocktails, and sweet treats" },
-    { title: "Baby Shower Games", category: "games", clipartId: "other-gift", time: "04:00 PM", showTime: true, description: "Fun guessing games and laughs" },
-    { title: "Blessings & Godh Bharai", category: "ritual", clipartId: "other-gift", time: "05:00 PM", showTime: true, description: "Traditional blessings for mom and baby" },
-    { title: "Celebratory Dinner & Gifts", category: "dinner", clipartId: "other-gift", time: "06:30 PM", showTime: true, description: "Feast and heartfelt thank you notes" }
-  ],
-  naming_ceremony: [
-    { title: "Sankalpam & Puja Inception", category: "puja", clipartId: "other-gift", time: "10:00 AM", showTime: true, description: "Auspicious invocation by Vedic pandits" },
-    { title: "Holy Hawan & Chanting", category: "hawan", clipartId: "other-gift", time: "11:00 AM", showTime: true, description: "Sacred fire offering for good health & prosperity" },
-    { title: "Whispering Name (Namkaran)", category: "ritual", clipartId: "other-gift", time: "11:45 AM", showTime: true, description: "Whispering auspicious name in baby's ear" },
-    { title: "Maha Aarti & Mahaprasad", category: "prasad", clipartId: "other-gift", time: "12:30 PM", showTime: true, description: "Divine aarti followed by traditional feast" }
-  ],
-  housewarming: [
-    { title: "Dwar Puja (Threshold)", category: "puja", clipartId: "other-gift", time: "09:30 AM", showTime: true, description: "Auspicious threshold entrance worship" },
-    { title: "Vastu Shanti & Hawan", category: "hawan", clipartId: "other-gift", time: "10:30 AM", showTime: true, description: "Sacred fire rituals to bless every corner" },
-    { title: "Boiling Milk Ritual", category: "ritual", clipartId: "other-gift", time: "11:30 AM", showTime: true, description: "Traditional symbol of overflow of prosperity" },
-    { title: "Celebration Lunch & Home Tour", category: "feast", clipartId: "other-gift", time: "12:30 PM", showTime: true, description: "Warm house tour and delicious lunch" }
-  ],
-  anniversary: [
-    { title: "Welcome Drinks & Toasts", category: "arrival", clipartId: "other-gift", time: "07:00 PM", showTime: true, description: "Sparkling toast to years of love" },
-    { title: "Journey Down Memory Lane", category: "slideshow", clipartId: "other-gift", time: "07:45 PM", showTime: true, description: "Heartfelt retrospective and anniversary cake" },
-    { title: "Vow Renewal & Dances", category: "dance", clipartId: "other-gift", time: "08:30 PM", showTime: true, description: "First dance and celebratory music" },
-    { title: "Gala Banquet Dinner", category: "dinner", clipartId: "other-gift", time: "09:15 PM", showTime: true, description: "Special anniversary feast and celebration" }
-  ],
-  religious_ceremony: [
-    { title: "Ganesh Puja & Sankalp", category: "puja", clipartId: "other-gift", time: "09:30 AM", showTime: true, description: "Invocation of Lord Ganesha for auspicious beginnings" },
-    { title: "Sacred Katha Recitation", category: "katha", clipartId: "other-gift", time: "10:30 AM", showTime: true, description: "Holy scripture reading and divine singing" },
-    { title: "Maha Hawan & Purnahuti", category: "hawan", clipartId: "other-gift", time: "11:45 AM", showTime: true, description: "Sacred fire offerings with Vedic mantras" },
-    { title: "Grand Aarti & Mahaprasad", category: "prasad", clipartId: "other-gift", time: "12:30 PM", showTime: true, description: "Sacred aarti and distribution of holy prasad" }
-  ],
-  corporate_event: [
-    { title: "Registration & Breakfast", category: "arrival", clipartId: "other-gift", time: "09:00 AM", showTime: true, description: "Delegate badge collection and welcome coffee" },
-    { title: "Keynote Opening Address", category: "keynote", clipartId: "other-gift", time: "10:00 AM", showTime: true, description: "Welcome address and industry vision speech" },
-    { title: "Panel Discussions & Q&A", category: "panel", clipartId: "other-gift", time: "11:30 AM", showTime: true, description: "Thought leadership presentations and debates" },
-    { title: "Networking Luncheon", category: "lunch", clipartId: "other-gift", time: "01:00 PM", showTime: true, description: "Executive networking over gourmet buffet" },
-    { title: "Innovation Showcase", category: "showcase", clipartId: "other-gift", time: "02:30 PM", showTime: true, description: "Product unveiling and technological demos" },
-    { title: "Cocktails & Dinner Reception", category: "reception", clipartId: "other-gift", time: "06:30 PM", showTime: true, description: "Evening celebration and executive mingling" }
-  ]
-};
 import TimelineClipartSelector from './TimelineClipartSelector';
-import { CATEGORY_DEFAULT_TIMELINES } from '../data/invitationCategoriesData';
 import { 
   SvgPlus, SvgTrash, SvgEdit, SvgCopy, SvgCheck, 
   SvgCalendar, SvgMapPin, SvgEye, SvgSliders, SvgLayers, SvgSparkles 
@@ -71,12 +15,9 @@ import {
 
 export default function TimelineEditorDrawer({ config = {}, onChangeField, triggerDialog }) {
   // Current ceremonies list or default
-  const fallbackCeremonies = (config.category && CATEGORY_DEFAULT_TIMELINES[config.category])
-    ? CATEGORY_DEFAULT_TIMELINES[config.category]
-    : DEFAULT_CEREMONIES;
   const ceremonies = Array.isArray(config.ceremonies) && config.ceremonies.length > 0 
     ? config.ceremonies 
-    : fallbackCeremonies;
+    : DEFAULT_CEREMONIES;
 
   // Active accordion panel inside timeline editor
   const [openPanel, setOpenPanel] = useState("list"); // 'visibility', 'list', 'details', 'layout', 'colors', 'shape', 'clipart', 'theme', 'advanced'
@@ -433,10 +374,10 @@ export default function TimelineEditorDrawer({ config = {}, onChangeField, trigg
             {/* Add Ceremony Dropdown / Presets */}
             <div className="pt-2">
               <label className="text-[10px] uppercase font-bold text-amber-300 block mb-1.5">
-                + Add Event From Template
+                + Add Ceremony From Template
               </label>
               <div className="grid grid-cols-2 gap-2">
-                {((config.category && CATEGORY_EVENT_TEMPLATES[config.category]) ? CATEGORY_EVENT_TEMPLATES[config.category] : CEREMONY_TEMPLATES).map(tpl => (
+                {CEREMONY_TEMPLATES.map(tpl => (
                   <button
                     key={tpl.title}
                     type="button"

@@ -216,25 +216,7 @@ const ScratchCardShield = React.memo(
 
         ctx.fillStyle = scratchShieldBadgeSubtextColor || accent;
         ctx.font = 'italic 12px "Cormorant Garamond", Georgia, serif';
-        const defaultSubtitle = isVideo 
-          ? 'Wipe gold shield to reveal romantic video & date' 
-          : (!config.category || config.category === 'wedding'
-            ? 'Wipe gold shield to reveal wedding date & countdown'
-            : config.category === 'birthday'
-            ? 'Wipe gold card to reveal birthday party details & countdown'
-            : config.category === 'first_birthday'
-            ? 'Wipe gold sparkles to reveal cake smash & party details'
-            : config.category === 'baby_shower'
-            ? 'Wipe gold shield to reveal baby shower details & countdown'
-            : config.category === 'naming_ceremony'
-            ? 'Wipe gold shield to reveal sacred muhurat & countdown'
-            : config.category === 'housewarming'
-            ? 'Wipe gold shield to reveal new home address & countdown'
-            : config.category === 'anniversary'
-            ? 'Wipe gold shield to reveal anniversary gala & countdown'
-            : config.category === 'religious_ceremony'
-            ? 'Wipe gold shield to reveal sacred puja timings & countdown'
-            : 'Wipe metallic shield to reveal summit agenda & countdown');
+        const defaultSubtitle = isVideo ? 'Wipe gold shield to reveal romantic video & date' : 'Wipe gold shield to reveal wedding date & countdown';
         ctx.fillText(scratchShieldBadgeSubtitle || defaultSubtitle, width / 2, height / 2 + 14);
 
         ctx.shadowBlur = 0;
@@ -2623,7 +2605,7 @@ export default function InvitationRenderer({
                           marginBottom: shouldScale ? `clamp(2px, 0.6cqw, 16px)` : undefined,
                           lineHeight: shouldScale ? 1.2 : undefined
                         }}
-                        value={config.coverTopTaglineText !== undefined ? config.coverTopTaglineText : ((config.category && config.category !== 'wedding') ? (config.category === 'birthday' ? '✦ SPECIAL INVITATION ✦' : '✦ CORDIAL INVITATION ✦') : "Under the Auspices of Love and Destiny")}
+                        value={config.coverTopTaglineText !== undefined ? config.coverTopTaglineText : "Under the Auspices of Love and Destiny"}
                       />
                     )}
 
@@ -2657,7 +2639,7 @@ export default function InvitationRenderer({
                             marginBottom: shouldScale ? `clamp(1px, 0.4cqw, 8px)` : undefined,
                             lineHeight: shouldScale ? 1.2 : undefined
                           }}
-                          value={config.coverSubheadingText !== undefined ? config.coverSubheadingText : ((config.category && config.category !== 'wedding') ? (config.category === 'birthday' ? 'Celebrating the Birthday of' : 'You Are Cordially Invited to Celebrate With Us') : "The Union Ceremony of")}
+                          value={config.coverSubheadingText !== undefined ? config.coverSubheadingText : "The Union Ceremony of"}
                         />
                       )}
 
@@ -2693,60 +2675,56 @@ export default function InvitationRenderer({
                             value={config.coverBrideText !== undefined ? config.coverBrideText : config.brideName}
                           />
                           
-                          {(!config.category || config.category === 'wedding' || Boolean(config.coverGroomText || config.groomName)) && (
-                            <>
-                              <EditableText config={config}
-                                as="span"
-                                isEditing={!!onChangeField}
-                                onChangeField={onChangeField}
-                                onSelect={onSelectElement}
-                                tabId="cover"
-                                field="coverAmpersandText"
-                                activeColorId={activeColorId}
-                                setActiveColorId={setActiveColorId}
-                                popoverId="coverAmpersand"
-                                onChangeColor={(color) => onChangeField && onChangeField('coverAmpersandTextColor', color)}
-                                colorValue={config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b'}
-                                className={`block my-2 ${config.coverAmpersandTextFont || config.coverAmpersandFont || 'font-cursive'} ${config.coverAmpersandTextSize || config.coverAmpersandSize || 'text-3xl sm:text-5xl'}`} 
-                                style={{ 
-                                  color: config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b',
-                                  textAlign: (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'left' ? 'left' : (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'right' ? 'right' : 'center',
-                                  opacity: (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) !== undefined ? (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) : 1,
-                                  filter: (config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow) !== undefined ? `brightness(${config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow}%)` : undefined,
-                                  transform: (config.coverAmpersandTextYOffset || config.coverAmpersandYOffset) ? `translateY(${config.coverAmpersandTextYOffset || config.coverAmpersandYOffset}px)` : undefined,
-                                  fontSize: shouldScale ? getScaledFontSize(config.coverAmpersandTextSize || config.coverAmpersandSize, 38, 12, 3.6, contentScale) : undefined,
-                                  margin: shouldScale ? `clamp(1px, 0.5cqw, 8px) 0` : undefined,
-                                  lineHeight: shouldScale ? 1.1 : undefined
-                                }}
-                                value={config.coverAmpersandText !== undefined ? config.coverAmpersandText : "&"}
-                              />
-                              
-                              <EditableText config={config}
-                                as="span"
-                                isEditing={!!onChangeField}
-                                onChangeField={onChangeField}
-                                onSelect={onSelectElement}
-                                tabId="cover"
-                                field="coverGroomText"
-                                activeColorId={activeColorId}
-                                setActiveColorId={setActiveColorId}
-                                popoverId="coverGroom"
-                                onChangeColor={(color) => onChangeField && onChangeField('coverGroomTextColor', color)}
-                                colorValue={config.coverGroomTextColor || config.coverGroomColor || '#ffffff'}
-                                className={`font-semibold block sm:inline ${config.coverGroomTextFont || config.coverGroomFont || 'font-serif'} ${config.coverGroomTextSize || config.coverGroomSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
-                                style={{ 
-                                  color: config.coverGroomTextColor || config.coverGroomColor || '#ffffff',
-                                  textAlign: (config.coverGroomTextAlign || config.coverGroomAlign) === 'left' ? 'left' : (config.coverGroomTextAlign || config.coverGroomAlign) === 'right' ? 'right' : 'center',
-                                  opacity: (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) !== undefined ? (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) : 1,
-                                  filter: (config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow) !== undefined ? `brightness(${config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow}%)` : undefined,
-                                  transform: (config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset) ? `translateY(${config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset}px)` : undefined,
-                                  fontSize: shouldScale ? getScaledFontSize(config.coverGroomTextSize || config.coverGroomSize, 60, 15, 5.2, contentScale) : undefined,
-                                  lineHeight: shouldScale ? 1.15 : undefined
-                                }}
-                                value={config.coverGroomText !== undefined ? config.coverGroomText : config.groomName}
-                              />
-                            </>
-                          )}
+                          <EditableText config={config}
+                            as="span"
+                            isEditing={!!onChangeField}
+                            onChangeField={onChangeField}
+                            onSelect={onSelectElement}
+                            tabId="cover"
+                            field="coverAmpersandText"
+                            activeColorId={activeColorId}
+                            setActiveColorId={setActiveColorId}
+                            popoverId="coverAmpersand"
+                            onChangeColor={(color) => onChangeField && onChangeField('coverAmpersandTextColor', color)}
+                            colorValue={config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b'}
+                            className={`block my-2 ${config.coverAmpersandTextFont || config.coverAmpersandFont || 'font-cursive'} ${config.coverAmpersandTextSize || config.coverAmpersandSize || 'text-3xl sm:text-5xl'}`} 
+                            style={{ 
+                              color: config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b',
+                              textAlign: (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'left' ? 'left' : (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'right' ? 'right' : 'center',
+                              opacity: (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) !== undefined ? (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) : 1,
+                              filter: (config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow) !== undefined ? `brightness(${config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow}%)` : undefined,
+                              transform: (config.coverAmpersandTextYOffset || config.coverAmpersandYOffset) ? `translateY(${config.coverAmpersandTextYOffset || config.coverAmpersandYOffset}px)` : undefined,
+                              fontSize: shouldScale ? getScaledFontSize(config.coverAmpersandTextSize || config.coverAmpersandSize, 38, 12, 3.6, contentScale) : undefined,
+                              margin: shouldScale ? `clamp(1px, 0.5cqw, 8px) 0` : undefined,
+                              lineHeight: shouldScale ? 1.1 : undefined
+                            }}
+                            value={config.coverAmpersandText !== undefined ? config.coverAmpersandText : "&"}
+                          />
+                          
+                          <EditableText config={config}
+                            as="span"
+                            isEditing={!!onChangeField}
+                            onChangeField={onChangeField}
+                            onSelect={onSelectElement}
+                            tabId="cover"
+                            field="coverGroomText"
+                            activeColorId={activeColorId}
+                            setActiveColorId={setActiveColorId}
+                            popoverId="coverGroom"
+                            onChangeColor={(color) => onChangeField && onChangeField('coverGroomTextColor', color)}
+                            colorValue={config.coverGroomTextColor || config.coverGroomColor || '#ffffff'}
+                            className={`font-semibold block sm:inline ${config.coverGroomTextFont || config.coverGroomFont || 'font-serif'} ${config.coverGroomTextSize || config.coverGroomSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
+                            style={{ 
+                              color: config.coverGroomTextColor || config.coverGroomColor || '#ffffff',
+                              textAlign: (config.coverGroomTextAlign || config.coverGroomAlign) === 'left' ? 'left' : (config.coverGroomTextAlign || config.coverGroomAlign) === 'right' ? 'right' : 'center',
+                              opacity: (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) !== undefined ? (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) : 1,
+                              filter: (config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow) !== undefined ? `brightness(${config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow}%)` : undefined,
+                              transform: (config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset) ? `translateY(${config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset}px)` : undefined,
+                              fontSize: shouldScale ? getScaledFontSize(config.coverGroomTextSize || config.coverGroomSize, 60, 15, 5.2, contentScale) : undefined,
+                              lineHeight: shouldScale ? 1.15 : undefined
+                            }}
+                            value={config.coverGroomText !== undefined ? config.coverGroomText : config.groomName}
+                          />
                         </h1>
                       )}
                     </div>
@@ -2872,7 +2850,7 @@ export default function InvitationRenderer({
                           fontSize: shouldScale ? getScaledFontSize(config.coverBottomTaglineTextSize || config.coverBottomTaglineSize, 11, 7, 1.2, contentScale) : undefined,
                           padding: shouldScale ? 'clamp(2px, 0.6cqw, 8px) clamp(8px, 1.8cqw, 18px)' : undefined
                         }}
-                        value={config.coverBottomTaglineText !== undefined ? config.coverBottomTaglineText : ((config.category && config.category !== 'wedding') ? '✦ WIPE BELOW TO REVEAL CELEBRATION TIMINGS & SECRET VENUE ✦' : "✦ A Sacred Promise of Eternal Love • Uncover Our Secret Date Below ✦")}
+                        value={config.coverBottomTaglineText !== undefined ? config.coverBottomTaglineText : "✦ A Sacred Promise of Eternal Love • Uncover Our Secret Date Below ✦"}
                       />
                     )}
                   </div>
@@ -3005,25 +2983,7 @@ export default function InvitationRenderer({
                     opacity: config.scratchDescriptionOpacity !== undefined ? config.scratchDescriptionOpacity : 1
                   }}
                 >
-                  {config.scratchDescription || config.scratchDesc || (
-                  !config.category || config.category === 'wedding'
-                    ? "We've kept the date a romantic surprise. Use your mouse or touchscreen to wipe off the gold metallic shield to discover the ceremony timings and live countdown!"
-                    : config.category === 'birthday'
-                    ? "We've kept the party details a surprise! Use your finger or mouse to wipe off the gold card to reveal the secret birthday party timings and live countdown!"
-                    : config.category === 'first_birthday'
-                    ? "Use your finger or mouse to wipe off the gold sparkles to reveal the celebration timings, cake smash and live countdown!"
-                    : config.category === 'baby_shower'
-                    ? "Wipe off the golden card to reveal the baby shower schedule, surprises and live countdown!"
-                    : config.category === 'naming_ceremony'
-                    ? "Wipe off the auspicious golden shield to discover the sacred Namkaran timings and live countdown!"
-                    : config.category === 'housewarming'
-                    ? "Wipe off the golden shield to discover our new home address, Griha Pravesh timings and live countdown!"
-                    : config.category === 'anniversary'
-                    ? "Wipe off the metallic shield to reveal the anniversary celebration timings, dinner schedule and live countdown!"
-                    : config.category === 'religious_ceremony'
-                    ? "Wipe off the sacred shield to discover the holy puja timings, maha aarti and live countdown!"
-                    : "Wipe off the metallic shield to unveil keynote speakers, summit agenda and conference countdown!"
-                )}
+                  {config.scratchDescription || config.scratchDesc || "We've kept the date a romantic surprise. Use your mouse or touchscreen to wipe off the gold metallic shield to discover the ceremony timings and live countdown!"}
                 </p>
               )}
 
@@ -3293,7 +3253,7 @@ export default function InvitationRenderer({
                               transform: (config.scratchCoupleTextYOffset || config.scratchCoupleYOffset) ? `translateY(${config.scratchCoupleTextYOffset || config.scratchCoupleYOffset}px)` : undefined
                             }}
                           >
-                            {config.scratchCoupleText || config.scratchCardCouple || ((config.category && config.category !== 'wedding') ? (config.heroName || config.coverTitle) : `${config.brideName} & ${config.groomName}`)}
+                            {config.scratchCoupleText || `${config.brideName} & ${config.groomName}`}
                           </span>
                           )}
                           
@@ -3311,7 +3271,7 @@ export default function InvitationRenderer({
                                 transform: (config.scratchMarriedLabelYOffset || config.scratchMarriedLabelTextYOffset) ? `translateY(${config.scratchMarriedLabelYOffset || config.scratchMarriedLabelTextYOffset}px)` : undefined
                               }}
                             >
-                              {config.scratchMarriedLabel || ((config.category === 'birthday') ? 'Celebrates Birthday On' : (config.category === 'first_birthday') ? 'Turns One Year Old On' : (config.category === 'baby_shower') ? 'Welcoming Baby On' : (config.category === 'naming_ceremony') ? 'Namkaran Ceremony On' : (config.category === 'housewarming') ? 'Griha Pravesh On' : (config.category === 'anniversary') ? 'Celebrating Anniversary On' : (config.category === 'religious_ceremony') ? 'Sacred Ceremony On' : (config.category === 'corporate_event') ? 'Event Commences On' : 'Are getting married on')}
+                              {config.scratchMarriedLabel || "Are getting married on"}
                             </p>
                             )}
                             {config.showScratchDate !== false && (
@@ -3572,18 +3532,7 @@ export default function InvitationRenderer({
                         filter: config.storySubtitleGlow !== undefined ? `brightness(${config.storySubtitleGlow}%)` : undefined,
                         transform: config.storySubtitleYOffset ? `translateY(${config.storySubtitleYOffset}px)` : undefined
                       }}
-                      value={config.storySubtitle || (
-                        config.category && config.category !== 'wedding'
-                          ? (config.category === 'birthday' ? 'THE BIRTHDAY STAR'
-                            : config.category === 'first_birthday' ? 'OUR LITTLE BLESSING'
-                            : config.category === 'baby_shower' ? 'WELCOMING BABY'
-                            : config.category === 'naming_ceremony' ? 'SACRED BLESSINGS'
-                            : config.category === 'housewarming' ? 'OUR NEW BEGINNING'
-                            : config.category === 'anniversary' ? 'A DECADE OF LOVE'
-                            : config.category === 'religious_ceremony' ? 'DIVINE DEVOTION'
-                            : 'EVENT OVERVIEW')
-                          : "Meet the families"
-                      )}
+                      value={config.storySubtitle || "Meet the families"}
                     />
 
                     <EditableText config={config}
@@ -3605,18 +3554,7 @@ export default function InvitationRenderer({
                         filter: config.storyTitleGlow !== undefined ? `brightness(${config.storyTitleGlow}%)` : undefined,
                         transform: config.storyTitleYOffset ? `translateY(${config.storyTitleYOffset}px)` : undefined
                       }}
-                      value={config.storyTitle || (
-                        config.category && config.category !== 'wedding'
-                          ? (config.category === 'birthday' ? `Celebrating ${config.heroName || config.coverBrideText || 'Our Birthday Star'}`
-                            : config.category === 'first_birthday' ? `One Whole Year of ${config.heroName || config.coverBrideText || 'Joy'}`
-                            : config.category === 'baby_shower' ? 'Showering with Love'
-                            : config.category === 'naming_ceremony' ? 'Namkaran Sanskar'
-                            : config.category === 'housewarming' ? `Welcome to ${config.houseName || 'Our New Home'}`
-                            : config.category === 'anniversary' ? 'Our Beautiful Journey'
-                            : config.category === 'religious_ceremony' ? (config.ceremonyName || 'Sacred Puja')
-                            : 'About This Event')
-                          : "Vows of Two Dynasties"
-                      )}
+                      value={config.storyTitle || "Vows of Two Dynasties"}
                     />
 
                     <div className={`w-16 h-1 bg-amber-500/30 ${
@@ -3627,101 +3565,6 @@ export default function InvitationRenderer({
                 )}
 
                 {(() => {
-                  // Standalone Non-Wedding Category Honoree Display (Zero Wedding Rituals, Zero Wedding Texts)
-                  if (config.category && config.category !== 'wedding') {
-                    return (
-                      <div className="space-y-6">
-                        <div 
-                          className="p-5 sm:p-7 rounded-2xl bg-black/25 border text-center max-w-xl mx-auto shadow-xl transition-all duration-300"
-                          style={customStyles.borderAccentSoft}
-                        >
-                          <EditableText config={config}
-                            as="h4"
-                            isEditing={!!onChangeField}
-                            onChangeField={onChangeField}
-                            onSelect={onSelectElement}
-                            tabId="couple"
-                            field="storyHonoreeTitle"
-                            activeColorId={activeColorId}
-                            setActiveColorId={setActiveColorId}
-                            popoverId="storyHonoreeTitle"
-                            onChangeColor={(color) => onChangeField && onChangeField('storyBrideTitleColor', color)}
-                            colorValue={config.storyBrideTitleColor || config.accentGold || '#b89254'}
-                            className={`text-sm sm:text-lg font-semibold mb-1 ${config.storyBrideTitleFont || config.cursiveFontClass || 'font-cursive'}`}
-                            style={{ color: config.storyBrideTitleColor || config.accentGold || '#b89254' }}
-                            value={config.storyHonoreeTitle || (config.category === 'birthday' ? 'The Birthday Star' : config.category === 'first_birthday' ? 'Our Little Miracle' : config.category === 'housewarming' ? 'The Homeowners' : 'Event Honoree')}
-                          />
-                          <EditableText config={config}
-                            as="p"
-                            isEditing={!!onChangeField}
-                            onChangeField={onChangeField}
-                            onSelect={onSelectElement}
-                            tabId="couple"
-                            field="heroName"
-                            activeColorId={activeColorId}
-                            setActiveColorId={setActiveColorId}
-                            popoverId="storyHeroName"
-                            onChangeColor={(color) => onChangeField && onChangeField('storyBrideNameColor', color)}
-                            colorValue={config.storyBrideNameColor || defaultBodyTextColor}
-                            className={`text-2xl sm:text-4xl font-bold my-1.5 ${config.storyBrideNameFont || 'font-serif'}`}
-                            style={{ color: config.storyBrideNameColor || defaultBodyTextColor }}
-                            value={config.heroName || config.brideName || config.coverBrideText || 'Aarav Sharma'}
-                          />
-                          <p className="text-xs sm:text-sm font-semibold text-amber-400/90 tracking-wide mt-1">
-                            {config.category === 'birthday' ? (config.age ? `Turning ${config.age} Years Old` : 'Milestone Birthday')
-                              : config.category === 'first_birthday' ? 'Turning 1 Year Old'
-                              : config.category === 'housewarming' ? (config.houseName || 'Our New Dream Home')
-                              : config.category === 'anniversary' ? (config.anniversaryNumber ? `${config.anniversaryNumber} Anniversary` : 'Wedding Anniversary')
-                              : (config.hostName ? `Hosted by ${config.hostName}` : '')}
-                          </p>
-                          {config.hostName && config.category !== 'housewarming' && (
-                            <p className="text-[11px] sm:text-xs text-slate-300/80 italic mt-1">
-                              Hosted by {config.hostName}
-                            </p>
-                          )}
-                        </div>
-
-                        {config.showStoryParagraph !== false && (
-                          <div className="space-y-3 pt-3 text-center max-w-2xl mx-auto">
-                            <EditableText config={config}
-                              as="h3"
-                              isEditing={!!onChangeField}
-                              onChangeField={onChangeField}
-                              onSelect={onSelectElement}
-                              tabId="couple"
-                              field="storyPathTitle"
-                              activeColorId={activeColorId}
-                              setActiveColorId={setActiveColorId}
-                              popoverId="storyPathTitle"
-                              onChangeColor={(color) => onChangeField && onChangeField('storyPathTitleColor', color)}
-                              colorValue={config.storyPathTitleColor || config.accentGold || '#b89254'}
-                              className={`text-xl sm:text-2xl font-semibold italic ${config.storyPathTitleFont || config.cursiveFontClass || 'font-cursive'}`}
-                              style={{ color: config.storyPathTitleColor || config.accentGold || '#b89254' }}
-                              value={config.storyPathTitle || (config.category === 'birthday' ? 'A Milestone Worth Celebrating' : config.category === 'housewarming' ? 'From Dream to Reality' : 'A Joyful Celebration')}
-                            />
-                            <EditableText config={config}
-                              as="p"
-                              isEditing={!!onChangeField}
-                              onChangeField={onChangeField}
-                              onSelect={onSelectElement}
-                              tabId="couple"
-                              field="storyParagraph"
-                              activeColorId={activeColorId}
-                              setActiveColorId={setActiveColorId}
-                              popoverId="storyParagraph"
-                              onChangeColor={(color) => onChangeField && onChangeField('storyParagraphColor', color)}
-                              colorValue={config.storyParagraphColor || defaultBodyTextColor}
-                              className={`leading-relaxed ${config.storyParagraphFont || config.storyTitleFont || 'font-serif'} text-xs sm:text-sm`}
-                              style={{ color: config.storyParagraphColor || defaultBodyTextColor }}
-                              value={config.storyParagraph || config.storyContent || config.invitationMessage || (config.category === 'birthday' ? `${config.heroName || 'Aarav Sharma'} is turning ${config.age || 25}! Join us as we look back on wonderful memories and toast to the bright exciting years ahead.` : 'Join us for this special celebration!')}
-                            />
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-
-                  // ORIGINAL WEDDING CODE (100% UNTOUCHED)
                   const isGroomFirst = config.coupleCardsOrder === 'groomFirst';
                   const isStacked = config.coupleCardsLayout === 'stacked';
                   const gapPx = config.coupleCardsGap !== undefined ? config.coupleCardsGap : 12;
@@ -3935,7 +3778,7 @@ export default function InvitationRenderer({
                   );
                 })()}
 
-                {(!config.category || config.category === 'wedding') && config.showStoryParagraph !== false && (
+                {config.showStoryParagraph !== false && (
                   <div className="space-y-3 pt-2">
                     <EditableText config={config}
                       as="h3"
@@ -4015,32 +3858,10 @@ export default function InvitationRenderer({
               {config.showVenueHeader !== false && (
                 <div className="text-center mb-6">
                   <span className="text-[10px] uppercase tracking-[0.25em] font-bold block mb-2" style={customStyles.colorAccent}>
-                    {config.venueSubtitle || (
-                      !config.category || config.category === 'wedding' ? "Ceremony Venue Directions"
-                      : config.category === "birthday" ? "Celebration Location & Directions"
-                      : config.category === "first_birthday" ? "Party Location & Directions"
-                      : config.category === "baby_shower" ? "Shower Location & Directions"
-                      : config.category === "naming_ceremony" ? "Auspicious Ceremony Directions"
-                      : config.category === "housewarming" ? "New Home Location & Directions"
-                      : config.category === "anniversary" ? "Celebration Venue Directions"
-                      : config.category === "religious_ceremony" ? "Sacred Venue Directions"
-                      : config.category === "corporate_event" ? "Summit Venue & Location"
-                      : "Venue Directions"
-                    )}
+                    Ceremony Venue Directions
                   </span>
                   <h2 className={`font-light ${config.venueTitleFont || 'font-serif'} ${config.venueTitleSize || 'text-2xl sm:text-3xl'} ${config.venueTitleAlign || 'text-center'}`}>
-                    {config.venueTitle || (
-                      !config.category || config.category === 'wedding' ? "Sacred Venue & Reception"
-                      : config.category === "birthday" ? "Party Venue & Celebration"
-                      : config.category === "first_birthday" ? "Celebration Venue"
-                      : config.category === "baby_shower" ? "Celebration Venue"
-                      : config.category === "naming_ceremony" ? "Namkaran Ceremony Venue"
-                      : config.category === "housewarming" ? "Our New Residence"
-                      : config.category === "anniversary" ? "Anniversary Celebration Venue"
-                      : config.category === "religious_ceremony" ? "Pooja & Prasad Venue"
-                      : config.category === "corporate_event" ? "Conference & Event Venue"
-                      : "Event Venue"
-                    )}
+                    Sacred Venue &amp; Reception
                   </h2>
                   <div className={`w-16 h-1 bg-amber-500/30 mt-4 ${
                     (config.venueTitleAlign === 'text-center') ? 'mx-auto' :
@@ -4049,7 +3870,7 @@ export default function InvitationRenderer({
                 </div>
               )}
 
-              <div className={config.showReceptionVenue !== false ? "grid grid-cols-1 md:grid-cols-2 gap-8" : "max-w-2xl mx-auto"}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Ceremony Venue */}
                 {config.showCeremonyVenue !== false && (
                   <div className="p-5 rounded-2xl bg-slate-900/40 border relative overflow-hidden" style={customStyles.borderAccentSoft}>
@@ -4059,18 +3880,7 @@ export default function InvitationRenderer({
                           <SvgCalendar className="w-5 h-5" style={customStyles.colorAccent} />
                         </div>
                         <div>
-                          <p className="text-[9px] uppercase tracking-wider font-bold opacity-90">
-                            {(!config.category || config.category === 'wedding') ? "Holy Ceremony"
-                              : config.category === "birthday" ? "Party Venue"
-                              : config.category === "first_birthday" ? "Celebration Venue"
-                              : config.category === "baby_shower" ? "Shower Venue"
-                              : config.category === "naming_ceremony" ? "Ceremony Venue"
-                              : config.category === "housewarming" ? "New Residence"
-                              : config.category === "anniversary" ? "Celebration Venue"
-                              : config.category === "religious_ceremony" ? "Sacred Venue"
-                              : config.category === "corporate_event" ? "Conference Venue"
-                              : "Event Venue"}
-                          </p>
+                          <p className="text-[9px] uppercase tracking-wider font-bold opacity-90">Holy Ceremony</p>
                           <EditableText config={config}
                             as="p"
                             isEditing={!!onChangeField}
@@ -4085,17 +3895,7 @@ export default function InvitationRenderer({
                             colorValue={config.weddingVenueColor || defaultBodyTextColor}
                             className="font-semibold text-xs sm:text-sm"
                             style={{ color: config.weddingVenueColor || defaultBodyTextColor }}
-                            value={config.weddingVenue || config.venueCeremonyName || (
-                              config.category === "birthday" ? "The Grand Celebration Hall"
-                              : config.category === "first_birthday" ? "Little Stars Celebration Hall"
-                              : config.category === "baby_shower" ? "Blossom Garden Pavilion"
-                              : config.category === "naming_ceremony" ? "Shree Celebration Hall"
-                              : config.category === "housewarming" ? (config.houseName || "Our New Residence")
-                              : config.category === "anniversary" ? "The Royal Ballroom"
-                              : config.category === "religious_ceremony" ? "Our Residence"
-                              : config.category === "corporate_event" ? "Grand Convention Centre"
-                              : (!config.category || config.category === 'wedding' ? "The Starlight Cathedral" : "Celebration Venue")
-                            )}
+                            value={config.weddingVenue}
                           />
                         </div>
                       </div>
@@ -4120,17 +3920,7 @@ export default function InvitationRenderer({
                             colorValue={config.weddingAddressColor || defaultBodyTextColor}
                             className="text-xs opacity-90"
                             style={{ color: config.weddingAddressColor || defaultBodyTextColor }}
-                            value={config.weddingAddress || config.venueCeremonyAddress || (
-                              config.category === "birthday" ? "45 Jubilee Hills, Road No. 10, Hyderabad"
-                              : config.category === "first_birthday" ? "12 Blossom Park, Indiranagar, Bangalore"
-                              : config.category === "baby_shower" ? "78 Green Valley Boulevard, Koregaon Park, Pune"
-                              : config.category === "naming_ceremony" ? "56 Temple View Road, Navrangpura, Ahmedabad"
-                              : config.category === "housewarming" ? "123 Celebration Avenue, Phase 2, Palm Meadows, Gurugram"
-                              : config.category === "anniversary" ? "Marine Drive Promenade, Nariman Point, Mumbai"
-                              : config.category === "religious_ceremony" ? "14 Shanti Kunj, Civil Lines, Jaipur"
-                              : config.category === "corporate_event" ? "Financial District, HITEC City, Hyderabad"
-                              : (!config.category || config.category === 'wedding' ? "100 Seraphim Way, Glass Valley, CA" : "Event Address")
-                            )}
+                            value={config.weddingAddress}
                           />
                         </div>
                       </div>
@@ -4199,18 +3989,7 @@ export default function InvitationRenderer({
                           <SvgAward className="w-5 h-5" style={customStyles.colorAccent} />
                         </div>
                         <div>
-                          <p className="text-[9px] uppercase tracking-wider font-bold opacity-90">
-                            {(!config.category || config.category === 'wedding') ? "Grand Reception"
-                              : config.category === "birthday" ? "After-Party Venue"
-                              : config.category === "first_birthday" ? "Secondary Venue"
-                              : config.category === "baby_shower" ? "High Tea / Reception Venue"
-                              : config.category === "naming_ceremony" ? "Mahaprasad & Feast Venue"
-                              : config.category === "housewarming" ? "Celebration Dinner Venue"
-                              : config.category === "anniversary" ? "Anniversary Dinner & Banquet"
-                              : config.category === "religious_ceremony" ? "Mahaprasad Venue"
-                              : config.category === "corporate_event" ? "Networking Dinner Venue"
-                              : "Reception Venue"}
-                          </p>
+                          <p className="text-[9px] uppercase tracking-wider font-bold opacity-90">Grand Reception</p>
                           <EditableText config={config}
                             as="p"
                             isEditing={!!onChangeField}
@@ -4529,18 +4308,7 @@ export default function InvitationRenderer({
                         onSelect={onSelectElement}
                         tabId="gallery"
                         field="gallerySubtitle"
-                        value={config.gallerySubtitle || (
-                          config.category && config.category !== 'wedding'
-                            ? (config.category === 'birthday' ? 'Milestone Moments & Smiles'
-                              : config.category === 'first_birthday' ? 'One Year of Smiles & Baby Steps'
-                              : config.category === 'baby_shower' ? 'Cherishing Every Step of Motherhood'
-                              : config.category === 'naming_ceremony' ? 'Sacred Blessings & Family Joy'
-                              : config.category === 'housewarming' ? 'From Dreams to Reality'
-                              : config.category === 'anniversary' ? 'Years of Love, Laughter & Togetherness'
-                              : config.category === 'religious_ceremony' ? 'Divine Blessings & Family'
-                              : 'Summit Highlights & Media')
-                            : "Our Love in Frames"
-                        )}
+                        value={config.gallerySubtitle || "Our Love in Frames"}
                         className="text-[10px] uppercase tracking-[0.25em] font-bold block mb-2"
                         style={customStyles.colorAccent}
                       />
@@ -4551,18 +4319,7 @@ export default function InvitationRenderer({
                         onSelect={onSelectElement}
                         tabId="gallery"
                         field="galleryTitle"
-                        value={config.galleryTitle || (
-                          config.category && config.category !== 'wedding'
-                            ? (config.category === 'birthday' ? 'Birthday Memories'
-                              : config.category === 'first_birthday' ? 'Little Star Moments'
-                              : config.category === 'baby_shower' ? 'Baby Shower Moments'
-                              : config.category === 'naming_ceremony' ? 'Namkaran Moments'
-                              : config.category === 'housewarming' ? 'Our Home Journey'
-                              : config.category === 'anniversary' ? 'Anniversary Memories'
-                              : config.category === 'religious_ceremony' ? 'Devotional Moments'
-                              : 'Event Highlights & Media')
-                            : "Our Gallery"
-                        )}
+                        value={config.galleryTitle || "Our Gallery"}
                         className={`font-light ${config.galleryTitleFont || 'font-serif'} ${config.galleryTitleSize || 'text-2xl sm:text-3xl'} text-center`}
                       />
                       <div className="w-16 h-0.5 bg-amber-500/30 mx-auto mt-4" />
@@ -4790,23 +4547,7 @@ export default function InvitationRenderer({
                         onChange={(e) => setRsvpForm(prev => ({ ...prev, note: e.target.value }))}
                         rows={2}
                         className="w-full px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-xs focus:outline-none focus:border-amber-500/50 resize-none"
-                        placeholder={
-                          !config.category || config.category === 'wedding' || config.category === 'anniversary'
-                            ? "A message for the couple..."
-                            : config.category === 'birthday'
-                            ? `A warm birthday wish for ${config.heroName || config.coverBrideText || 'the birthday star'}...`
-                            : config.category === 'first_birthday'
-                            ? "A sweet blessing or wish for the baby..."
-                            : config.category === 'baby_shower'
-                            ? "A loving message or blessing for mama & baby..."
-                            : config.category === 'naming_ceremony'
-                            ? "A divine blessing for the baby..."
-                            : config.category === 'housewarming'
-                            ? "Congratulations & blessings for the new home..."
-                            : config.category === 'religious_ceremony'
-                            ? "Pranam and devotional blessings..."
-                            : "Notes, remarks or dietary requirements..."
-                        }
+                        placeholder="A message for the couple..."
                       />
                     </div>
                     <button
@@ -4891,25 +4632,10 @@ export default function InvitationRenderer({
             <div className="max-w-4xl mx-auto">
               <div className="text-center mb-6">
                 <span className="text-[10px] uppercase tracking-[0.25em] font-bold block mb-2" style={customStyles.colorAccent}>
-                  {config.wishesSubtitle || (
-                    config.category && config.category !== 'wedding'
-                      ? (config.category === 'corporate_event' ? 'Guestbook & Feedback' : 'Send Your Love & Wishes')
-                      : "Share Your Love"
-                  )}
+                  Share Your Love
                 </span>
                 <h2 className={`font-light ${config.wishTitleFont || 'font-serif'} ${config.wishTitleSize || 'text-2xl sm:text-3xl'} ${config.wishTitleAlign || 'text-center'}`}>
-                  {config.wishesTitle || (
-                    config.category && config.category !== 'wedding'
-                      ? (config.category === 'birthday' ? 'Warm Birthday Wishes'
-                        : config.category === 'first_birthday' ? 'Sweet Blessings & Wishes'
-                        : config.category === 'baby_shower' ? 'Shower Blessings & Love'
-                        : config.category === 'naming_ceremony' ? 'Divine Blessings & Pranam'
-                        : config.category === 'housewarming' ? 'Griha Pravesh Blessings'
-                        : config.category === 'anniversary' ? 'Anniversary Wishes & Toasts'
-                        : config.category === 'religious_ceremony' ? 'Pranam & Divine Blessings'
-                        : 'Guestbook & Remarks')
-                      : "Blessings & Wishes"
-                  )}
+                  Blessings &amp; Wishes
                 </h2>
                 <div className={`w-16 h-1 bg-amber-500/30 mt-4 ${
                   (config.wishTitleAlign === 'text-center') ? 'mx-auto' :
