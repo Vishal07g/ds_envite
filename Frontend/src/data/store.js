@@ -1278,7 +1278,9 @@ const INITIAL_INVITATIONS = [
   "status": "published",
   "title": "Suman & Vishal's Wedding Invitation",
   "updatedAt": "2026-10-20T01:53:10.490Z",
-  "customerId": "user-customer"
+  "customerId": "user-customer",
+  "rsvps": [],
+  "wishes": []
 },
   {
     id: "invite-demo",
