@@ -82,3 +82,4 @@ async function updateFirebase() {
 }
 
 updateFirebase().catch(console.error);
+
