@@ -1121,13 +1121,6 @@ export async function syncDriveFolder({ invitation, oldFolderName, customFolderN
     }
   }
 
-  // Fallback: If folderId was not returned from remote API, link directly to DS Envite DataCentre Google Drive Root
-  if (!folderState.folderId) {
-    folderState.folderId = GOOGLE_DRIVE_ROOT_FOLDER_ID;
-    folderState.folderUrl = GOOGLE_DRIVE_ROOT_FOLDER_URL;
-    folderState.status = "synced";
-  }
-
   return folderState;
 }
 

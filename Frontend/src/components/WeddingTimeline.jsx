@@ -1,46 +1,14 @@
 import React, { useMemo } from 'react';
 import { TIMELINE_CLIPARTS, formatCeremonyDate, DEFAULT_CEREMONIES, DEFAULT_TIMELINE_CONFIG } from '../data/timelineDefaults';
-import { CATEGORY_DEFAULT_TIMELINES } from '../data/invitationCategoriesData';
 import { SvgCalendar, SvgMapPin, SvgExternalLink, SvgHeart } from './icons';
 import { hexToRgb } from '../utils/helpers';
 
 export default function WeddingTimeline({ config = {}, isPrintMode = false }) {
-  // Merge timeline configuration with category defaults
+  // Merge timeline configuration with defaults
   const timelineConfig = useMemo(() => {
-    const isNonWedding = config.category && config.category !== 'wedding';
-    const catCeremonies = isNonWedding && CATEGORY_DEFAULT_TIMELINES[config.category] 
-      ? CATEGORY_DEFAULT_TIMELINES[config.category] 
-      : DEFAULT_CEREMONIES;
-    const catHeading = isNonWedding
-      ? (config.category === "birthday" ? "Party Schedule"
-        : config.category === "first_birthday" ? "Celebration Schedule"
-        : config.category === "baby_shower" ? "Shower Schedule"
-        : config.category === "naming_ceremony" ? "Ceremony Schedule"
-        : config.category === "housewarming" ? "Puja & Celebration Schedule"
-        : config.category === "anniversary" ? "Anniversary Program"
-        : config.category === "religious_ceremony" ? "Ceremony & Puja Timings"
-        : config.category === "corporate_event" ? "Event Agenda"
-        : "Celebration Schedule")
-      : "Wedding Ceremony";
-    const catSubtitle = isNonWedding
-      ? (config.category === "birthday" ? "Order of Events"
-        : config.category === "religious_ceremony" ? "Divine Schedule"
-        : config.category === "corporate_event" ? "Summit Timeline"
-        : "Schedule")
-      : "Timeline";
-
-    const hasLeakedWeddingCeremonies = isNonWedding && Array.isArray(config.ceremonies) && 
-      config.ceremonies.some(c => c.id === 'ceremony-haldi' || c.id === 'ceremony-mehendi');
-
     return {
       ...DEFAULT_TIMELINE_CONFIG,
-      ...(isNonWedding ? {
-        timelineHeading: catHeading,
-        timelineSubtitle: catSubtitle,
-        ceremonies: catCeremonies
-      } : {}),
-      ...config,
-      ...(hasLeakedWeddingCeremonies ? { ceremonies: catCeremonies } : {})
+      ...config
     };
   }, [config]);
 
@@ -60,23 +28,8 @@ export default function WeddingTimeline({ config = {}, isPrintMode = false }) {
   }, [config.primaryColor]);
 
   const {
-    timelineHeading = (config.category && config.category !== "wedding")
-      ? (config.category === "birthday" ? "Party Schedule"
-        : config.category === "first_birthday" ? "Celebration Schedule"
-        : config.category === "baby_shower" ? "Shower Schedule"
-        : config.category === "naming_ceremony" ? "Ceremony Schedule"
-        : config.category === "housewarming" ? "Puja & Celebration Schedule"
-        : config.category === "anniversary" ? "Anniversary Program"
-        : config.category === "religious_ceremony" ? "Ceremony & Puja Timings"
-        : config.category === "corporate_event" ? "Event Agenda"
-        : "Celebration Schedule")
-      : "Wedding Ceremony",
-    timelineSubtitle = (config.category && config.category !== "wedding")
-      ? (config.category === "birthday" ? "Order of Events"
-        : config.category === "religious_ceremony" ? "Divine Schedule"
-        : config.category === "corporate_event" ? "Summit Timeline"
-        : "Schedule")
-      : "Timeline",
+    timelineHeading = "Wedding Ceremony",
+    timelineSubtitle = "Timeline",
     showTimelineHeading = true,
     showTimelineSubtitle = true,
     showTimelineLine = true,
@@ -111,15 +64,14 @@ export default function WeddingTimeline({ config = {}, isPrintMode = false }) {
     timelineCardCornerRadius = 18,
     timelineClipartSize = 46,
     showTimelineOuterFrame = true,
-    ceremonies = ((config.category && CATEGORY_DEFAULT_TIMELINES[config.category]) ? CATEGORY_DEFAULT_TIMELINES[config.category] : DEFAULT_CEREMONIES)
+    ceremonies = DEFAULT_CEREMONIES
   } = timelineConfig;
 
   // Process and sort ceremony list
   const sortedCeremonies = useMemo(() => {
-    const fallbackList = (config.category && CATEGORY_DEFAULT_TIMELINES[config.category]) ? CATEGORY_DEFAULT_TIMELINES[config.category] : DEFAULT_CEREMONIES;
     const list = Array.isArray(ceremonies) && ceremonies.length > 0 
       ? [...ceremonies] 
-      : [...fallbackList];
+      : [...DEFAULT_CEREMONIES];
 
     const visibleList = list.filter(c => c.visible !== false);
 
