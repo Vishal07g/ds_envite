@@ -9,13 +9,36 @@ import {
 import Toast from '../components/Toast';
 import CustomDialog from '../components/CustomDialog';
 import ThemeEditorModal from '../components/ThemeEditorModal';
+import { formatDriveDirectUrl } from '../utils/helpers';
 import InvitationTypeDropdown from '../components/InvitationTypeDropdown';
+import CategoryDropdown from '../components/CategoryDropdown';
+import HomeHeroBanner from '../components/HomeHeroBanner';
+import CinematicHeroBanner from '../components/CinematicHeroBanner';
+import CinematicLandingBackground from '../components/CinematicLandingBackground';
+import { INVITATION_CATEGORIES } from '../data/invitationCategoriesData';
+import GuidedInvitationModal from '../components/GuidedInvitationModal';
 
 export default function PresetGallery() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
   const [toast, setToast] = useState({ show: false, message: "", type: "info" });
   const [filterReligion, setFilterReligion] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [openPresetDropdownId, setOpenPresetDropdownId] = useState(null);
+  const [hoveredPresetId, setHoveredPresetId] = useState(null);
+
+  // Close preset dropdown on click outside
+  useEffect(() => {
+    const handleDocumentClick = (e) => {
+      if (!e.target.closest('.preset-dropdown-container')) {
+        setOpenPresetDropdownId(null);
+      }
+    };
+    document.addEventListener('click', handleDocumentClick);
+    return () => document.removeEventListener('click', handleDocumentClick);
+  }, []);
+  const [isGuidedModalOpen, setIsGuidedModalOpen] = useState(false);
+  const presetsSectionRef = React.useRef(null);
   
   // Preview Form Modal state
   const [previewPreset, setPreviewPreset] = useState(null);
@@ -72,10 +95,13 @@ export default function PresetGallery() {
   };
 
   const [presets, setPresets] = useState(() => dbStore.getPresets());
+  const [brandSettings, setBrandSettings] = useState(() => dbStore.getBrandSettings());
+  const allInvitations = dbStore.getInvitations();
 
   useEffect(() => {
     const handleSync = () => {
       setPresets(dbStore.getPresets());
+      setBrandSettings(dbStore.getBrandSettings());
     };
     window.addEventListener("db_synced", handleSync);
     return () => window.removeEventListener("db_synced", handleSync);
@@ -262,231 +288,345 @@ export default function PresetGallery() {
   };
 
   const filteredPresets = presets.filter(p => {
-    if (filterReligion === "all") return true;
-    return p.religion === filterReligion;
+    const matchesReligion = filterReligion === "all" || p.religion === filterReligion;
+    const pCategory = p.category || p.config?.category || 'wedding';
+    const matchesCategory = selectedCategory === "all" || pCategory === selectedCategory;
+    return matchesReligion && matchesCategory;
   });
 
+  const selectedCatObj = (typeof INVITATION_CATEGORIES !== 'undefined' ? INVITATION_CATEGORIES : []).find(c => c.id === selectedCategory);
+
   return (
-    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-body)] p-6 space-y-8 font-sans preset-gallery-container">
+    <div className="min-h-screen bg-[var(--bg-app)] text-[var(--text-body)] py-6 sm:py-8 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 font-sans preset-gallery-container w-full">
+      <div className="w-full max-w-[1720px] mx-auto space-y-8">
       {toast.show && (
         <Toast message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: "" })} />
       )}
 
-      {/* Hero Banner with a beautiful dark themed glass card wrapper */}
-      <div className="w-[calc(100%+3rem)] -mx-6 rounded-none bg-[#0b0f19]/75 border-y border-white/5 shadow-2xl backdrop-blur-md hero-dark-card py-10 px-6 -mt-6">
-        <div className="max-w-3xl mx-auto text-center space-y-3">
-          <h1 className="text-4xl sm:text-5xl font-cinzel font-bold tracking-wider text-amber-100 leading-tight">
-            Digital Invitation
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-200 font-medium leading-relaxed">
-            Choose from our selection of premium curated presets. Instantly preview templates, submit wedding details, and share a watermark-free experience upon payment.
-          </p>
-        </div>
-      </div>
+      {/* 1. Cinematic Multi-Layer Architectural Background Environment */}
+      {brandSettings?.landingTheme && (
+        <CinematicLandingBackground theme={brandSettings.landingTheme} />
+      )}
 
-      {/* Filter Toolbar */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-end justify-between gap-4 border-y border-slate-850 py-5 max-w-6xl mx-auto px-2">
-        <div className="flex-1 max-w-sm">
-          <InvitationTypeDropdown
-            value={filterReligion}
-            onChange={setFilterReligion}
-            labelText="Invitation Type & Theme Category"
-          />
-        </div>
+      {/* 2. Full-Width Cinematic Hero Banner & Integrated Occasion Category Selector */}
+      <CinematicHeroBanner
+        theme={brandSettings?.landingTheme}
+        onDraftClick={() => setIsGuidedModalOpen(true)}
+        onExploreClick={() => presetsSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
+        selectedCategory={selectedCategory}
+        onSelectCategory={(catId) => {
+          setSelectedCategory(catId);
+          if (catId === "all") {
+            setFilterReligion("all");
+          }
+        }}
+      />
+
+      {/* Presets Section Anchor */}
+      <div ref={presetsSectionRef} className="scroll-mt-6" />
+
+      {/* Unified Luxury Category & Filter Command Hub */}
+      {brandSettings?.landingTheme?.visibility?.showFilterHub !== false && (
+        <div className="w-full rounded-3xl border border-[#E9DCCB] bg-[#FFFEFB]/95 shadow-md p-5 sm:p-6 backdrop-blur-md space-y-5 relative z-40 overflow-visible">
         
-        <div className="flex items-center space-x-3 self-end md:self-auto">
-          {currentUser?.role === 'admin' && (
-            <button
-              onClick={handleOpenCreateTheme}
-              className="px-4 py-3 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 font-extrabold text-xs uppercase tracking-wider shadow-lg hover:shadow-amber-500/20 active:scale-98 transition flex items-center space-x-1.5 shrink-0"
-            >
-              <SvgPlus className="w-4 h-4 text-slate-950" />
-              <span>Add New Theme</span>
-            </button>
+        {/* Hub Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E9DCCB]/60 pb-3">
+          <div className="space-y-0.5">
+            <div className="flex items-center space-x-2">
+              <span className="text-base">🎉</span>
+              <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#513321]">
+                Curated Celebration & Design Hub
+              </h2>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-900 border border-amber-500/25">
+                {filteredPresets.length} {filteredPresets.length === 1 ? 'Design' : 'Designs'} Available
+              </span>
+            </div>
+            <p className="text-[11px] text-[#8C6D58] font-medium pl-6">
+              {selectedCatObj ? selectedCatObj.subtitle : 'Select celebration category & faith to filter matching luxury presets'}
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-2 self-start sm:self-auto">
+            {(selectedCategory !== 'all' || filterReligion !== 'all') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCategory('all');
+                  setFilterReligion('all');
+                }}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold text-[#8D414D] hover:bg-[#F9E8E5] border border-[#E9C9BD] transition cursor-pointer flex items-center space-x-1"
+              >
+                <span>✕</span>
+                <span>Reset Filters</span>
+              </button>
+            )}
+            {currentUser?.role === 'admin' && (
+              <button
+                onClick={handleOpenCreateTheme}
+                className="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#D6AD61] to-[#C49A4A] hover:from-[#C49A4A] hover:to-[#AC853B] text-[#382416] hover:text-white font-extrabold text-xs uppercase tracking-wider shadow-sm transition flex items-center space-x-1.5 shrink-0 cursor-pointer"
+              >
+                <SvgPlus className="w-3.5 h-3.5" />
+                <span>Add Theme</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Dual Animated Dropdowns (Category + Faith/Tradition) in Responsive Full-Width Layout */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 items-end relative z-50">
+          {/* Dropdown 1: Celebration Category */}
+          <div className="relative z-50">
+            <CategoryDropdown
+              value={selectedCategory}
+              onChange={setSelectedCategory}
+              presets={presets}
+              labelText="Celebration Category"
+              className="w-full"
+            />
+          </div>
+
+          {/* Dropdown 2: Cultural Faith & Tradition */}
+          <div className="relative z-40">
+            <InvitationTypeDropdown
+              value={filterReligion}
+              onChange={setFilterReligion}
+              presets={presets}
+              labelText="Tradition & Sacred Symbol"
+              className="w-full"
+            />
+          </div>
+
+          {/* Active Filter Summary Capsule */}
+          {brandSettings?.landingTheme?.visibility?.showSummaryCapsule !== false && (
+            <div className="hidden lg:flex flex-col justify-end pb-1 space-y-1">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#8C6D58]">
+              Active Selection
+            </span>
+            <div className="flex items-center space-x-2 text-xs font-medium text-[#513321] bg-[#FFF9F2] border border-[#E9DCCB] px-3.5 py-2.5 rounded-xl">
+              <span>{selectedCatObj?.icon || '🌟'}</span>
+              <span className="font-bold truncate">{selectedCatObj?.name || 'All Celebrations'}</span>
+              <span className="text-[#8C6D58]">•</span>
+              <span className="truncate">{filterReligion === 'all' ? 'All Traditions' : filterReligion}</span>
+            </div>
+          </div>
           )}
         </div>
       </div>
+      )}
 
-      {/* Presets Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto pt-4">
+      {/* Presets Grid - Responsive & Expansive (Fluid Full Width) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 w-full pt-4 relative z-10">
         {filteredPresets.map(preset => {
           const cfg = preset.config || {};
-          const hex = (cfg.primaryColor || "#0b1329").replace('#', '');
-          const r = parseInt(hex.substring(0, 2), 16) || 0;
-          const g = parseInt(hex.substring(2, 4), 16) || 0;
-          const b = parseInt(hex.substring(4, 6), 16) || 0;
-          const isLightBg = ((r * 299 + g * 587 + b * 114) / 1000) > 155;
+          const isDropdownOpen = openPresetDropdownId === preset.id || hoveredPresetId === preset.id;
+
+          const matchingInv = allInvitations.find(i => 
+            (i.config?.presetId === preset.id || i.presetId === preset.id) ||
+            (i.config?.brideName && cfg.brideName && i.config.brideName.toLowerCase() === cfg.brideName.toLowerCase()) ||
+            (preset.title && i.title && i.title.toLowerCase().includes(preset.title.toLowerCase().replace(/['’]s\s*theme/i, '').trim()))
+          );
+
+          const coverDesign = preset.thumbnail || cfg.heroImage || matchingInv?.config?.heroImage || (
+            (cfg.brideName?.toLowerCase() === 'suman' || preset.title?.toLowerCase().includes('suman'))
+              ? '/cover_suman_vishal_1k.jpg'
+              : (preset.religion === 'hindu' ? '/thumbnails/radha-krishna.jpg' : '/cover_suman_vishal_1k.jpg')
+          );
+          const resolvedCoverUrl = formatDriveDirectUrl(coverDesign, "image");
 
           return (
-            <div key={preset.id} className="rounded-2xl border border-slate-800 bg-slate-950/70 shadow-xl overflow-hidden flex flex-col justify-between hover:border-amber-500/40 transition duration-300">
+            <div 
+              key={preset.id} 
+              onMouseEnter={() => setHoveredPresetId(preset.id)}
+              onMouseLeave={() => setHoveredPresetId(null)}
+              className={`preset-dropdown-container rounded-2xl border transition-all duration-300 relative flex flex-col justify-between ${
+                isDropdownOpen
+                  ? 'border-[#C49A4A] shadow-2xl z-[999999] bg-[#FFFEFB]'
+                  : 'border-[#E9DCCB] hover:border-[#C49A4A]/70 bg-[#FFFEFB] shadow-md hover:shadow-xl z-10'
+              }`}
+            >
               
-              {/* Card visual thumbnail — mirrors invitation design */}
+              {/* Card visual thumbnail — mirrors authentic invitation cover design */}
               <div 
-                className="h-48 p-4 flex flex-col justify-between relative overflow-hidden bg-cover bg-center border-b border-slate-800 group"
+                onClick={() => setOpenPresetDropdownId(prev => prev === preset.id ? null : preset.id)}
+                className="preset-card-cover h-52 sm:h-56 p-4 flex flex-col justify-between relative overflow-hidden bg-cover bg-center border-b border-[#E9DCCB]/60 group transition-all duration-300 rounded-t-2xl cursor-pointer"
                 style={{ 
                   backgroundColor: cfg.primaryColor || '#0b1329',
-                  backgroundImage: `linear-gradient(${isLightBg ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.45)'}, ${isLightBg ? 'rgba(255,255,255,0.70)' : 'rgba(0,0,0,0.75)'}), url("${preset.thumbnail || cfg.heroImage || '/bg_floral_pink.jpg'}")`,
+                  backgroundImage: `linear-gradient(to bottom, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.10) 45%, rgba(0, 0, 0, 0.65) 100%), url("${resolvedCoverUrl}")`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center'
                 }}
               >
-                {/* Ornamental border overlay matching invitation */}
+                {/* Ornamental border overlay matching invitation cover */}
                 <div 
-                  className="absolute inset-2.5 border rounded-xl pointer-events-none transition-all duration-300 group-hover:scale-95"
-                  style={{ borderColor: cfg.accentGold || '#f59e0b', opacity: 0.6 }}
+                  className="absolute inset-2.5 border rounded-xl pointer-events-none transition-all duration-300 group-hover:scale-[0.98]"
+                  style={{ borderColor: cfg.accentGold || '#D6AD61', opacity: 0.65 }}
                 />
 
-                <div className="flex justify-between items-center z-10">
-                  <span className="text-base font-bold drop-shadow-md" style={{ color: isLightBg ? '#8a2b3f' : (cfg.accentGold || '#f59e0b') }}>
-                    {cfg.customSacredSymbol || '✦'}
+                {/* Top Quick Action Pill */}
+                <div className="flex justify-end items-center z-10">
+                  <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider backdrop-blur-md shadow-xs border transition-colors ${
+                    isDropdownOpen
+                      ? 'bg-[#D6AD61] text-[#382416] border-[#C49A4A]'
+                      : 'bg-black/50 text-white/90 border-white/20'
+                  }`}>
+                    {isDropdownOpen ? '▲ Close Details' : '▼ View Details'}
                   </span>
-                  <div className="flex items-center space-x-1.5">
-                    {!preset.hidePrice && (
-                      <span className="text-[10px] px-2 py-0.5 rounded-full font-black tracking-wider bg-amber-500 text-slate-950 shadow-md">
-                        ₹{Math.round((preset.price || cfg.price || 999) * (1 - (preset.discountPercent !== undefined ? preset.discountPercent : (cfg.discountPercent !== undefined ? cfg.discountPercent : 30)) / 100))}
-                      </span>
-                    )}
-                    <span 
-                      className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider backdrop-blur-md shadow"
-                      style={{
-                        backgroundColor: isLightBg ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.85)',
-                        color: isLightBg ? '#8a2b3f' : '#f59e0b',
-                        border: `1px solid ${cfg.accentGold || '#f59e0b'}40`
-                      }}
-                    >
-                      {preset.religion || 'secular'}
-                    </span>
-                    {currentUser?.role === 'admin' && (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            handleOpenEditTheme(preset);
-                          }}
-                          className="p-1 rounded bg-amber-500 hover:bg-amber-400 text-slate-950 transition shadow-md flex items-center justify-center border border-slate-900 cursor-pointer"
-                          title="Edit Theme Preset Details"
-                        >
-                          <SvgEdit className="w-3 h-3 text-slate-950 font-bold" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            e.preventDefault();
-                            handleDeletePreset(preset);
-                          }}
-                          className="p-1 rounded bg-rose-600 hover:bg-rose-500 text-white transition shadow-md flex items-center justify-center border border-slate-900 cursor-pointer"
-                          title="Delete Invitation Design Preset"
-                        >
-                          <SvgTrash className="w-3 h-3 text-white" />
-                        </button>
-                      </>
-                    )}
-                  </div>
                 </div>
 
-                {/* High-Contrast Headline & Couple Title Box */}
-                <div 
-                  className="text-center z-10 px-3 py-2 rounded-xl backdrop-blur-md shadow-md"
-                  style={{
-                    backgroundColor: isLightBg ? 'rgba(255, 255, 255, 0.88)' : 'rgba(11, 19, 41, 0.88)',
-                    border: `1px solid ${isLightBg ? 'rgba(138, 43, 63, 0.35)' : 'rgba(229, 184, 88, 0.35)'}`
-                  }}
-                >
-                  <h4 
-                    className="text-xs font-extrabold tracking-wider uppercase font-cinzel line-clamp-1"
-                    style={{ 
-                      color: isLightBg ? '#8a2b3f' : (cfg.accentGold || '#f59e0b')
-                    }}
-                  >
-                    {preset.title}
-                  </h4>
-                  <p 
-                    className={`text-sm font-semibold ${cfg.cursiveFontClass || 'font-cursive'} truncate mt-0.5`}
-                    style={{ color: isLightBg ? '#1e293b' : '#ffffff' }}
-                  >
-                    {cfg.brideName || 'Bride'} &amp; {cfg.groomName || 'Groom'}
-                  </p>
-                </div>
-
-                <div className="flex justify-between items-center z-10 text-[9px] font-mono font-bold" style={{ color: isLightBg ? '#1e293b' : '#e2e8f0' }}>
-                  <span className="bg-black/40 px-1.5 py-0.5 rounded backdrop-blur-sm text-slate-200">ID: {preset.id}</span>
+                {/* Bottom ID and Swatches */}
+                <div className="flex justify-between items-center z-10 text-[9px] font-mono font-bold text-white/90">
+                  <span className="bg-black/60 px-2 py-0.5 rounded backdrop-blur-sm border border-white/15">ID: {preset.id}</span>
                   <div className="flex space-x-1 shrink-0">
-                    <span className="w-2.5 h-2.5 rounded-full border border-white/40 shadow-sm" style={{ backgroundColor: cfg.primaryColor }} title="Primary Color" />
-                    <span className="w-2.5 h-2.5 rounded-full border border-white/40 shadow-sm" style={{ backgroundColor: cfg.accentGold }} title="Accent Gold" />
-                    <span className="w-2.5 h-2.5 rounded-full border border-white/40 shadow-sm" style={{ backgroundColor: cfg.lightBgColor }} title="Light Bg" />
+                    <span className="w-2.5 h-2.5 rounded-full border border-white/60 shadow-sm" style={{ backgroundColor: cfg.primaryColor || '#0b1329' }} title="Primary Color" />
+                    <span className="w-2.5 h-2.5 rounded-full border border-white/60 shadow-sm" style={{ backgroundColor: cfg.accentGold || '#D6AD61' }} title="Accent Gold" />
+                    <span className="w-2.5 h-2.5 rounded-full border border-white/60 shadow-sm" style={{ backgroundColor: cfg.lightBgColor || '#FFF9F2' }} title="Light Bg" />
                   </div>
                 </div>
               </div>
 
-              {/* Actions Footer */}
-              <div className="p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-cinzel text-sm font-extrabold text-slate-100 tracking-wide">{preset.title}</h3>
-                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 font-extrabold border border-amber-500/25 uppercase tracking-wider">
-                    {preset.religion || 'Secular'}
-                  </span>
-                </div>
-
-                {/* Official Price Tag with Selling Price, Strikethrough MRP & Discount % */}
-                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-between shadow-xs">
-                  {!preset.hidePrice ? (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs line-through text-slate-400 font-mono">
-                        ₹{preset.price || cfg.price || 999}
-                      </span>
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-bold uppercase tracking-wider">
-                        {preset.discountPercent !== undefined ? preset.discountPercent : (cfg.discountPercent !== undefined ? cfg.discountPercent : 30)}% OFF
-                      </span>
-                      <span className="text-sm font-black text-amber-600 dark:text-amber-300 font-mono">
+              {/* Minimalist Card Footer - Clean & Uncluttered Default View */}
+              <div 
+                onClick={() => setOpenPresetDropdownId(prev => prev === preset.id ? null : preset.id)}
+                className="p-3.5 flex items-center justify-between cursor-pointer bg-[#FFFEFB] hover:bg-[#FFF9F2] transition-colors rounded-b-2xl border-t border-[#E9DCCB]/40"
+              >
+                <div className="truncate pr-2">
+                  <h3 className="font-cinzel text-xs sm:text-sm font-extrabold text-[#513321] tracking-wide truncate">
+                    {preset.title}
+                  </h3>
+                  <div className="flex items-center space-x-2 mt-0.5">
+                    <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-amber-500/15 text-amber-900 font-bold border border-amber-500/25 uppercase tracking-wider">
+                      {preset.religion || 'Secular'}
+                    </span>
+                    {!preset.hidePrice && (
+                      <span className="text-xs font-black text-[#8C5D2C] font-mono">
                         ₹{Math.round((preset.price || cfg.price || 999) * (1 - (preset.discountPercent !== undefined ? preset.discountPercent : (cfg.discountPercent !== undefined ? cfg.discountPercent : 30)) / 100))}
                       </span>
-                    </div>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 italic">Price: Contact for pricing</span>
-                  )}
-
-                  {currentUser?.role === 'admin' && (
-                    <button 
-                      type="button"
-                      onClick={() => {
-                        dbStore.updatePreset(preset.id, { hidePrice: !preset.hidePrice });
-                        showToast(preset.hidePrice ? "Price tag is now visible on preset cards" : "Price tag hidden on preset cards", "info");
-                      }}
-                      className="px-2 py-0.5 rounded text-[9px] font-bold border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer"
-                      title={preset.hidePrice ? "Unhide price" : "Hide price"}
-                    >
-                      {preset.hidePrice ? "👁 Unhide" : "🚫 Hide"}
-                    </button>
-                  )}
-                </div>
-
-                <div className="space-y-2 pt-1">
-                  <button
-                    onClick={() => handleOpenEditTheme(preset)}
-                    className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 hover:text-amber-200 text-xs font-bold transition flex items-center justify-center space-x-1.5 shadow-sm cursor-pointer"
-                  >
-                    <SvgSliders className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Customize &amp; Edit Design</span>
-                  </button>
-                  
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleOpenPreviewModal(preset)}
-                      className="px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white text-xs font-semibold text-center transition flex items-center justify-center space-x-1 cursor-pointer"
-                    >
-                      <SvgExternalLink className="w-3.5 h-3.5" />
-                      <span>Preview</span>
-                    </button>
-                    <button
-                      onClick={() => handleOpenOrderModal(preset)}
-                      className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 text-xs font-bold transition text-center uppercase tracking-wider shadow cursor-pointer"
-                    >
-                      Order Now
-                    </button>
+                    )}
                   </div>
                 </div>
+
+                <div className="flex items-center space-x-1 shrink-0">
+                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all border ${
+                    isDropdownOpen
+                      ? 'bg-[#D6AD61] text-[#382416] border-[#C49A4A] rotate-180'
+                      : 'bg-[#F7EFE5] text-[#513321] border-[#E9DCCB]'
+                  }`}>
+                    ▼
+                  </span>
+                </div>
               </div>
+
+              {/* Interactive Animated Dropdown Menu Panel (Floats on Top of Every Layer) */}
+              {isDropdownOpen && (
+                <div 
+                  onClick={(e) => e.stopPropagation()}
+                  className="absolute top-full left-0 right-0 mt-1.5 z-[999999] bg-[#FFFEFB] border-2 border-[#C49A4A] rounded-2xl shadow-2xl p-4 space-y-3 animate-dropdown-slide-down backdrop-blur-md"
+                >
+                  {/* Dropdown Header: Full title + badges */}
+                  <div className="flex items-center justify-between border-b border-[#E9DCCB]/70 pb-2.5">
+                    <div className="truncate pr-2">
+                      <h4 className="font-cinzel text-xs sm:text-sm font-extrabold text-[#513321] truncate">
+                        {preset.title}
+                      </h4>
+                      <p className="text-[9.5px] text-[#8C6D58] font-medium truncate mt-0.5">
+                        {cfg.brideName || 'Bride'} &amp; {cfg.groomName || 'Groom'}
+                      </p>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-900 font-extrabold border border-amber-500/25 uppercase tracking-wider shrink-0">
+                      {preset.religion || 'Secular'}
+                    </span>
+                  </div>
+
+                  {/* Official Price Tag with Selling Price, Strikethrough MRP & Discount % */}
+                  <div className="p-2.5 rounded-xl bg-[#FFF9F2] border border-[#E9DCCB] flex items-center justify-between shadow-xs">
+                    {!preset.hidePrice ? (
+                      <div className="flex items-center space-x-2">
+                        <span className="text-xs line-through text-[#8C6D58] font-mono">
+                          ₹{preset.price || cfg.price || 999}
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-800 font-bold border border-emerald-500/25 uppercase tracking-wider">
+                          {preset.discountPercent !== undefined ? preset.discountPercent : (cfg.discountPercent !== undefined ? cfg.discountPercent : 30)}% OFF
+                        </span>
+                        <span className="text-sm font-black text-[#513321] font-mono">
+                          ₹{Math.round((preset.price || cfg.price || 999) * (1 - (preset.discountPercent !== undefined ? preset.discountPercent : (cfg.discountPercent !== undefined ? cfg.discountPercent : 30)) / 100))}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[10px] text-[#8C6D58] italic font-medium">Price: Contact for pricing</span>
+                    )}
+
+                    {currentUser?.role === 'admin' && (
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          dbStore.updatePreset(preset.id, { hidePrice: !preset.hidePrice });
+                          showToast(preset.hidePrice ? "Price tag is now visible on preset cards" : "Price tag hidden on preset cards", "info");
+                        }}
+                        className="px-2 py-0.5 rounded-lg text-[9px] font-bold border border-[#E9DCCB] bg-[#FFFEFB] hover:bg-[#F7EFE5] text-[#513321] transition cursor-pointer"
+                        title={preset.hidePrice ? "Unhide price" : "Hide price"}
+                      >
+                        {preset.hidePrice ? "👁 Unhide" : "🚫 Hide"}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Action Buttons inside Dropdown */}
+                  <div className="space-y-2 pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditTheme(preset)}
+                      className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-[#D6AD61] to-[#C49A4A] hover:from-[#C49A4A] hover:to-[#AC853B] text-[#382416] hover:text-white text-xs font-bold transition flex items-center justify-center space-x-1.5 shadow-sm cursor-pointer"
+                    >
+                      <SvgSliders className="w-3.5 h-3.5" />
+                      <span>Customize &amp; Edit Design</span>
+                    </button>
+                    
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenPreviewModal(preset)}
+                        className="px-3 py-2 rounded-xl bg-[#FFF9F2] hover:bg-[#F7EFE5] border border-[#E9DCCB] text-[#513321] text-xs font-bold text-center transition flex items-center justify-center space-x-1 cursor-pointer shadow-xs"
+                      >
+                        <SvgExternalLink className="w-3.5 h-3.5 text-[#8C6D58]" />
+                        <span>Preview</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenOrderModal(preset)}
+                        className="px-3 py-2 rounded-xl bg-[#8D414D] hover:bg-[#78343F] text-white text-xs font-bold transition text-center uppercase tracking-wider shadow-sm cursor-pointer"
+                      >
+                        Order Now
+                      </button>
+                    </div>
+
+                    {currentUser?.role === 'admin' && (
+                      <div className="pt-2 border-t border-[#E9DCCB]/60 flex items-center justify-between">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-[#8C6D58]">
+                          Admin Controls
+                        </span>
+                        <div className="flex items-center space-x-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditTheme(preset)}
+                            className="px-2 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-900 border border-amber-500/30 text-[10px] font-bold transition flex items-center space-x-1 cursor-pointer"
+                          >
+                            <SvgEdit className="w-3 h-3" />
+                            <span>Edit Preset</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePreset(preset)}
+                            className="px-2 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-800 border border-rose-500/30 text-[10px] font-bold transition flex items-center space-x-1 cursor-pointer"
+                          >
+                            <SvgTrash className="w-3 h-3" />
+                            <span>Delete</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
             </div>
           );
@@ -919,7 +1059,18 @@ export default function PresetGallery() {
         showToast={showToast}
       />
 
+      <GuidedInvitationModal
+        isOpen={isGuidedModalOpen}
+        onClose={() => setIsGuidedModalOpen(false)}
+        initialCategoryId={selectedCategory === "all" ? "wedding" : selectedCategory}
+        onCreated={(newInv) => {
+          showToast("New invitation draft created & Google Drive folder linked!", "success");
+          navigate(currentUser?.role === 'admin' ? `/admin/editor/${newInv.id}` : '/customer');
+        }}
+      />
+
       <CustomDialog {...dialog} themeConfig={selectedPreset?.config || {}} />
+      </div>
     </div>
   );
 }

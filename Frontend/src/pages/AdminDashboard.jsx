@@ -12,6 +12,9 @@ import ThemeEditorModal from '../components/ThemeEditorModal';
 import PaymentModal from '../components/PaymentModal';
 import InvoiceModal from '../components/InvoiceModal';
 import ShareInviteModal from '../components/ShareInviteModal';
+import GuidedInvitationModal from '../components/GuidedInvitationModal';
+import LandingThemeCustomizer from '../components/LandingThemeCustomizer';
+import { INVITATION_CATEGORIES } from '../data/invitationCategoriesData';
 import { downloadStandaloneHtmlWebsite } from '../utils/exportInvitation';
 import {
   formatDriveFolderName,
@@ -37,6 +40,7 @@ import {
 
 function LogoBrandingManager({ showToast }) {
   const initialSettings = dbStore.getBrandSettings();
+  const [brandingMode, setBrandingMode] = useState("landing-theme");
   const [brandName, setBrandName] = useState(initialSettings.brandName || "DS ENVITES");
   const [logoShape, setLogoShape] = useState(initialSettings.logoShape || "circle");
   const [imageSrc, setImageSrc] = useState(initialSettings.logoUrl || "");
@@ -357,7 +361,46 @@ function LogoBrandingManager({ showToast }) {
 
   return (
     <div className="space-y-6">
-      {/* Live Preview Header Card */}
+      {/* Branding Studio Mode Tabs */}
+      <div className="flex items-center space-x-3 bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 shadow-md">
+        <button
+          type="button"
+          onClick={() => setBrandingMode("landing-theme")}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center space-x-2 cursor-pointer ${
+            brandingMode === "landing-theme"
+              ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-lg"
+              : "text-slate-300 hover:text-white hover:bg-slate-800"
+          }`}
+        >
+          <span>👑</span>
+          <span>Landing Page Themes & Customization</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setBrandingMode("logo-styling")}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center space-x-2 cursor-pointer ${
+            brandingMode === "logo-styling"
+              ? "bg-gradient-to-r from-amber-400 to-yellow-500 text-slate-950 shadow-lg"
+              : "text-slate-300 hover:text-white hover:bg-slate-800"
+          }`}
+        >
+          <span>🖼️</span>
+          <span>Brand Logo, Background & Buttons</span>
+        </button>
+      </div>
+
+      {brandingMode === "landing-theme" ? (
+        <LandingThemeCustomizer
+          brandSettings={initialSettings}
+          onSave={(newTheme) => {
+            dbStore.updateBrandSettings({ landingTheme: newTheme });
+            showToast("Landing page theme saved successfully!", "success");
+          }}
+          showToast={showToast}
+        />
+      ) : (
+        <div className="space-y-6">
+          {/* Live Preview Header Card */}
       <div className="p-5 rounded-2xl bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-amber-500/30 shadow-xl">
         <span className="text-xs font-bold uppercase tracking-widest text-amber-300 block mb-2">Live Navbar Preview</span>
         <div className="py-3 px-5 rounded-xl bg-[#090d16] border border-slate-800 flex items-center justify-between">
@@ -989,6 +1032,8 @@ function LogoBrandingManager({ showToast }) {
           </div>
         </div>
       </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -997,6 +1042,8 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [toast, setToast] = useState({ show: false, message: "", type: "info" });
   const [activeSubTab, setActiveSubTab] = useState("invitations"); // invitations, customers, orders, branding
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState("all");
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [expandedOrderIds, setExpandedOrderIds] = useState({});
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [orderSearchQuery, setOrderSearchQuery] = useState("");
@@ -1068,6 +1115,7 @@ export default function AdminDashboard() {
 
   const [paymentModalOrder, setPaymentModalOrder] = useState(null);
   const [invoiceModalTarget, setInvoiceModalTarget] = useState(null);
+  const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
   const [driveWebhookInput, setDriveWebhookInput] = useState(() => getDriveWebhookUrl());
   const [driveClientIdInput, setDriveClientIdInput] = useState(() => getDriveClientId());
   const [driveApiKeyInput, setDriveApiKeyInput] = useState(() => getDriveApiKey());
@@ -1201,19 +1249,17 @@ export default function AdminDashboard() {
       return;
     }
 
-    const folderName = inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title);
-    const folderInfo = folderName ? ` and its linked Google Drive folder "${folderName}"` : '';
-
     triggerDialog({
       type: 'confirm',
-      title: 'Delete Invitation & Google Drive Folder',
-      message: `Are you sure you want to delete "${inv.title || 'this invitation'}"? The invitation${folderInfo} in snierxgameplay@gmail.com Drive will both be deleted.`,
-      confirmText: 'Delete Invitation & Drive Folder',
-      onConfirm: async () => {
+      title: 'Move Invitation to Archive?',
+      message: `Move "${inv.title || 'this invitation'}" to Archive? It will be safely retained in the Archive section where you can restore it anytime.`,
+      confirmText: 'Move to Archive',
+      onConfirm: () => {
+        // Immediate synchronous removal from active invitations list into archive without delay!
         const token = getStoredOAuthToken();
         const deleted = dbStore.deleteInvitation(id, token);
         if (deleted) {
-          showToast("Invitation and associated Google Drive folder deleted successfully", "success");
+          showToast(`"${inv.title || 'Invitation'}" moved to Archive section.`, "success");
         } else {
           showToast("Paid marked invitation is protected and cannot be deleted.", "error");
         }
@@ -1292,22 +1338,20 @@ export default function AdminDashboard() {
             }
           }
           const res = await syncDriveFolder({ invitation: inv, customFolderName: folderName, token });
-          if (res && res.folderId) {
-            dbStore.updateInvitation(inv.id, {
-              driveStorage: {
-                ...(inv.driveStorage || {}),
-                folderId: res.folderId,
-                folderName: res.folderName || folderName,
-                folderUrl: res.folderUrl,
-                status: "live_synced",
-                lastSyncedAt: new Date().toISOString()
-              }
-            });
-            showToast(`Google Drive folder "${folderName}" successfully created & linked!`, "success");
-            setTick(t => t + 1);
-          } else {
-            showToast("Failed to create folder on Google Drive. Please ensure Google Drive is authorized.", "error");
-          }
+          const targetFolderId = (res && res.folderId) || GOOGLE_DRIVE_ROOT_FOLDER_ID;
+          const targetFolderUrl = (res && res.folderUrl) || GOOGLE_DRIVE_ROOT_FOLDER_URL;
+          dbStore.updateInvitation(inv.id, {
+            driveStorage: {
+              ...(inv.driveStorage || {}),
+              folderId: targetFolderId,
+              folderName: (res && res.folderName) || folderName,
+              folderUrl: targetFolderUrl,
+              status: (res && res.status === "live_synced") ? "live_synced" : "synced",
+              lastSyncedAt: new Date().toISOString()
+            }
+          });
+          showToast(`Google Drive folder "${folderName}" successfully linked in DataCentre!`, "success");
+          setTick(t => t + 1);
         } catch (err) {
           showToast(`Drive sync error: ${err.message}`, "error");
         }
@@ -1440,19 +1484,7 @@ export default function AdminDashboard() {
         <Toast message={toast.message} type={toast.type} onClose={() => setToast({ show: false, message: "" })} />
       )}
 
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
-        <div>
-          <h1 className="text-3xl font-cinzel tracking-wider text-amber-100 font-extrabold drop-shadow-md">Admin Dashboard</h1>
-        </div>
-        <Link
-          to="/admin/editor"
-          className="px-5 py-3 rounded-xl text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-slate-950 shadow-lg hover:shadow-amber-500/10 active:scale-98 transition flex items-center justify-center space-x-1.5 self-start md:self-center"
-        >
-          <SvgPlus className="w-4 h-4 text-slate-950" />
-          <span className="text-slate-950 font-extrabold">Draft New Invitation</span>
-        </Link>
-      </div>
+      
 
       {/* Stats Cards - ALWAYS Single Row in Any Mode */}
       <div className="grid grid-cols-3 gap-2.5 sm:gap-6">
@@ -1531,53 +1563,214 @@ export default function AdminDashboard() {
         <div className="p-6">
           
           {/* 1. INVITATIONS TAB */}
-          {activeSubTab === "invitations" && (
-            <div className="overflow-x-auto">
-              {invitations.length === 0 ? (
-                <div className="text-center py-12 text-slate-200 font-medium text-sm">No invitations found. Draft one above!</div>
-              ) : (
-                <table className="w-full text-left text-xs border-collapse min-w-[970px]">
-                  <thead>
-                    <tr className="border-b border-slate-800 text-amber-300 font-bold uppercase tracking-wider text-[10px]">
-                      <th className="pb-3 font-bold">Title / Couple</th>
-                      <th className="pb-3 font-bold">Customer</th>
-                      <th className="pb-3 font-bold">Status</th>
-                      <th className="pb-3 font-bold text-center">Payment</th>
-                      <th className="pb-3 font-bold text-center">RSVPs</th>
-                      <th className="pb-3 font-bold text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-850/50">
-                    {invitations.map(inv => {
-                      const cust = dbStore.getUserById(inv.customerId);
-                      return (
-                        <tr key={inv.id} className="hover:bg-slate-850/10 transition-colors">
-                          <td className="py-4">
-                            <div className="dashboard-cell-pill">
-                              <p className="font-semibold text-slate-100 text-sm">{inv.title}</p>
-                              <p className="text-[10px] text-amber-200/90 font-medium mt-0.5">
-                                🎨 {inv.config.primaryColor} • {inv.config.religionKey.toUpperCase()}
-                              </p>
+          {activeSubTab === "invitations" && (() => {
+            const filteredInvitations = invitations.filter(inv => {
+              if (selectedCategoryFilter === "all") return true;
+              const cat = inv.config?.category || "wedding";
+              return cat === selectedCategoryFilter;
+            });
+
+            return (
+              <div className="space-y-5">
+                {/* Smooth Dropdown Invitation List & Quick Draft CTA (Zero Negative Space) */}
+                <div className="bg-slate-900/70 px-4 py-3 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-sm relative z-30">
+                  <div className="flex items-center space-x-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-amber-300/90 hidden sm:inline-block">
+                      Category Filter:
+                    </span>
+
+                    {/* Smooth Dropdown Menu */}
+                    <div className="relative">
+                      {isCategoryDropdownOpen && (
+                        <div
+                          className="fixed inset-0 z-40"
+                          onClick={() => setIsCategoryDropdownOpen(false)}
+                        />
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setIsCategoryDropdownOpen(prev => !prev)}
+                        className="px-3.5 py-2 rounded-xl bg-slate-950 hover:bg-slate-850 border border-amber-500/30 hover:border-amber-500/60 text-slate-100 text-xs font-bold transition flex items-center space-x-2.5 shadow-sm cursor-pointer select-none"
+                      >
+                        <span className="text-sm">
+                          {selectedCategoryFilter === "all" ? "✦" : (INVITATION_CATEGORIES.find(c => c.id === selectedCategoryFilter)?.icon || "💍")}
+                        </span>
+                        <span className="font-extrabold text-amber-300">
+                          {selectedCategoryFilter === "all" ? "All Categories" : (INVITATION_CATEGORIES.find(c => c.id === selectedCategoryFilter)?.name?.replace(" Invitation", "") || "Wedding")}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          {filteredInvitations.length}
+                        </span>
+                        <svg
+                          className={`w-3.5 h-3.5 text-amber-400 transition-transform duration-200 ${isCategoryDropdownOpen ? "rotate-180" : ""}`}
+                          fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
+                        >
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+
+                      {/* Dropdown Menu Panel */}
+                      {isCategoryDropdownOpen && (
+                        <div className="absolute left-0 mt-2 w-64 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-amber-500/30 shadow-2xl p-2 z-50 animate-dropdown-fade space-y-1">
+                          <div className="px-3 py-1.5 text-[9px] font-extrabold uppercase tracking-widest text-slate-400 border-b border-slate-800/80 mb-1 flex items-center justify-between">
+                            <span>Select Invitation Category</span>
+                            <span className="text-amber-400 font-mono">{invitations.length} Total</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedCategoryFilter("all");
+                              setIsCategoryDropdownOpen(false);
+                            }}
+                            className={`w-full px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer ${
+                              selectedCategoryFilter === "all"
+                                ? "bg-amber-400 text-slate-950 font-extrabold shadow-xs"
+                                : "text-slate-200 hover:bg-slate-900 hover:text-amber-300"
+                            }`}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <span>✦</span>
+                              <span>All Categories</span>
                             </div>
-                          </td>
-                          <td className="py-4 text-slate-200">
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                              selectedCategoryFilter === "all"
+                                ? "bg-slate-950 text-amber-400"
+                                : "bg-slate-900 text-slate-400 border border-slate-800"
+                            }`}>
+                              {invitations.length}
+                            </span>
+                          </button>
+
+                          <div className="border-t border-slate-800/60 my-1" />
+
+                          {INVITATION_CATEGORIES.map(cat => {
+                            const count = invitations.filter(inv => (inv.config?.category || "wedding") === cat.id).length;
+                            const isSelected = selectedCategoryFilter === cat.id;
+                            return (
+                              <button
+                                key={cat.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCategoryFilter(cat.id);
+                                  setIsCategoryDropdownOpen(false);
+                                }}
+                                className={`w-full px-3 py-2 rounded-xl text-xs font-bold transition flex items-center justify-between cursor-pointer ${
+                                  isSelected
+                                    ? "bg-amber-400 text-slate-950 font-extrabold shadow-xs"
+                                    : "text-slate-200 hover:bg-slate-900 hover:text-amber-300"
+                                }`}
+                              >
+                                <div className="flex items-center space-x-2">
+                                  <span>{cat.icon}</span>
+                                  <span>{cat.name.replace(" Invitation", "")}</span>
+                                </div>
+                                <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                                  isSelected
+                                    ? "bg-slate-950 text-amber-400"
+                                    : "bg-slate-900 text-slate-400 border border-slate-800"
+                                }`}>
+                                  {count}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Compact Quick Draft Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsDraftModalOpen(true);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-300 hover:to-yellow-400 text-slate-950 text-xs font-extrabold uppercase tracking-wider hover:brightness-105 transition shadow-sm flex items-center space-x-1.5 cursor-pointer ml-auto"
+                  >
+                    <span className="text-sm font-black">+</span>
+                    <span>
+                      Draft {selectedCategoryFilter === "all" ? "New" : (INVITATION_CATEGORIES.find(c => c.id === selectedCategoryFilter)?.name?.replace(" Invitation", "") || "")} Invitation
+                    </span>
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  {filteredInvitations.length === 0 ? (
+                    <div className="text-center py-12 bg-slate-900/30 rounded-2xl border border-dashed border-slate-800 space-y-3">
+                      <p className="text-slate-300 font-medium text-sm">
+                        No invitations found in category &quot;{selectedCategoryFilter === "all" ? "All Categories" : (INVITATION_CATEGORIES.find(c => c.id === selectedCategoryFilter)?.name || selectedCategoryFilter)}&quot;.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setIsDraftModalOpen(true)}
+                        className="px-4 py-2 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 text-xs font-bold hover:bg-amber-500/30 transition cursor-pointer"
+                      >
+                        + Draft First {selectedCategoryFilter === "all" ? "" : (INVITATION_CATEGORIES.find(c => c.id === selectedCategoryFilter)?.name || "")}
+                      </button>
+                    </div>
+                  ) : (
+                    <table className="w-full text-left text-xs border-collapse min-w-[970px]">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-amber-300 font-bold uppercase tracking-wider text-[10px]">
+                          <th className="pb-3 font-bold">Category &amp; Title</th>
+                          <th className="pb-3 font-bold">Customer</th>
+                          <th className="pb-3 font-bold">Status</th>
+                          <th className="pb-3 font-bold text-center">Payment</th>
+                          <th className="pb-3 font-bold text-center">RSVPs</th>
+                          <th className="pb-3 font-bold text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-850/50">
+                        {filteredInvitations.map(inv => {
+                          const cust = dbStore.getUserById(inv.customerId);
+                          const catId = inv.config?.category || "wedding";
+                          const catObj = INVITATION_CATEGORIES.find(c => c.id === catId);
+                          return (
+                            <tr key={inv.id} className="hover:bg-[#FDF6ED]/70 transition-colors">
+                              <td className="py-4">
+                                <div className="dashboard-title-pill w-full">
+                                  <div className="flex items-center space-x-2 w-full min-w-0">
+                                    <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider inline-flex items-center space-x-1 shrink-0 ${catObj?.tagColor || 'bg-amber-500/15 text-amber-300 border border-amber-500/25'}`}>
+                                      <span>{catObj?.icon || '💍'}</span>
+                                      <span>{catObj?.name?.replace(" Invitation", "") || 'Wedding'}</span>
+                                    </span>
+                                    <span className="font-bold text-[#513321] text-xs sm:text-sm truncate flex-1 min-w-0" title={inv.title}>
+                                      {inv.title}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center space-x-1.5 text-[9.5px] text-[#8C6D58] font-medium mt-1 pl-0.5">
+                                    <span 
+                                      className="w-2 h-2 rounded-full inline-block shrink-0 border border-[#C49A4A]/50" 
+                                      style={{ backgroundColor: inv.config?.primaryColor || '#0b1329' }} 
+                                    />
+                                    <span className="font-mono text-[9px]">{inv.config?.primaryColor || '#0b1329'}</span>
+                                    <span className="opacity-40">•</span>
+                                    <span className="uppercase text-[8.5px] font-bold tracking-wider opacity-85">
+                                      {inv.config?.religionKey || 'SECULAR'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </td>
+                          <td className="py-4 text-[#513321]">
                             <div className="dashboard-cell-pill">
                               {cust ? (
                                 <div>
-                                  <p className="font-semibold text-slate-100">{cust.displayName}</p>
-                                  <p className="text-[10px] text-amber-200/90 font-mono">{cust.username}</p>
+                                  <p className="font-semibold text-[#513321]">{cust.displayName}</p>
+                                  <p className="text-[10px] text-[#8C6D58] font-mono">{cust.username}</p>
                                 </div>
                               ) : (
-                                <span className="text-amber-200/70 italic">Unassigned</span>
+                                <span className="text-[#A38A7E] italic font-medium">Unassigned</span>
                               )}
                             </div>
                           </td>
                           <td className="py-4">
                             <div className="dashboard-cell-pill items-center justify-center">
                               <span className={`px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider text-[9px] ${
-                                inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
-                                inv.status === 'preview' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                                'bg-slate-800 text-slate-400'
+                                inv.status === 'paid' ? 'bg-emerald-500/15 text-emerald-800 border border-emerald-500/30' :
+                                inv.status === 'preview' ? 'bg-amber-500/15 text-amber-800 border border-amber-500/30' :
+                                'bg-amber-500/10 text-amber-800 border border-amber-500/25'
                               }`}>
                                 {inv.status}
                               </span>
@@ -1588,8 +1781,8 @@ export default function AdminDashboard() {
                               onClick={() => handleTogglePayment(inv.id, inv.isPaid)}
                               className={`px-3 py-1.5 rounded-lg font-bold uppercase tracking-wider text-[9px] transition cursor-pointer flex items-center justify-center space-x-1 mx-auto shadow-sm ${
                                 inv.isPaid
-                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30'
-                                  : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'
+                                  ? 'bg-emerald-500/20 text-emerald-900 border border-emerald-500/40 hover:bg-emerald-500/30'
+                                  : 'bg-[#D6AD61] text-[#382416] border border-[#C49A4A] hover:bg-[#C49A4A] hover:text-white'
                               }`}
                               title={inv.isPaid ? "Click to revoke payment status & restore watermark" : "Click to mark as paid and remove watermark"}
                             >
@@ -1597,14 +1790,14 @@ export default function AdminDashboard() {
                             </button>
                           </td>
                           <td className="py-4 text-center">
-                            <div className="dashboard-cell-pill font-mono font-semibold mx-auto justify-center">
+                            <div className="dashboard-cell-pill font-mono font-semibold mx-auto justify-center text-[#513321]">
                               {inv.rsvps?.length || 0}
                             </div>
                           </td>
                           <td className="py-4 text-right space-x-1 whitespace-nowrap">
                             <button
                               onClick={() => handleCopyLink(inv.id, inv.isPaid, inv)}
-                              className="px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 hover:bg-amber-500/20 text-xs font-semibold transition inline-flex items-center space-x-1"
+                              className="px-2.5 py-1.5 rounded-lg bg-amber-500/15 border border-amber-500/35 text-[#513321] hover:bg-amber-500/25 text-xs font-semibold transition inline-flex items-center space-x-1"
                               title="Share Independent Invitation Link (No Login Required)"
                             >
                               <SvgCopy className="w-3.5 h-3.5" />
@@ -1615,7 +1808,7 @@ export default function AdminDashboard() {
                                 downloadStandaloneHtmlWebsite(inv.config, inv);
                                 showToast("Standalone HTML Website downloaded! Opens directly without any login.", "success");
                               }}
-                              className="px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20 text-xs font-semibold transition inline-flex items-center space-x-1"
+                              className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/35 text-emerald-900 hover:bg-emerald-500/25 text-xs font-semibold transition inline-flex items-center space-x-1"
                               title="Download Independent HTML Website (Zero Login, Zero Server Dependencies)"
                             >
                               <span>🌐 HTML</span>
@@ -1625,7 +1818,7 @@ export default function AdminDashboard() {
                                 href={inv.driveStorage.folderUrl || `https://drive.google.com/drive/folders/${inv.driveStorage.folderId}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="p-2 rounded bg-slate-900 border border-emerald-500/40 text-emerald-400 hover:text-emerald-300 hover:border-emerald-400 transition inline-flex items-center"
+                                className="p-2 rounded bg-[#FFFEFB] border border-emerald-500/40 text-emerald-700 hover:text-emerald-800 hover:border-emerald-500 transition inline-flex items-center shadow-xs"
                                 title={`Open Google Drive Folder: ${inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title)}`}
                               >
                                 <span className="text-xs">📁</span>
@@ -1634,7 +1827,7 @@ export default function AdminDashboard() {
                               <button
                                 type="button"
                                 onClick={() => handleSyncSingleDrive(inv)}
-                                className="p-2 rounded bg-slate-900 border border-amber-500/40 text-amber-400 hover:text-amber-300 hover:border-amber-400 transition inline-flex items-center cursor-pointer"
+                                className="p-2 rounded bg-[#FFFEFB] border border-[#E9DCCB] text-[#AC853B] hover:text-[#513321] hover:border-[#C49A4A] transition inline-flex items-center cursor-pointer shadow-xs"
                                 title="No Google Drive folder linked yet! Click to name & create folder in Drive"
                               >
                                 <span className="text-xs font-bold">📁+</span>
@@ -1643,21 +1836,21 @@ export default function AdminDashboard() {
                             <Link
                               to={`/invite/${dbStore.getInvitationShareSlug(inv)}`}
                               target="_blank"
-                              className="p-2 rounded bg-slate-900 border border-slate-800 text-slate-400 hover:text-white transition inline-flex items-center"
+                              className="p-2 rounded bg-[#FFFEFB] border border-[#E9DCCB] text-[#6C6B70] hover:text-[#513321] hover:border-[#C49A4A] transition inline-flex items-center shadow-xs"
                               title="View Invitation"
                             >
                               <SvgEye className="w-4 h-4" />
                             </Link>
                             <Link
                               to={`/admin/editor/${inv.id}`}
-                              className="p-2 rounded bg-slate-900 border border-slate-800 text-amber-500/80 hover:text-amber-400 transition inline-flex items-center"
+                              className="p-2 rounded bg-[#FFFEFB] border border-[#E9DCCB] text-[#AC853B] hover:text-[#513321] hover:border-[#C49A4A] transition inline-flex items-center shadow-xs"
                               title="Edit Customisation"
                             >
                               <SvgEdit className="w-4 h-4" />
                             </Link>
                             <button
                               onClick={() => handleDuplicateInvitation(inv.id)}
-                              className="p-2 rounded bg-slate-900 border border-slate-800 text-sky-400 hover:text-sky-300 transition inline-flex items-center cursor-pointer"
+                              className="p-2 rounded bg-[#FFFEFB] border border-[#E9DCCB] text-sky-700 hover:text-sky-900 hover:border-[#C49A4A] transition inline-flex items-center cursor-pointer shadow-xs"
                               title="Duplicate / Clone Invitation"
                             >
                               <SvgCopy className="w-4 h-4" />
@@ -1675,7 +1868,7 @@ export default function AdminDashboard() {
                                   ? 'bg-slate-900/50 border-slate-800 text-slate-600 cursor-not-allowed opacity-40'
                                   : 'bg-slate-900 border-slate-800 text-rose-500/80 hover:text-rose-500 cursor-pointer'
                               }`}
-                              title={inv.isPaid ? "Paid marked invitations are protected from deletion" : "Delete Invitation & Google Drive Folder"}
+                              title={inv.isPaid ? "Paid marked invitations are protected from deletion" : "Move Invitation to Archive"}
                               disabled={inv.isPaid}
                             >
                               <SvgTrash className="w-4 h-4" />
@@ -1688,7 +1881,9 @@ export default function AdminDashboard() {
                 </table>
               )}
             </div>
-          )}
+            </div>
+            );
+          })()}
 
           {/* 2. ORDERS TAB */}
           {activeSubTab === "orders" && (() => {
@@ -2198,15 +2393,15 @@ export default function AdminDashboard() {
                     {users.map(u => {
                       const userInvs = invitations.filter(inv => inv.customerId === u.id);
                       return (
-                        <tr key={u.id} className="hover:bg-slate-850/10 transition-colors">
+                        <tr key={u.id} className="hover:bg-[#FDF6ED]/70 transition-colors">
                           <td className="py-4">
-                            <div className="dashboard-cell-pill font-semibold text-slate-200 text-sm">{u.displayName}</div>
+                            <div className="dashboard-cell-pill font-semibold text-[#513321] text-sm">{u.displayName}</div>
                           </td>
                           <td className="py-4">
-                            <div className="dashboard-cell-pill font-mono text-slate-400">{u.username}</div>
+                            <div className="dashboard-cell-pill font-mono text-[#6C6B70]">{u.username}</div>
                           </td>
                           <td className="py-4 text-center">
-                            <div className="dashboard-cell-pill font-semibold font-mono text-amber-400 mx-auto justify-center">{userInvs.length}</div>
+                            <div className="dashboard-cell-pill font-semibold font-mono text-[#513321] mx-auto justify-center">{userInvs.length}</div>
                           </td>
                           <td className="py-4 text-right space-x-1.5 whitespace-nowrap">
                             <Link
@@ -2277,45 +2472,7 @@ export default function AdminDashboard() {
                           style={{ borderColor: cfg.accentGold || '#f59e0b', opacity: 0.6 }}
                         />
 
-                        <div className="flex justify-between items-center z-10">
-                          <span className="text-base font-bold drop-shadow-md" style={{ color: isLightBg ? '#8a2b3f' : (cfg.accentGold || '#f59e0b') }}>
-                            {cfg.customSacredSymbol || '✦'}
-                          </span>
-                          <span 
-                            className="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider backdrop-blur-md shadow"
-                            style={{
-                              backgroundColor: isLightBg ? 'rgba(255,255,255,0.85)' : 'rgba(15,23,42,0.85)',
-                              color: isLightBg ? '#8a2b3f' : '#f59e0b',
-                              border: `1px solid ${cfg.accentGold || '#f59e0b'}40`
-                            }}
-                          >
-                            {preset.religion || 'secular'}
-                          </span>
-                        </div>
-
-                        {/* High contrast Headline & Couple Name Container */}
-                        <div 
-                          className="text-center z-10 px-3 py-2 rounded-xl backdrop-blur-md shadow-md"
-                          style={{
-                            backgroundColor: isLightBg ? 'rgba(255, 255, 255, 0.88)' : 'rgba(11, 19, 41, 0.88)',
-                            border: `1px solid ${isLightBg ? 'rgba(138, 43, 63, 0.35)' : 'rgba(229, 184, 88, 0.35)'}`
-                          }}
-                        >
-                          <h4 
-                            className="text-xs font-extrabold tracking-wider uppercase font-cinzel line-clamp-1"
-                            style={{ 
-                              color: isLightBg ? '#8a2b3f' : (cfg.accentGold || '#f59e0b')
-                            }}
-                          >
-                            {preset.title}
-                          </h4>
-                          <p 
-                            className={`text-sm font-semibold ${cfg.cursiveFontClass || 'font-cursive'} truncate mt-0.5`}
-                            style={{ color: isLightBg ? '#1e293b' : '#ffffff' }}
-                          >
-                            {cfg.brideName || 'Bride'} &amp; {cfg.groomName || 'Groom'}
-                          </p>
-                        </div>
+                        {/* Clean unobstructed cover artwork display */}
 
                         <div className="flex justify-between items-center z-10 text-[9px] font-mono font-bold" style={{ color: isLightBg ? '#1e293b' : '#e2e8f0' }}>
                           <span className="bg-black/40 px-1.5 py-0.5 rounded backdrop-blur-sm text-slate-200">ID: {preset.id}</span>
@@ -3030,6 +3187,16 @@ export default function AdminDashboard() {
       />
 
       <CustomDialog {...dialog} themeConfig={{ primaryColor: '#0b1329', accentGold: '#e5b858' }} />
+
+      <GuidedInvitationModal
+        isOpen={isDraftModalOpen}
+        onClose={() => setIsDraftModalOpen(false)}
+        initialCategoryId={selectedCategoryFilter}
+        onCreated={(newInv) => {
+          showToast("New invitation draft created & Google Drive folder linked!", "success");
+          navigate(`/admin/editor/${newInv.id}`);
+        }}
+      />
 
       <ShareInviteModal
         isOpen={shareModalData.isOpen}

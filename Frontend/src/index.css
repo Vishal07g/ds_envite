@@ -30,15 +30,23 @@ body, html, #root {
 .p-2\.5.bg-slate-900\/40.rounded:not(input):not(#invitation-preview-container *):not(#invitation-view-container *):not(.invitation-render-root *):not(#admin-sidebar *):not(.admin-sidebar *),
 .p-4.bg-white\/5:not(input):not(#invitation-preview-container *):not(#invitation-view-container *):not(.invitation-render-root *):not(#admin-sidebar *):not(.admin-sidebar *),
 .bg-slate-900.p-3.rounded:not(input):not(#invitation-preview-container *):not(#invitation-view-container *):not(.invitation-render-root *):not(#admin-sidebar *):not(.admin-sidebar *),
-.border-slate-800:not(.single-row-tabs-container):not(.single-row-tab-item):not(input):not(.login-input-field):not(#invitation-preview-container):not(#invitation-preview-container *):not(#invitation-view-container):not(#invitation-view-container *):not(.invitation-render-root):not(.invitation-render-root *):not(#admin-sidebar):not(#admin-sidebar *):not(.admin-sidebar):not(.admin-sidebar *),
-.border-slate-850:not(.single-row-tabs-container):not(.single-row-tab-item):not(input):not(.login-input-field):not(#invitation-preview-container *):not(#invitation-view-container *):not(.invitation-render-root *):not(#admin-sidebar *):not(.admin-sidebar *),
-.border-white\/5:not(input):not(#invitation-preview-container *):not(#invitation-view-container *):not(.invitation-render-root *):not(#admin-sidebar *):not(.admin-sidebar *) {
+.border-slate-800:not(.single-row-tabs-container):not(.single-row-tab-item):not(input):not(.login-input-field):not(#invitation-preview-container):not(#invitation-preview-container *):not(#invitation-view-container):not(#invitation-view-container *):not(.invitation-render-root):not(.invitation-render-root *):not(#admin-sidebar):not(#admin-sidebar *):not(.admin-sidebar):not(.admin-sidebar *):not(.preset-card-cover):not(.preset-card-cover *),
+.border-slate-850:not(.single-row-tabs-container):not(.single-row-tab-item):not(input):not(.login-input-field):not(#invitation-preview-container *):not(#invitation-view-container *):not(.invitation-render-root *):not(#admin-sidebar *):not(.admin-sidebar *):not(.preset-card-cover):not(.preset-card-cover *),
+.border-white\/5:not(input):not(#invitation-preview-container *):not(#invitation-view-container *):not(.invitation-render-root *):not(#admin-sidebar *):not(.admin-sidebar *):not(.preset-card-cover):not(.preset-card-cover *) {
   border-radius: var(--radius-lg, 20px) !important;
   background: var(--bg-card, #FFFEFB) !important;
   border: 1px solid var(--border-normal, #E9DCCB) !important;
   box-shadow: var(--card-shadow, 0 8px 24px rgba(104, 71, 45, 0.05)) !important;
   color: var(--text-body, #6C6B70) !important;
   transition: all 0.25s ease !important;
+}
+
+/* Ensure preset card covers preserve their full invitation cover background design */
+.preset-card-cover {
+  background-color: transparent !important;
+  background-size: cover !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
 }
 
 /* Card hover lift animations */
@@ -1194,16 +1202,27 @@ span[class*="rounded-full"][class*="text-amber-"] {
   font-weight: 700 !important;
 }
 
-/* Universal Dropdown Hoisting and Stacking Elevation */
+/* Universal Dropdown Hoisting and Stacking Elevation (Every dropdown top of every layer) */
 .order-last.md\:order-first div:has(.custom-select-dropdown-animate),
 .relative:has(.custom-select-dropdown-animate),
+.relative:has(.animate-dropdown-slide-down),
 .relative:has(.sidebar-tab-dropdown-menu),
 .relative:has([class*="dropdown-menu"]),
 .relative:has([role="listbox"]),
-.relative:has([aria-expanded="true"]) {
+.relative:has([aria-expanded="true"]),
+div:has([aria-expanded="true"]),
+.dropdown-elevated-parent {
   position: relative !important;
   z-index: 999999 !important;
-  isolation: isolate !important;
+}
+
+/* Ensure dropdown popups themselves always float on the absolute highest layer */
+.animate-dropdown-slide-down,
+.custom-select-dropdown-animate,
+.sidebar-tab-dropdown-menu,
+[aria-expanded="true"] + div,
+[aria-expanded="true"] ~ div {
+  z-index: 999999 !important;
 }
 
 /* ------------------------------------------------
@@ -1256,7 +1275,7 @@ span[class*="rounded-full"][class*="text-amber-"] {
   border: 1px solid rgba(244, 63, 94, 0.4) !important;
 }
 
-/* Glassmorphic Cell Pill Backgrounds (Seamless Dark Theme with Crisp Text) */
+/* Glassmorphic Cell Pill Backgrounds (Harmonized with Luxury Warm Cream Theme) */
 .dashboard-cell-pill {
   display: inline-flex !important;
   flex-direction: column !important;
@@ -1264,23 +1283,24 @@ span[class*="rounded-full"][class*="text-amber-"] {
   justify-content: center !important;
   padding: 6px 14px !important;
   border-radius: var(--radius-sm, 14px) !important;
-  background: rgba(15, 23, 42, 0.75) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.25) !important;
+  background: var(--bg-card, #FFFEFB) !important;
+  border: 1px solid var(--border-normal, #E9DCCB) !important;
+  box-shadow: 0 2px 6px rgba(104, 71, 45, 0.05) !important;
   box-sizing: border-box !important;
   max-width: 100% !important;
   text-align: left !important;
+  color: var(--text-heading, #513321) !important;
 }
 
 .dashboard-cell-pill p:first-child,
 .dashboard-cell-pill span:first-child {
-  color: #f8fafc !important; /* Crisp bright white on dark */
+  color: var(--text-heading, #513321) !important;
   font-weight: 700 !important;
 }
 
 .dashboard-cell-pill p:last-child,
 .dashboard-cell-pill span:last-child {
-  color: #fde68a !important; /* Rich amber gold complementary */
+  color: var(--text-body, #6C6B70) !important;
 }
 
 /* Center status badge wrappers inside cell pill */
@@ -1340,8 +1360,8 @@ span[class*="rounded-full"][class*="text-amber-"] {
 /* Column 1: Title / Couple */
 .admin-dashboard-container table:has(th:nth-child(5)) th:nth-child(1),
 .admin-dashboard-container table:has(th:nth-child(5)) td:nth-child(1) {
-  width: 240px !important;
-  min-width: 240px !important;
+  width: 280px !important;
+  min-width: 280px !important;
   text-align: left !important;
 }
 .admin-dashboard-container table:has(th:nth-child(5)) td:nth-child(1) .dashboard-cell-pill {
@@ -2599,3 +2619,84 @@ body.privacy-shield-body-lock {
 
 
 
+
+/* Smart & Minimal Dashboard Title Pill: Harmonized Warm Ivory/Cream Theme */
+.dashboard-title-pill,
+.admin-dashboard-container td:first-child .dashboard-cell-pill {
+  height: auto !important;
+  min-height: 50px !important;
+  max-height: 58px !important;
+  padding: 6px 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: flex-start !important;
+  border-radius: var(--radius-sm, 14px) !important;
+  background: var(--bg-card, #FFFEFB) !important;
+  border: 1px solid var(--border-normal, #E9DCCB) !important;
+  box-shadow: 0 2px 6px rgba(104, 71, 45, 0.05) !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+  width: 100% !important;
+  color: var(--text-heading, #513321) !important;
+}
+
+.dashboard-title-pill:active,
+.admin-dashboard-container td:first-child .dashboard-cell-pill:active {
+  transform: scale(0.98) !important;
+  background: var(--bg-panel, #F7EFE5) !important;
+}
+
+/* ------------------------------------------------
+   CINEMATIC WEDDING LANDING THEME ANIMATIONS
+   ------------------------------------------------ */
+@keyframes swaySubtle {
+  0%, 100% {
+    transform: rotate(-1.5deg) translateY(0);
+  }
+  50% {
+    transform: rotate(1.5deg) translateY(3px);
+  }
+}
+
+@keyframes swaySubtleReverse {
+  0%, 100% {
+    transform: rotate(1.5deg) translateY(0);
+  }
+  50% {
+    transform: rotate(-1.5deg) translateY(3px);
+  }
+}
+
+.animate-sway-subtle {
+  animation: swaySubtle 6s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+.animate-sway-subtle-reverse {
+  animation: swaySubtleReverse 7s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+@keyframes petalFloatDown {
+  0% {
+    transform: translateY(-20px) translateX(0) rotate(0deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.7;
+  }
+  80% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(120px) translateX(40px) rotate(180deg);
+    opacity: 0;
+  }
+}
+
+.petal-float-1 { animation: petalFloatDown 14s ease-in-out infinite; }
+.petal-float-2 { animation: petalFloatDown 18s ease-in-out 3s infinite; }
+.petal-float-3 { animation: petalFloatDown 12s ease-in-out 1.5s infinite; }
+.petal-float-4 { animation: petalFloatDown 16s ease-in-out 5s infinite; }
+.petal-float-5 { animation: petalFloatDown 20s ease-in-out 7s infinite; }

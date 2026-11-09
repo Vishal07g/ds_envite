@@ -2,6 +2,8 @@
 import { ref, set, get, onValue } from "firebase/database";
 import { database } from "../utils/firebase.js";
 import { DEFAULT_TIMELINE_CONFIG } from "./timelineDefaults.js";
+import { CATEGORY_DEFAULT_TIMELINES, getFutureDateString } from "./invitationCategoriesData.js";
+import { getCategoryDefaultConfig } from "./categoryDefaultConfigs.js";
 import {
   formatDriveFolderName,
   syncDriveFolder,
@@ -13,6 +15,7 @@ import {
   uploadBase64ToDriveStorage
 } from "../utils/googleDriveStorage.js";
 import { getCoupleDetails } from "../utils/monogramThumbnail.js";
+import { DEFAULT_LANDING_THEME } from "./landingThemeDefaults.js";
 
 // Firebase Realtime Database sync status
 let isFirebaseSynced = false;
@@ -154,6 +157,101 @@ export function getRandomBrideGroomNames() {
   const bride = RANDOM_BRIDE_NAMES[Math.floor(Math.random() * RANDOM_BRIDE_NAMES.length)];
   const groom = RANDOM_GROOM_NAMES[Math.floor(Math.random() * RANDOM_GROOM_NAMES.length)];
   return { bride, groom };
+}
+
+
+export function isGenericInvitationTitle(title) {
+  if (!title || typeof title !== "string") return true;
+  const t = title.trim().toLowerCase();
+  return (
+    t === "new wedding invitation" ||
+    t.startsWith("new wedding invitation") ||
+    t === "wedding invitation" ||
+    t.startsWith("wedding invitation (copy") ||
+    t === "new invitation" ||
+    t.startsWith("new invitation") ||
+    t === "invitation" ||
+    t.startsWith("invitation (copy") ||
+    t.includes("untitled")
+  );
+}
+
+export function getHeroCharacterTitle(config = {}, rawTitle = "") {
+  const cat = config?.category || config?.eventType || "wedding";
+  const raw = typeof rawTitle === "string" ? rawTitle : "";
+  const isCopy = raw.toLowerCase().includes("(copy)");
+  const copyCount = (raw.match(/\(copy\)/gi) || []).length;
+  const copySuffix = copyCount > 1 ? ` (Copy ${copyCount})` : (isCopy ? " (Copy)" : "");
+
+  // 1. Birthday
+  if (cat === "birthday") {
+    const hero = (config?.heroName || config?.heroCharacter || config?.characterName || config?.birthdayPersonName || "").trim();
+    if (hero) return `${hero} - Birthday Invitation${copySuffix}`;
+  }
+
+  // 2. First Birthday
+  if (cat === "first_birthday") {
+    const hero = (config?.babyName || config?.heroName || config?.characterName || "").trim();
+    if (hero) return `${hero} - First Birthday Invitation${copySuffix}`;
+  }
+
+  // 3. Baby Shower
+  if (cat === "baby_shower") {
+    const hero = (config?.motherName || config?.parentsNames || config?.heroName || "").trim();
+    if (hero) return `${hero} - Baby Shower Invitation${copySuffix}`;
+  }
+
+  // 4. Naming Ceremony
+  if (cat === "naming_ceremony") {
+    const hero = (config?.babyName || config?.heroName || "").trim();
+    if (hero) return `${hero} - Naming Ceremony Invitation${copySuffix}`;
+  }
+
+  // 5. Housewarming
+  if (cat === "housewarming") {
+    const hero = (config?.familyName || config?.hostNames || config?.heroName || "").trim();
+    if (hero) return `${hero} - Housewarming Invitation${copySuffix}`;
+  }
+
+  // 6. Anniversary
+  if (cat === "anniversary") {
+    const hero = (config?.coupleNames || (config?.brideName && config?.groomName ? `${config.brideName} & ${config.groomName}` : null) || config?.heroName || "").trim();
+    if (hero) return `${hero} - Anniversary Invitation${copySuffix}`;
+  }
+
+  // 7. Religious Ceremony
+  if (cat === "religious_ceremony") {
+    const hero = (config?.hostName || config?.familyName || config?.ceremonyName || config?.heroName || "").trim();
+    if (hero) return `${hero} - Religious Ceremony Invitation${copySuffix}`;
+  }
+
+  // 8. Corporate Event
+  if (cat === "corporate_event") {
+    const hero = (config?.companyName || config?.eventName || config?.keynoteSpeaker || config?.heroName || "").trim();
+    if (hero) return `${hero} - Corporate Event Invitation${copySuffix}`;
+  }
+
+  // 9. Wedding
+  let bride = (config?.coverBrideText || config?.brideName || config?.storyBrideName || "").trim();
+  let groom = (config?.coverGroomText || config?.groomName || config?.storyGroomName || "").trim();
+
+  if (bride && groom) {
+    if (config?.coupleCardsOrder === "groomFirst") {
+      return `${groom} & ${bride}'s Wedding${copySuffix}`;
+    }
+    return `${bride} & ${groom}'s Wedding${copySuffix}`;
+  } else if (bride) {
+    return `${bride}'s Wedding${copySuffix}`;
+  } else if (groom) {
+    return `${groom}'s Wedding${copySuffix}`;
+  }
+
+  const generalHero = (config?.heroCharacter || config?.heroName || config?.characterName || "").trim();
+  if (generalHero) {
+    return `${generalHero} Invitation${copySuffix}`;
+  }
+
+  return rawTitle && !isGenericInvitationTitle(rawTitle) ? rawTitle : `Wedding Invitation${copySuffix}`;
 }
 
 export function getRandomHeroCharacterName() {
@@ -566,6 +664,7 @@ const INITIAL_PRESETS = [
     id: "preset-classic",
     title: "Elegant Floral Cream",
     religion: "secular",
+    thumbnail: "/cover_suman_vishal_1k.jpg",
     config: {
       ...DEFAULT_CONFIG,
       presetId: "preset-classic",
@@ -583,6 +682,7 @@ const INITIAL_PRESETS = [
     id: "preset-dark",
     title: "Royal Floral Navy",
     religion: "secular",
+    thumbnail: "/bg_floral_dark.jpg",
     config: {
       ...DEFAULT_CONFIG,
       presetId: "preset-dark",
@@ -621,6 +721,7 @@ const INITIAL_PRESETS = [
     id: "preset-green",
     title: "Romantic Lace Green",
     religion: "secular",
+    thumbnail: "/bg_lace_green.jpg",
     config: {
       ...DEFAULT_CONFIG,
       presetId: "preset-green",
@@ -659,6 +760,7 @@ const INITIAL_PRESETS = [
     id: "preset-royal-scroll",
     title: "3D Royal Imperial Scroll",
     religion: "royal",
+    thumbnail: "/real_palace_doors.jpg",
     config: {
       ...DEFAULT_CONFIG,
       presetId: "preset-royal-scroll",
@@ -700,6 +802,7 @@ const INITIAL_PRESETS = [
     id: "preset-royal-palace",
     title: "Indian Vintage Royal Palace (Rajwada)",
     religion: "hindu",
+    thumbnail: "/thumbnails/radha-krishna.jpg",
     config: {
       ...DEFAULT_CONFIG,
       presetId: "preset-royal-palace",
@@ -740,6 +843,7 @@ const INITIAL_PRESETS = [
     id: "preset-neon-glass",
     title: "Cyberpunk Minimalist Neon Glass",
     religion: "secular",
+    thumbnail: "/cover_suman_vishal_1k.jpg",
     config: {
       ...DEFAULT_CONFIG,
       presetId: "preset-neon-glass",
@@ -778,6 +882,7 @@ const INITIAL_PRESETS = [
     id: "preset-gold-foil",
     title: "Luxury Metallic Floral Gold Foil",
     religion: "secular",
+    thumbnail: "/cover_suman_vishal_1k.jpg",
     config: {
       ...DEFAULT_CONFIG,
       presetId: "preset-gold-foil",
@@ -1313,13 +1418,14 @@ const DEFAULT_BRAND_SETTINGS = {
   logoScale: 1.0,
   logoX: 0,
   logoY: 0,
-  appBgColor: "#FFF9F2",
+  appBgColor: "#F6E9E5",
   appBgGradient: "",
   appBgOverlayUrl: "",
   appBgOverlayOpacity: 0.35,
   appBgOverlayRepeat: "repeat",
   appBgOverlayBlendMode: "normal",
-  appButtonStyle: "gold-gradient"
+  appButtonStyle: "gold-gradient",
+  landingTheme: DEFAULT_LANDING_THEME
 };
 
 // Helper to normalize Firebase object/array structures safely
@@ -1473,22 +1579,33 @@ if (typeof window !== "undefined") {
   }
 }
 
+let serverDbCache = null;
+
 // Helper to load or initialize database
 function getDb() {
   if (typeof window === "undefined" || !window.localStorage) {
-    return {
-      users: INITIAL_USERS,
-      invitations: INITIAL_INVITATIONS,
-      presets: INITIAL_PRESETS,
-      bgPresets: INITIAL_BG_PRESETS,
-      envelopePresets: INITIAL_ENVELOPE_PRESETS,
-      envelopeTextures: [],
-      musicPresets: CURATED_MUSIC_PRESETS,
-      orders: [],
-      notifications: [],
-      archive: [],
-      brandSettings: DEFAULT_BRAND_SETTINGS
-    };
+    if (!serverDbCache) {
+      serverDbCache = {
+        users: JSON.parse(JSON.stringify(INITIAL_USERS)),
+        invitations: JSON.parse(JSON.stringify(INITIAL_INVITATIONS)),
+        presets: JSON.parse(JSON.stringify(INITIAL_PRESETS)),
+        bgPresets: JSON.parse(JSON.stringify(INITIAL_BG_PRESETS)),
+        envelopePresets: JSON.parse(JSON.stringify(INITIAL_ENVELOPE_PRESETS)),
+        envelopeTextures: [],
+        musicPresets: JSON.parse(JSON.stringify(CURATED_MUSIC_PRESETS)),
+        orders: [],
+        notifications: [],
+        archive: [],
+        brandSettings: DEFAULT_BRAND_SETTINGS
+      };
+      // Hydrate thumbnails for serverDbCache presets
+      serverDbCache.presets.forEach(p => {
+        if (!p.thumbnail) {
+          p.thumbnail = p.config?.heroImage || '/cover_suman_vishal_1k.jpg';
+        }
+      });
+    }
+    return serverDbCache;
   }
 
   let db = dbCache;
@@ -1644,6 +1761,35 @@ function getDb() {
     }
   }
 
+  // Ensure cover design of same invitation is thumbnail of theme by default
+  if (db.presets && Array.isArray(db.presets)) {
+    db.presets.forEach(p => {
+      const cfg = p.config || {};
+      const matchingInv = db.invitations?.find(i => 
+        (i.config?.presetId === p.id || i.presetId === p.id) ||
+        (i.config?.brideName && cfg.brideName && i.config.brideName.toLowerCase() === cfg.brideName.toLowerCase()) ||
+        (p.title && i.title && i.title.toLowerCase().includes(p.title.toLowerCase().replace(/['’]s\s*theme/i, '').trim()))
+      );
+
+      const invCover = (matchingInv?.config?.heroImage && matchingInv.config.heroImage !== '/bg_floral_pink.jpg')
+        ? matchingInv.config.heroImage
+        : (matchingInv?.config?.coverImage || (
+            (cfg.heroImage && cfg.heroImage !== '/bg_floral_pink.jpg')
+              ? cfg.heroImage
+              : ((cfg.brideName?.toLowerCase() === 'suman' || p.title?.toLowerCase().includes('suman'))
+                ? '/cover_suman_vishal_1k.jpg'
+                : (p.religion === 'hindu' ? '/thumbnails/radha-krishna.jpg' : '/cover_suman_vishal_1k.jpg'))
+          ));
+
+      if (!p.thumbnail || p.thumbnail === '/bg_floral_pink.jpg') {
+        p.thumbnail = invCover;
+      }
+      if (!p.config.heroImage || p.config.heroImage === '/bg_floral_pink.jpg') {
+        p.config.heroImage = invCover;
+      }
+    });
+  }
+
   return db;
 }
 
@@ -1666,7 +1812,10 @@ function saveDb(db) {
   if (!db.deletedPresetIds || !Array.isArray(db.deletedPresetIds)) db.deletedPresetIds = [];
 
   dbCache = db;
-  if (typeof window === "undefined" || !window.localStorage) return;
+  if (typeof window === "undefined" || !window.localStorage) {
+    serverDbCache = db;
+    return;
+  }
   localStorage.setItem("db_users", JSON.stringify(db.users));
   localStorage.setItem("db_invitations", JSON.stringify(db.invitations));
   localStorage.setItem("db_presets", JSON.stringify(db.presets));
@@ -1690,6 +1839,8 @@ function saveDb(db) {
 // ==========================================
 // STORE API
 // ==========================================
+
+const TWO_DAYS_MS = 2 * 24 * 60 * 60 * 1000;
 
 export const dbStore = {
   // --- ARCHIVE / RECYCLER SYSTEM (2-Day Expiry) ---
@@ -1847,7 +1998,182 @@ export const dbStore = {
 
   // --- INVITATIONS ---
   getInvitations() {
-    return getDb().invitations;
+    const db = getDb();
+    let hasChanges = false;
+    if (Array.isArray(db.invitations)) {
+      db.invitations.forEach(inv => {
+        // Auto-heal Google Drive folder connection so every invitation is linked by default
+        if (!inv.driveStorage) {
+          inv.driveStorage = {
+            rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
+            rootFolderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
+            folderName: formatDriveFolderName(inv.config, inv.title),
+            folderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
+            folderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
+            status: "synced",
+            lastSyncedAt: new Date().toISOString()
+          };
+          hasChanges = true;
+        } else if (!inv.driveStorage.folderId) {
+          inv.driveStorage.folderId = GOOGLE_DRIVE_ROOT_FOLDER_ID;
+          inv.driveStorage.folderUrl = GOOGLE_DRIVE_ROOT_FOLDER_URL;
+          inv.driveStorage.status = "synced";
+          hasChanges = true;
+        }
+
+        // Strict Protection: Never touch paid invitations!
+        if (inv.isPaid) return;
+
+        // If it's a non-wedding invitation, ensure honoree & category timeline fields are healed if still showing wedding
+        if (inv.config && inv.config.category && inv.config.category !== "wedding") {
+          const cat = inv.config.category;
+          const catDefaults = getCategoryDefaultConfig(cat, inv.config);
+
+          // Deep clean: Wipe out any leaked wedding text templates
+          if (
+            inv.config.coverSubheadingText === "The Union Ceremony of" ||
+            inv.config.coverTopBadgeText === "Under the auspices of love and destiny" ||
+            (inv.config.coverBottomTaglineText && inv.config.coverBottomTaglineText.includes("Sacred Promise")) ||
+            (inv.config.storyParagraph && inv.config.storyParagraph.includes("maple leaves")) ||
+            inv.config.storyBrideParentLabel === "Daughter of" ||
+            inv.config.storyBrideTitle === "The Beautiful Bride"
+          ) {
+            inv.config.coverSubheadingText = catDefaults.coverSubheadingText;
+            inv.config.coverTopBadgeText = catDefaults.coverTopBadgeText;
+            inv.config.coverQuoteText = catDefaults.coverQuoteText;
+            inv.config.coverBottomTaglineText = catDefaults.coverBottomTaglineText;
+            inv.config.coverBrideText = catDefaults.coverBrideText;
+            inv.config.coverGroomText = "";
+            inv.config.coverAmpersandText = "";
+            inv.config.storySubtitle = catDefaults.storySubtitle;
+            inv.config.storyTitle = catDefaults.storyTitle;
+            inv.config.storyHonoreeTitle = catDefaults.storyHonoreeTitle;
+            inv.config.storyContent = catDefaults.storyContent;
+            inv.config.storyPathTitle = catDefaults.storyPathTitle;
+            inv.config.storyParagraph = catDefaults.storyParagraph;
+            inv.config.storyBrideTitle = catDefaults.storyHonoreeTitle;
+            inv.config.storyBrideParentLabel = "";
+            inv.config.storyGroomTitle = "";
+            inv.config.storyGroomParentLabel = "";
+            inv.config.brideFamily = "";
+            inv.config.groomFamily = "";
+            hasChanges = true;
+          }
+
+          // Auto-heal Venue for non-wedding invitations so wedding venues never leak
+          if (
+            inv.config.weddingVenue === "The Starlight Cathedral" ||
+            inv.config.weddingAddress === "100 Seraphim Way, Glass Valley, CA" ||
+            inv.config.receptionVenue === "The Gilded Glass Greenhouse" ||
+            inv.config.receptionAddress === "450 Conservatory Road, Glass Valley, CA" ||
+            inv.config.venueTitle === "Sacred Venue & Reception" ||
+            !inv.config.weddingVenue
+          ) {
+            inv.config.weddingVenue = catDefaults.weddingVenue;
+            inv.config.weddingAddress = catDefaults.weddingAddress;
+            inv.config.venueCeremonyName = catDefaults.weddingVenue;
+            inv.config.venueCeremonyAddress = catDefaults.weddingAddress;
+            inv.config.showReceptionVenue = false;
+            inv.config.receptionVenue = "";
+            inv.config.receptionAddress = "";
+            inv.config.venueTitle = catDefaults.venueTitle;
+            inv.config.venueSubtitle = catDefaults.venueSubtitle;
+            hasChanges = true;
+          }
+
+          // Auto-heal Gallery & Wishes titles
+          if (!inv.config.gallerySubtitle || inv.config.gallerySubtitle === "Our Love in Frames") {
+            inv.config.gallerySubtitle = catDefaults.gallerySubtitle;
+            hasChanges = true;
+          }
+          if (!inv.config.galleryTitle || inv.config.galleryTitle === "Our Gallery") {
+            inv.config.galleryTitle = catDefaults.galleryTitle;
+            hasChanges = true;
+          }
+          if (!inv.config.wishesTitle) {
+            inv.config.wishesTitle = catDefaults.wishesTitle;
+            inv.config.wishesSubtitle = catDefaults.wishesSubtitle;
+            hasChanges = true;
+          }
+
+          
+          // Auto-heal generic titles so every invitation draft displays the main character / hero character name
+          if (!inv.isPaid && isGenericInvitationTitle(inv.title)) {
+            const cfg = inv.config || {};
+            let bride = (cfg.coverBrideText || cfg.brideName || "").trim();
+            let groom = (cfg.coverGroomText || cfg.groomName || "").trim();
+            let hero = (cfg.heroName || cfg.heroCharacter || cfg.characterName || cfg.birthdayPersonName || "").trim();
+
+            if ((!bride && !groom && !hero) || (bride === "Suman" && groom === "Vishal" && inv.id !== "invite-1792299417819")) {
+              const randCfg = generateRandomDraftConfig(cfg.category || cfg.eventType || 'wedding', cfg);
+              inv.config = { ...cfg, ...randCfg };
+            }
+            inv.title = getHeroCharacterTitle(inv.config, inv.title);
+            hasChanges = true;
+          }
+
+          // Auto-heal Ceremonies if still showing wedding rituals
+          if (Array.isArray(inv.config.ceremonies) && inv.config.ceremonies.some(c => c.id === 'ceremony-haldi' || c.id === 'ceremony-mehendi')) {
+            inv.config.ceremonies = catDefaults.ceremonies;
+            inv.config.timelineHeading = catDefaults.timelineHeading;
+            inv.config.timelineSubtitle = catDefaults.timelineSubtitle;
+            hasChanges = true;
+          }
+
+          const honoree = inv.config.heroName || inv.title?.split(" - ")[0] || "Special Guest";
+          if (!inv.config.scratchCoupleText || inv.config.scratchCoupleText === "Radha & Krishna") {
+            inv.config.scratchCoupleText = honoree;
+            inv.config.scratchCardCouple = honoree;
+            hasChanges = true;
+          }
+          if (!inv.config.scratchMarriedLabel || inv.config.scratchMarriedLabel === "Are getting married on") {
+            inv.config.scratchMarriedLabel = cat === "birthday" ? "Celebrates Birthday On"
+              : cat === "first_birthday" ? "Turns One Year Old On"
+              : cat === "baby_shower" ? "Welcoming Baby On"
+              : cat === "naming_ceremony" ? "Namkaran Ceremony On"
+              : cat === "housewarming" ? "Griha Pravesh On"
+              : cat === "anniversary" ? "Celebrating Anniversary On"
+              : cat === "religious_ceremony" ? "Sacred Ceremony On"
+              : cat === "corporate_event" ? "Event Commences On"
+              : "Celebrates On";
+            hasChanges = true;
+          }
+          if (!inv.config.timelineHeading || inv.config.timelineHeading === "Wedding Ceremony") {
+            inv.config.timelineHeading = cat === "birthday" ? "Party Schedule"
+              : cat === "first_birthday" ? "Celebration Schedule"
+              : cat === "baby_shower" ? "Shower Schedule"
+              : cat === "naming_ceremony" ? "Ceremony Schedule"
+              : cat === "housewarming" ? "Puja & Celebration Schedule"
+              : cat === "anniversary" ? "Anniversary Program"
+              : cat === "religious_ceremony" ? "Ceremony & Puja Timings"
+              : cat === "corporate_event" ? "Event Agenda"
+              : "Celebration Schedule";
+            hasChanges = true;
+          }
+          // If ceremonies has wedding rituals (haldi, mehendi), heal it with CATEGORY_DEFAULT_TIMELINES[cat]
+          const hasWeddingRituals = Array.isArray(inv.config.ceremonies) && inv.config.ceremonies.some(c => 
+            (c.title || "").toLowerCase().includes("haldi") || 
+            (c.title || "").toLowerCase().includes("mehendi") || 
+            (c.title || "").toLowerCase().includes("mandap")
+          );
+          if (hasWeddingRituals && CATEGORY_DEFAULT_TIMELINES[cat]) {
+            inv.config.ceremonies = CATEGORY_DEFAULT_TIMELINES[cat].map((item, idx) => ({
+              ...item,
+              date: inv.config.weddingDate || getFutureDateString(30),
+              venueName: inv.config.venueCeremonyName || "Celebration Hall",
+              venueAddress: inv.config.venueCeremonyAddress || "",
+              order: idx
+            }));
+            hasChanges = true;
+          }
+        }
+      });
+
+      if (hasChanges) {
+        saveDb(db);
+      }
+    }
+    return db.invitations;
   },
   getInvitationsByCustomer(customerId) {
     return this.getInvitations().filter(inv => inv.customerId === customerId);
@@ -1993,8 +2319,11 @@ export const dbStore = {
     const db = getDb();
     const timestamp = Date.now();
     
-    // For new draft invitations, if no names provided or using static default or generic title, generate random bride/groom and hero character
-    let fullConfig = { ...DEFAULT_CONFIG, ...(config || {}) };
+    // For new draft invitations, isolate category defaults so wedding never leaks into other categories
+    const cat = config?.category;
+    const isNonWedding = cat && cat !== 'wedding';
+    const baseDefaults = isNonWedding ? getCategoryDefaultConfig(cat, config) : DEFAULT_CONFIG;
+    let fullConfig = { ...baseDefaults, ...(config || {}) };
     let bride = (fullConfig.coverBrideText || fullConfig.brideName || "").trim();
     let groom = (fullConfig.coverGroomText || fullConfig.groomName || "").trim();
     let hero = (fullConfig.heroCharacter || fullConfig.characterName || fullConfig.heroName || "").trim();
@@ -2002,7 +2331,7 @@ export const dbStore = {
     const isGenericTitle = !title || title === "New Wedding Invitation" || title === "New Invitation";
     const isDefaultNames = (!bride && !groom && !hero) || (bride === "Suman" && groom === "Vishal");
 
-    if (isDefaultNames || isGenericTitle) {
+    if (!isNonWedding && (isDefaultNames || isGenericTitle)) {
       const randomCfg = generateRandomDraftConfig(fullConfig.eventType || 'wedding', fullConfig);
       fullConfig = { ...fullConfig, ...randomCfg };
       bride = randomCfg.brideName;
@@ -2059,7 +2388,7 @@ export const dbStore = {
         rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
         rootFolderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
         folderName: folderName,
-        folderId: null,
+        folderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
         folderUrl: GOOGLE_DRIVE_ROOT_FOLDER_URL,
         lastSyncedAt: new Date().toISOString(),
         status: "synced"
@@ -2252,8 +2581,7 @@ export const dbStore = {
     return db.invitations[idx];
   },
   deleteInvitation(id, token = null) {
-    const db = getDb();
-    const inv = db.invitations.find(i => i.id === id);
+    const inv = this.getInvitationById(id);
     if (!inv) return false;
 
     // RULE: Paid marked invitations are strictly protected and MUST remain untouched!
@@ -2262,9 +2590,10 @@ export const dbStore = {
       return false;
     }
 
+    // 1. Move to Archive section without delay
     this.archiveItem('invitation', inv, inv.title || 'Invitation');
 
-    // Automatically delete linked Google Drive folder from snierxgameplay@gmail.com Drive
+    // 2. Automatically delete linked Google Drive folder asynchronously in background
     const folderId = inv.driveStorage?.folderId;
     const folderName = inv.driveStorage?.folderName || formatDriveFolderName(inv.config, inv.title);
     deleteDriveFolder(folderId, token, folderName).then(res => {
@@ -2273,7 +2602,9 @@ export const dbStore = {
       console.warn(`[Google Drive] Failed to delete linked folder for invitation ${id}:`, err);
     });
 
-    db.invitations = db.invitations.filter(inv => inv.id !== id);
+    // 3. Fresh DB reference to remove from active invitations array
+    const db = getDb();
+    db.invitations = (db.invitations || []).filter(item => item.id !== id);
     saveDb(db);
     dispatchDbSynced();
     return true;
@@ -2293,7 +2624,9 @@ export const dbStore = {
     const nameSlug = this.slugify(namePart) || "wedding";
     const newSlug = `${nameSlug}-${timestamp}`;
 
-    const newTitle = customTitle || `${source.title || (bride && groom ? `${bride} & ${groom}'s Wedding` : "Invitation")} (Copy)`;
+    const heroTitle = getHeroCharacterTitle(cleanConfig);
+    const isSrcGeneric = isGenericInvitationTitle(source.title);
+    const newTitle = customTitle || (isSrcGeneric ? `${heroTitle} (Copy)` : `${source.title || heroTitle} (Copy)`);
     const newFolderName = customFolderName || formatDriveFolderName(cleanConfig, newTitle);
 
     const dupBride = (cleanConfig.coverBrideText || cleanConfig.brideName || "").trim();
@@ -2532,15 +2865,21 @@ export const dbStore = {
   createPreset(title, religion = "secular", config = {}) {
     const db = getDb();
     const presetId = `preset-${Date.now()}`;
+    const coverDesign = (config.heroImage && config.heroImage !== '/bg_floral_pink.jpg')
+      ? config.heroImage
+      : (config.coverImage || ((config.brideName?.toLowerCase() === 'suman' || title?.toLowerCase().includes('suman')) ? '/cover_suman_vishal_1k.jpg' : (config.heroImage || '/cover_suman_vishal_1k.jpg')));
+
     const newPreset = {
       id: presetId,
       title,
       religion,
+      thumbnail: coverDesign,
       config: {
         ...DEFAULT_CONFIG,
         presetId,
         religionKey: religion,
-        ...config
+        ...config,
+        heroImage: config.heroImage || coverDesign
       }
     };
     db.presets.push(newPreset);
@@ -2551,18 +2890,37 @@ export const dbStore = {
   createPresetFromInvitation(configOrId, title) {
     const db = getDb();
     let config = null;
+    let invObj = null;
     if (typeof configOrId === 'string') {
-      const inv = db.invitations.find(i => i.id === configOrId);
-      if (inv) config = inv.config;
+      invObj = db.invitations.find(i => i.id === configOrId);
+      if (invObj) config = invObj.config;
     } else if (configOrId && typeof configOrId === 'object') {
       config = configOrId;
+      if (config.invitationId) {
+        invObj = db.invitations.find(i => i.id === config.invitationId);
+      }
+      if (!invObj && config.brideName) {
+        invObj = db.invitations.find(i => i.config?.brideName === config.brideName);
+      }
     }
     if (!config) throw new Error("Configuration not found");
+
+    // The cover design of the same invitation MUST be the thumbnail of the theme by default
+    const coverDesign = (config.heroImage && config.heroImage !== '/bg_floral_pink.jpg')
+      ? config.heroImage
+      : (invObj?.config?.heroImage && invObj.config.heroImage !== '/bg_floral_pink.jpg'
+        ? invObj.config.heroImage
+        : (config.coverImage || ((config.brideName?.toLowerCase() === 'suman' || title?.toLowerCase().includes('suman')) ? '/cover_suman_vishal_1k.jpg' : (config.heroImage || '/cover_suman_vishal_1k.jpg'))));
+
     const newPreset = {
       id: `preset-${Date.now()}`,
       title,
       religion: config.religionKey || "secular",
-      config: JSON.parse(JSON.stringify(config))
+      thumbnail: coverDesign,
+      config: {
+        ...JSON.parse(JSON.stringify(config)),
+        heroImage: coverDesign
+      }
     };
     db.presets.push(newPreset);
     saveDb(db);
@@ -2966,9 +3324,17 @@ export const dbStore = {
     if (!db.brandSettings) {
       db.brandSettings = { ...DEFAULT_BRAND_SETTINGS };
       saveDb(db);
-    } else if (db.brandSettings.appBgColor === "#090d16") {
-      db.brandSettings.appBgColor = "#FFF9F2";
-      saveDb(db);
+    } else {
+      let changed = false;
+      if (!db.brandSettings.landingTheme) {
+        db.brandSettings.landingTheme = JSON.parse(JSON.stringify(DEFAULT_LANDING_THEME));
+        changed = true;
+      }
+      if (db.brandSettings.appBgColor === "#090d16") {
+        db.brandSettings.appBgColor = "#F6E9E5";
+        changed = true;
+      }
+      if (changed) saveDb(db);
     }
     return db.brandSettings;
   },
