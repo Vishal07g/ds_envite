@@ -1283,6 +1283,32 @@ const INITIAL_INVITATIONS = [
   "wishes": []
 },
   {
+    id: "invite-1792423053258",
+    customerId: "user-customer",
+    title: "Vishal & Suman — Wedding Invitation",
+    slug: "suman-vishal-1792423053258",
+    customSlug: "suman-vishal-1792423053258",
+    isCustomSlugManuallySet: true,
+    config: {
+      ...DEFAULT_CONFIG,
+      brideName: "Suman",
+      groomName: "Vishal",
+      weddingDate: "2026-11-21T16:00:00",
+      presetId: "preset-royal-scroll",
+      primaryColor: "#400d18",
+      accentGold: "#d4af37",
+      envelopeBgColor: "#2b060c",
+      envelopeInitials: "S 👑 V"
+    },
+    rsvps: [],
+    wishes: [],
+    isPaid: true,
+    shareText: "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Suman & Vishal",
+    status: "published",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  },
+  {
     id: "invite-demo",
     customerId: "user-customer",
     title: "Ananya & Aarav's Wedding",
@@ -1614,29 +1640,26 @@ function getDb() {
     saveDb(db);
   }
 
-  // Guarantee customer Suman & Vishal invitation is always present and completely hydrated with all ceremonies and details
+  // Guarantee BOTH customer Suman & Vishal paid invitations are always present and protected
   const primarySumanDef = INITIAL_INVITATIONS[0];
-  const existingSumanIdx = db.invitations.findIndex(i => 
-    i.id === "invite-1792299417819" || 
-    i.id === "invite-1792423053258" || 
-    (i.config && i.config.brideName === "Suman" && i.config.groomName === "Vishal")
-  );
-  if (existingSumanIdx === -1) {
+  const primaryIdx = db.invitations.findIndex(i => i.id === "invite-1792299417819");
+  if (primaryIdx === -1) {
     if (primarySumanDef) db.invitations.unshift(JSON.parse(JSON.stringify(primarySumanDef)));
   } else {
-    // If ceremonies are missing or < 5, hydrate with the full details
-    const curr = db.invitations[existingSumanIdx];
+    const curr = db.invitations[primaryIdx];
+    curr.isPaid = true;
+    curr.status = "published";
     if (!curr.config?.ceremonies || curr.config.ceremonies.length < 5 || !curr.config.weddingVenue || curr.config.weddingVenue.includes("Starlight")) {
-      db.invitations[existingSumanIdx] = {
+      db.invitations[primaryIdx] = {
         ...JSON.parse(JSON.stringify(primarySumanDef)),
         id: curr.id,
         customerId: "user-customer",
         isPaid: true,
+        status: "published",
         wishes: (curr.wishes && curr.wishes.length > 0) ? curr.wishes : (primarySumanDef.wishes || []),
         rsvps: (curr.rsvps && curr.rsvps.length > 0) ? curr.rsvps : (primarySumanDef.rsvps || [])
       };
     } else {
-      // Ensure starting and main music URLs are valid and not the stale 404 URL
       if (!curr.config.startingMusicUrl || curr.config.startingMusicUrl.includes("1ScEGe8HiEjdTdhbYh2R_6rTJMjHfsNu6")) {
         curr.config.startingMusicUrl = primarySumanDef.config.startingMusicUrl;
       }
@@ -1644,6 +1667,16 @@ function getDb() {
         curr.config.musicUrl = primarySumanDef.config.musicUrl;
       }
     }
+  }
+
+  // Guarantee second paid Suman & Vishal invitation (invite-1792423053258) is always present and marked paid
+  const secondSumanDef = INITIAL_INVITATIONS[1];
+  const secondIdx = db.invitations.findIndex(i => i.id === "invite-1792423053258");
+  if (secondIdx === -1) {
+    if (secondSumanDef) db.invitations.splice(1, 0, JSON.parse(JSON.stringify(secondSumanDef)));
+  } else {
+    db.invitations[secondIdx].isPaid = true;
+    db.invitations[secondIdx].status = "published";
   }
 
   return db;
