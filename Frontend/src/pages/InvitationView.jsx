@@ -138,12 +138,16 @@ export default function InvitationView() {
             const cs = String(i.customSlug || '').toLowerCase();
             const sStripped = s.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
             const csStripped = cs.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
+            const b = (i.config?.brideName || i.config?.coverBrideText || '').toLowerCase();
+            const g = (i.config?.groomName || i.config?.coverGroomText || '').toLowerCase();
+            const namesMatch = b && g && cleanId.includes(b) && cleanId.includes(g);
             return (
               i.id === id || 
               i.slug === id || 
               i.customSlug === id ||
               sStripped === strippedTarget ||
               csStripped === strippedTarget ||
+              namesMatch ||
               (num && ((i.id && i.id.includes(num)) || (i.slug && i.slug.includes(num)) || (i.customSlug && i.customSlug.includes(num)))) ||
               (String(id).replace(/^invite-/, '') === String(i.id || '').replace(/^invite-/, '')) ||
               (s && s.startsWith(cleanId)) ||

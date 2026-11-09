@@ -1108,7 +1108,10 @@ export default function InvitationRenderer({
   const [revealSparks, setRevealSparks] = useState([]);
   const [torchPos, setTorchPos] = useState({ x: 200, y: 150 });
 
-  const currentFirstLetters = `${(config.brideName || "E").charAt(0)} & ${(config.groomName || "T").charAt(0)}`;
+  const isGroomFirst = config.coupleCardsOrder === 'groomFirst' || config.coupleOrder === 'groomFirst';
+  const currentFirstLetters = isGroomFirst
+    ? `${(config.groomName || "T").charAt(0)} & ${(config.brideName || "E").charAt(0)}`
+    : `${(config.brideName || "E").charAt(0)} & ${(config.groomName || "T").charAt(0)}`;
 
 
 
@@ -2298,7 +2301,7 @@ export default function InvitationRenderer({
               <SvgHeart className="w-4 h-4 text-rose-500 animate-pulse shrink-0 mr-1" fill="rgba(244,63,94,0.3)" />
             )}
             <span className="font-cinzel tracking-wider text-xs sm:text-sm pl-1" style={customStyles.colorAccent}>
-              {config.brideName} &amp; {config.groomName}
+              {config.weddingTitle || (isGroomFirst ? `${config.groomName} & ${config.brideName}` : `${config.brideName} & ${config.groomName}`)}
             </span>
           </div>
 
@@ -2650,81 +2653,163 @@ export default function InvitationRenderer({
                             lineHeight: shouldScale ? 1.15 : undefined
                           }}
                         >
-                          <EditableText config={config}
-                            as="span"
-                            isEditing={!!onChangeField}
-                            onChangeField={onChangeField}
-                            onSelect={onSelectElement}
-                            tabId="cover"
-                            field="coverBrideText"
-                            activeColorId={activeColorId}
-                            setActiveColorId={setActiveColorId}
-                            popoverId="coverBride"
-                            onChangeColor={(color) => onChangeField && onChangeField('coverBrideTextColor', color)}
-                            colorValue={config.coverBrideTextColor || config.coverBrideColor || '#ffffff'}
-                            className={`font-semibold block sm:inline ${config.coverBrideTextFont || config.coverBrideFont || 'font-serif'} ${config.coverBrideTextSize || config.coverBrideSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
-                            style={{ 
-                              color: config.coverBrideTextColor || config.coverBrideColor || '#ffffff',
-                              textAlign: (config.coverBrideTextAlign || config.coverBrideAlign) === 'left' ? 'left' : (config.coverBrideTextAlign || config.coverBrideAlign) === 'right' ? 'right' : 'center',
-                              opacity: (config.coverBrideTextOpacity !== undefined ? config.coverBrideTextOpacity : config.coverBrideOpacity) !== undefined ? (config.coverBrideTextOpacity !== undefined ? config.coverBrideTextOpacity : config.coverBrideOpacity) : 1,
-                              filter: (config.coverBrideTextGlow !== undefined ? config.coverBrideTextGlow : config.coverBrideGlow) !== undefined ? `brightness(${config.coverBrideTextGlow !== undefined ? config.coverBrideTextGlow : config.coverBrideGlow}%)` : undefined,
-                              transform: (config.coverBrideTextYOffset || config.coverBrideYOffset || config.brideNameYOffset) ? `translateY(${config.coverBrideTextYOffset || config.coverBrideYOffset || config.brideNameYOffset}px)` : undefined,
-                              fontSize: shouldScale ? getScaledFontSize(config.coverBrideTextSize || config.coverBrideSize, 60, 15, 5.2, contentScale) : undefined,
-                              lineHeight: shouldScale ? 1.15 : undefined
-                            }}
-                            value={config.coverBrideText !== undefined ? config.coverBrideText : config.brideName}
-                          />
-                          
-                          <EditableText config={config}
-                            as="span"
-                            isEditing={!!onChangeField}
-                            onChangeField={onChangeField}
-                            onSelect={onSelectElement}
-                            tabId="cover"
-                            field="coverAmpersandText"
-                            activeColorId={activeColorId}
-                            setActiveColorId={setActiveColorId}
-                            popoverId="coverAmpersand"
-                            onChangeColor={(color) => onChangeField && onChangeField('coverAmpersandTextColor', color)}
-                            colorValue={config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b'}
-                            className={`block my-2 ${config.coverAmpersandTextFont || config.coverAmpersandFont || 'font-cursive'} ${config.coverAmpersandTextSize || config.coverAmpersandSize || 'text-3xl sm:text-5xl'}`} 
-                            style={{ 
-                              color: config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b',
-                              textAlign: (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'left' ? 'left' : (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'right' ? 'right' : 'center',
-                              opacity: (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) !== undefined ? (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) : 1,
-                              filter: (config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow) !== undefined ? `brightness(${config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow}%)` : undefined,
-                              transform: (config.coverAmpersandTextYOffset || config.coverAmpersandYOffset) ? `translateY(${config.coverAmpersandTextYOffset || config.coverAmpersandYOffset}px)` : undefined,
-                              fontSize: shouldScale ? getScaledFontSize(config.coverAmpersandTextSize || config.coverAmpersandSize, 38, 12, 3.6, contentScale) : undefined,
-                              margin: shouldScale ? `clamp(1px, 0.5cqw, 8px) 0` : undefined,
-                              lineHeight: shouldScale ? 1.1 : undefined
-                            }}
-                            value={config.coverAmpersandText !== undefined ? config.coverAmpersandText : "&"}
-                          />
-                          
-                          <EditableText config={config}
-                            as="span"
-                            isEditing={!!onChangeField}
-                            onChangeField={onChangeField}
-                            onSelect={onSelectElement}
-                            tabId="cover"
-                            field="coverGroomText"
-                            activeColorId={activeColorId}
-                            setActiveColorId={setActiveColorId}
-                            popoverId="coverGroom"
-                            onChangeColor={(color) => onChangeField && onChangeField('coverGroomTextColor', color)}
-                            colorValue={config.coverGroomTextColor || config.coverGroomColor || '#ffffff'}
-                            className={`font-semibold block sm:inline ${config.coverGroomTextFont || config.coverGroomFont || 'font-serif'} ${config.coverGroomTextSize || config.coverGroomSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
-                            style={{ 
-                              color: config.coverGroomTextColor || config.coverGroomColor || '#ffffff',
-                              textAlign: (config.coverGroomTextAlign || config.coverGroomAlign) === 'left' ? 'left' : (config.coverGroomTextAlign || config.coverGroomAlign) === 'right' ? 'right' : 'center',
-                              opacity: (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) !== undefined ? (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) : 1,
-                              filter: (config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow) !== undefined ? `brightness(${config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow}%)` : undefined,
-                              transform: (config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset) ? `translateY(${config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset}px)` : undefined,
-                              fontSize: shouldScale ? getScaledFontSize(config.coverGroomTextSize || config.coverGroomSize, 60, 15, 5.2, contentScale) : undefined,
-                              lineHeight: shouldScale ? 1.15 : undefined
-                            }}
-                            value={config.coverGroomText !== undefined ? config.coverGroomText : config.groomName}
-                          />
+                          {isGroomFirst ? (
+                            <>
+                              <EditableText config={config}
+                                as="span"
+                                isEditing={!!onChangeField}
+                                onChangeField={onChangeField}
+                                onSelect={onSelectElement}
+                                tabId="cover"
+                                field="coverGroomText"
+                                activeColorId={activeColorId}
+                                setActiveColorId={setActiveColorId}
+                                popoverId="coverGroom"
+                                onChangeColor={(color) => onChangeField && onChangeField('coverGroomTextColor', color)}
+                                colorValue={config.coverGroomTextColor || config.coverGroomColor || '#ffffff'}
+                                className={`font-semibold block sm:inline ${config.coverGroomTextFont || config.coverGroomFont || 'font-serif'} ${config.coverGroomTextSize || config.coverGroomSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
+                                style={{ 
+                                  color: config.coverGroomTextColor || config.coverGroomColor || '#ffffff',
+                                  textAlign: (config.coverGroomTextAlign || config.coverGroomAlign) === 'left' ? 'left' : (config.coverGroomTextAlign || config.coverGroomAlign) === 'right' ? 'right' : 'center',
+                                  opacity: (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) !== undefined ? (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) : 1,
+                                  filter: (config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow) !== undefined ? `brightness(${config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow}%)` : undefined,
+                                  transform: (config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset) ? `translateY(${config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset}px)` : undefined,
+                                  fontSize: shouldScale ? getScaledFontSize(config.coverGroomTextSize || config.coverGroomSize, 60, 15, 5.2, contentScale) : undefined,
+                                  lineHeight: shouldScale ? 1.15 : undefined
+                                }}
+                                value={config.coverGroomText !== undefined ? config.coverGroomText : config.groomName}
+                              />
+                              
+                              <EditableText config={config}
+                                as="span"
+                                isEditing={!!onChangeField}
+                                onChangeField={onChangeField}
+                                onSelect={onSelectElement}
+                                tabId="cover"
+                                field="coverAmpersandText"
+                                activeColorId={activeColorId}
+                                setActiveColorId={setActiveColorId}
+                                popoverId="coverAmpersand"
+                                onChangeColor={(color) => onChangeField && onChangeField('coverAmpersandTextColor', color)}
+                                colorValue={config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b'}
+                                className={`block my-2 ${config.coverAmpersandTextFont || config.coverAmpersandFont || 'font-cursive'} ${config.coverAmpersandTextSize || config.coverAmpersandSize || 'text-3xl sm:text-5xl'}`} 
+                                style={{ 
+                                  color: config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b',
+                                  textAlign: (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'left' ? 'left' : (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'right' ? 'right' : 'center',
+                                  opacity: (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) !== undefined ? (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) : 1,
+                                  filter: (config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow) !== undefined ? `brightness(${config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow}%)` : undefined,
+                                  transform: (config.coverAmpersandTextYOffset || config.coverAmpersandYOffset) ? `translateY(${config.coverAmpersandTextYOffset || config.coverAmpersandYOffset}px)` : undefined,
+                                  fontSize: shouldScale ? getScaledFontSize(config.coverAmpersandTextSize || config.coverAmpersandSize, 38, 12, 3.6, contentScale) : undefined,
+                                  margin: shouldScale ? `clamp(1px, 0.5cqw, 8px) 0` : undefined,
+                                  lineHeight: shouldScale ? 1.1 : undefined
+                                }}
+                                value={config.coverAmpersandText !== undefined ? config.coverAmpersandText : "&"}
+                              />
+                              
+                              <EditableText config={config}
+                                as="span"
+                                isEditing={!!onChangeField}
+                                onChangeField={onChangeField}
+                                onSelect={onSelectElement}
+                                tabId="cover"
+                                field="coverBrideText"
+                                activeColorId={activeColorId}
+                                setActiveColorId={setActiveColorId}
+                                popoverId="coverBride"
+                                onChangeColor={(color) => onChangeField && onChangeField('coverBrideTextColor', color)}
+                                colorValue={config.coverBrideTextColor || config.coverBrideColor || '#ffffff'}
+                                className={`font-semibold block sm:inline ${config.coverBrideTextFont || config.coverBrideFont || 'font-serif'} ${config.coverBrideTextSize || config.coverBrideSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
+                                style={{ 
+                                  color: config.coverBrideTextColor || config.coverBrideColor || '#ffffff',
+                                  textAlign: (config.coverBrideTextAlign || config.coverBrideAlign) === 'left' ? 'left' : (config.coverBrideTextAlign || config.coverBrideAlign) === 'right' ? 'right' : 'center',
+                                  opacity: (config.coverBrideTextOpacity !== undefined ? config.coverBrideTextOpacity : config.coverBrideOpacity) !== undefined ? (config.coverBrideTextOpacity !== undefined ? config.coverBrideTextOpacity : config.coverBrideOpacity) : 1,
+                                  filter: (config.coverBrideTextGlow !== undefined ? config.coverBrideTextGlow : config.coverBrideGlow) !== undefined ? `brightness(${config.coverBrideTextGlow !== undefined ? config.coverBrideTextGlow : config.coverBrideGlow}%)` : undefined,
+                                  transform: (config.coverBrideTextYOffset || config.coverBrideYOffset || config.brideNameYOffset) ? `translateY(${config.coverBrideTextYOffset || config.coverBrideYOffset || config.brideNameYOffset}px)` : undefined,
+                                  fontSize: shouldScale ? getScaledFontSize(config.coverBrideTextSize || config.coverBrideSize, 60, 15, 5.2, contentScale) : undefined,
+                                  lineHeight: shouldScale ? 1.15 : undefined
+                                }}
+                                value={config.coverBrideText !== undefined ? config.coverBrideText : config.brideName}
+                              />
+                            </>
+                          ) : (
+                            <>
+                              <EditableText config={config}
+                                as="span"
+                                isEditing={!!onChangeField}
+                                onChangeField={onChangeField}
+                                onSelect={onSelectElement}
+                                tabId="cover"
+                                field="coverBrideText"
+                                activeColorId={activeColorId}
+                                setActiveColorId={setActiveColorId}
+                                popoverId="coverBride"
+                                onChangeColor={(color) => onChangeField && onChangeField('coverBrideTextColor', color)}
+                                colorValue={config.coverBrideTextColor || config.coverBrideColor || '#ffffff'}
+                                className={`font-semibold block sm:inline ${config.coverBrideTextFont || config.coverBrideFont || 'font-serif'} ${config.coverBrideTextSize || config.coverBrideSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
+                                style={{ 
+                                  color: config.coverBrideTextColor || config.coverBrideColor || '#ffffff',
+                                  textAlign: (config.coverBrideTextAlign || config.coverBrideAlign) === 'left' ? 'left' : (config.coverBrideTextAlign || config.coverBrideAlign) === 'right' ? 'right' : 'center',
+                                  opacity: (config.coverBrideTextOpacity !== undefined ? config.coverBrideTextOpacity : config.coverBrideOpacity) !== undefined ? (config.coverBrideTextOpacity !== undefined ? config.coverBrideTextOpacity : config.coverBrideOpacity) : 1,
+                                  filter: (config.coverBrideTextGlow !== undefined ? config.coverBrideTextGlow : config.coverBrideGlow) !== undefined ? `brightness(${config.coverBrideTextGlow !== undefined ? config.coverBrideTextGlow : config.coverBrideGlow}%)` : undefined,
+                                  transform: (config.coverBrideTextYOffset || config.coverBrideYOffset || config.brideNameYOffset) ? `translateY(${config.coverBrideTextYOffset || config.coverBrideYOffset || config.brideNameYOffset}px)` : undefined,
+                                  fontSize: shouldScale ? getScaledFontSize(config.coverBrideTextSize || config.coverBrideSize, 60, 15, 5.2, contentScale) : undefined,
+                                  lineHeight: shouldScale ? 1.15 : undefined
+                                }}
+                                value={config.coverBrideText !== undefined ? config.coverBrideText : config.brideName}
+                              />
+                              
+                              <EditableText config={config}
+                                as="span"
+                                isEditing={!!onChangeField}
+                                onChangeField={onChangeField}
+                                onSelect={onSelectElement}
+                                tabId="cover"
+                                field="coverAmpersandText"
+                                activeColorId={activeColorId}
+                                setActiveColorId={setActiveColorId}
+                                popoverId="coverAmpersand"
+                                onChangeColor={(color) => onChangeField && onChangeField('coverAmpersandTextColor', color)}
+                                colorValue={config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b'}
+                                className={`block my-2 ${config.coverAmpersandTextFont || config.coverAmpersandFont || 'font-cursive'} ${config.coverAmpersandTextSize || config.coverAmpersandSize || 'text-3xl sm:text-5xl'}`} 
+                                style={{ 
+                                  color: config.coverAmpersandTextColor || config.coverAmpersandColor || config.accentGold || '#f59e0b',
+                                  textAlign: (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'left' ? 'left' : (config.coverAmpersandTextAlign || config.coverAmpersandAlign) === 'right' ? 'right' : 'center',
+                                  opacity: (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) !== undefined ? (config.coverAmpersandTextOpacity !== undefined ? config.coverAmpersandTextOpacity : config.coverAmpersandOpacity) : 1,
+                                  filter: (config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow) !== undefined ? `brightness(${config.coverAmpersandTextGlow !== undefined ? config.coverAmpersandTextGlow : config.coverAmpersandGlow}%)` : undefined,
+                                  transform: (config.coverAmpersandTextYOffset || config.coverAmpersandYOffset) ? `translateY(${config.coverAmpersandTextYOffset || config.coverAmpersandYOffset}px)` : undefined,
+                                  fontSize: shouldScale ? getScaledFontSize(config.coverAmpersandTextSize || config.coverAmpersandSize, 38, 12, 3.6, contentScale) : undefined,
+                                  margin: shouldScale ? `clamp(1px, 0.5cqw, 8px) 0` : undefined,
+                                  lineHeight: shouldScale ? 1.1 : undefined
+                                }}
+                                value={config.coverAmpersandText !== undefined ? config.coverAmpersandText : "&"}
+                              />
+                              
+                              <EditableText config={config}
+                                as="span"
+                                isEditing={!!onChangeField}
+                                onChangeField={onChangeField}
+                                onSelect={onSelectElement}
+                                tabId="cover"
+                                field="coverGroomText"
+                                activeColorId={activeColorId}
+                                setActiveColorId={setActiveColorId}
+                                popoverId="coverGroom"
+                                onChangeColor={(color) => onChangeField && onChangeField('coverGroomTextColor', color)}
+                                colorValue={config.coverGroomTextColor || config.coverGroomColor || '#ffffff'}
+                                className={`font-semibold block sm:inline ${config.coverGroomTextFont || config.coverGroomFont || 'font-serif'} ${config.coverGroomTextSize || config.coverGroomSize || 'text-4xl sm:text-6xl md:text-7xl'}`}
+                                style={{ 
+                                  color: config.coverGroomTextColor || config.coverGroomColor || '#ffffff',
+                                  textAlign: (config.coverGroomTextAlign || config.coverGroomAlign) === 'left' ? 'left' : (config.coverGroomTextAlign || config.coverGroomAlign) === 'right' ? 'right' : 'center',
+                                  opacity: (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) !== undefined ? (config.coverGroomTextOpacity !== undefined ? config.coverGroomTextOpacity : config.coverGroomOpacity) : 1,
+                                  filter: (config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow) !== undefined ? `brightness(${config.coverGroomTextGlow !== undefined ? config.coverGroomTextGlow : config.coverGroomGlow}%)` : undefined,
+                                  transform: (config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset) ? `translateY(${config.coverGroomTextYOffset || config.coverGroomYOffset || config.groomNameYOffset}px)` : undefined,
+                                  fontSize: shouldScale ? getScaledFontSize(config.coverGroomTextSize || config.coverGroomSize, 60, 15, 5.2, contentScale) : undefined,
+                                  lineHeight: shouldScale ? 1.15 : undefined
+                                }}
+                                value={config.coverGroomText !== undefined ? config.coverGroomText : config.groomName}
+                              />
+                            </>
+                          )}
                         </h1>
                       )}
                     </div>
@@ -3253,7 +3338,7 @@ export default function InvitationRenderer({
                               transform: (config.scratchCoupleTextYOffset || config.scratchCoupleYOffset) ? `translateY(${config.scratchCoupleTextYOffset || config.scratchCoupleYOffset}px)` : undefined
                             }}
                           >
-                            {config.scratchCoupleText || `${config.brideName} & ${config.groomName}`}
+                            {config.scratchCoupleText || (isGroomFirst ? `${config.groomName} & ${config.brideName}` : `${config.brideName} & ${config.groomName}`)}
                           </span>
                           )}
                           
