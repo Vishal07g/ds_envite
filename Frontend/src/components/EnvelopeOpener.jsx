@@ -97,10 +97,11 @@ export default function EnvelopeOpener({
   const envelopeBg = config.envelopeBgColor || "#5a0e1c"; // Deep rich burgundy/wine matching reference
   const envelopeBgImage = config.showEnvelopeTexture !== false ? config.envelopeBgImage : undefined;
   const sealColor = config.envelopeSealColor || "#c89f4b"; // Antique gold
+  const isGroomFirst = config.coupleCardsOrder === 'groomFirst' || config.coupleOrder === 'groomFirst';
   const resolvedBride = (config.coverBrideText || config.brideName || "").trim();
   const resolvedGroom = (config.coverGroomText || config.groomName || "").trim();
   const autoCoupleNames = (resolvedBride && resolvedGroom)
-    ? `${resolvedBride} & ${resolvedGroom}`
+    ? (isGroomFirst ? `${resolvedGroom} & ${resolvedBride}` : `${resolvedBride} & ${resolvedGroom}`)
     : (resolvedBride || resolvedGroom || "");
 
   const isDummyText = (txt) => {
@@ -113,17 +114,26 @@ export default function EnvelopeOpener({
     config.envelopeNamesText.trim() &&
     !isDummyText(config.envelopeNamesText);
 
-  const namesText = (isCustomEnvelopeName ? config.envelopeNamesText : (autoCoupleNames || config.envelopeNamesText || "")).trim();
+  // If groomFirst is active, ensure displayed envelope names prioritize Groom & Bride
+  let resolvedEnvelopeNames = isCustomEnvelopeName ? config.envelopeNamesText : (autoCoupleNames || config.envelopeNamesText || "");
+  if (isGroomFirst && resolvedBride && resolvedGroom && resolvedEnvelopeNames.toLowerCase().includes(resolvedBride.toLowerCase()) && resolvedEnvelopeNames.toLowerCase().includes(resolvedGroom.toLowerCase())) {
+    resolvedEnvelopeNames = `${resolvedGroom} & ${resolvedBride}`;
+  }
+  const namesText = (resolvedEnvelopeNames || "").trim();
 
   const autoInitials = (resolvedBride && resolvedGroom)
-    ? `${resolvedBride.charAt(0)} & ${resolvedGroom.charAt(0)}`
+    ? (isGroomFirst ? `${resolvedGroom.charAt(0)} & ${resolvedBride.charAt(0)}` : `${resolvedBride.charAt(0)} & ${resolvedGroom.charAt(0)}`)
     : "";
 
   const isCustomInitials = config.envelopeInitials &&
     !config.envelopeInitials.toUpperCase().includes("A & A") &&
     !config.envelopeInitials.toUpperCase().includes("A 👑 A");
 
-  const initials = isCustomInitials ? config.envelopeInitials : (autoInitials || (resolvedBride && resolvedGroom ? `${resolvedBride.charAt(0)} & ${resolvedGroom.charAt(0)}` : "S & V"));
+  let resolvedInitials = isCustomInitials ? config.envelopeInitials : (autoInitials || (resolvedBride && resolvedGroom ? (isGroomFirst ? `${resolvedGroom.charAt(0)} & ${resolvedBride.charAt(0)}` : `${resolvedBride.charAt(0)} & ${resolvedGroom.charAt(0)}`) : "V & S"));
+  if (isGroomFirst && resolvedBride && resolvedGroom && (resolvedInitials.toUpperCase().includes("S & V") || resolvedInitials.toUpperCase().includes("S 👑 V") || resolvedInitials.toUpperCase().includes("SV"))) {
+    resolvedInitials = resolvedInitials.toUpperCase().includes("👑") ? "V 👑 S" : "V & S";
+  }
+  const initials = resolvedInitials;
   const tagline = config.envelopeTagline || "Cordially Invited";
   const animDuration = Math.max(1.0, parseFloat(config.envelopeSpeed || "1.2"));
   const particleCount = parseInt(config.envelopeParticles || "24");

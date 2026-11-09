@@ -34,8 +34,13 @@ export function getCoupleDetails({
     const brideSlug = cleanBride.toLowerCase().replace(/[^a-z0-9]+/g, "-");
     const groomSlug = cleanGroom.toLowerCase().replace(/[^a-z0-9]+/g, "-");
 
-    // 1. Slug priority: Does the slug start with groom name or bride name?
-    if (rawSlug) {
+    // 0. Explicit config order override
+    if (config?.coupleCardsOrder === 'groomFirst' || config?.coupleOrder === 'groomFirst') {
+      isGroomFirst = true;
+    } else if (config?.coupleCardsOrder === 'brideFirst' || config?.coupleOrder === 'brideFirst') {
+      isGroomFirst = false;
+    } else if (rawSlug) {
+      // 1. Slug priority: Does the slug start with groom name or bride name?
       if (rawSlug.startsWith(groomSlug)) {
         isGroomFirst = true;
       } else if (rawSlug.startsWith(brideSlug)) {

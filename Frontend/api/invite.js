@@ -33,7 +33,11 @@ function getCoupleDetails({
     const brideSlug = cleanBride.toLowerCase().replace(/[^a-z0-9]+/g, '-');
     const groomSlug = cleanGroom.toLowerCase().replace(/[^a-z0-9]+/g, '-');
 
-    if (rawSlug) {
+    if (config?.coupleCardsOrder === 'groomFirst' || config?.coupleOrder === 'groomFirst') {
+      isGroomFirst = true;
+    } else if (config?.coupleCardsOrder === 'brideFirst' || config?.coupleOrder === 'brideFirst') {
+      isGroomFirst = false;
+    } else if (rawSlug) {
       if (rawSlug.startsWith(groomSlug)) {
         isGroomFirst = true;
       } else if (rawSlug.startsWith(brideSlug)) {

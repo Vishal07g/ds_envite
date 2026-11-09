@@ -817,7 +817,7 @@ const INITIAL_PRESETS = [
 
 const INITIAL_USERS = [
   { id: "user-admin", username: "dsenviteadmin", password: "dsenvite1006", displayName: "Administrator", role: "admin" },
-  { id: "user-customer", username: "customer", password: "customer123", displayName: "Suman & Vishal", role: "customer" }
+  { id: "user-customer", username: "customer", password: "customer123", displayName: "Vishal & Suman", role: "customer" }
 ];
 
 const INITIAL_INVITATIONS = [
@@ -1017,7 +1017,7 @@ const INITIAL_INVITATIONS = [
     "envelopeFlapBgEnd": "rgba(90, 14, 28, 0.9)",
     "envelopeFlapBgStart": "rgba(184, 146, 84, 0.25)",
     "envelopeFlapShape": "curved-scoop",
-    "envelopeInitials": "S & V",
+    "envelopeInitials": "V & S",
     "envelopeInitialsColor": "",
     "envelopeInitialsFont": "font-cursive",
     "envelopeInitialsSize": "text-3xl",
@@ -1032,7 +1032,9 @@ const INITIAL_INVITATIONS = [
     "envelopeNamesColor": "",
     "envelopeNamesFont": "font-cinzel",
     "envelopeNamesSize": "text-xl",
-    "envelopeNamesText": "Suman & Vishal",
+    "envelopeNamesText": "Vishal & Suman",
+    "coupleCardsOrder": "groomFirst",
+    "weddingTitle": "Vishal & Suman",
     "envelopeNamesTextYOffset": 5,
     "envelopeOpeningStyle": "classic-envelope",
     "envelopePaperOpacity": 0.85,
@@ -1261,9 +1263,9 @@ const INITIAL_INVITATIONS = [
     "wishTitleSize": "text-2xl sm:text-3xl"
   },
   "createdAt": "2026-10-20T01:53:10.490Z",
-  "customSlug": "suman-vishal",
+  "customSlug": "vishal-suman",
   "driveStorage": {
-    "folderName": "Suman & Vishal (Snehalata Marriage Hall, Neamatpur, WB)",
+    "folderName": "Vishal & Suman (Snehalata Marriage Hall, Neamatpur, WB)",
     "folderUrl": "https://drive.google.com/drive/folders/1_pdrNFiXcOymZQEby52O3FbvImCU_SW8?usp=sharing",
     "lastSyncedAt": "2026-10-20T01:53:10.490Z",
     "rootFolderId": "1_pdrNFiXcOymZQEby52O3FbvImCU_SW8",
@@ -1273,10 +1275,10 @@ const INITIAL_INVITATIONS = [
   "id": "invite-1792299417819",
   "isCustomSlugManuallySet": true,
   "isPaid": true,
-  "shareText": "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Suman & Vishal",
-  "slug": "suman-vishal",
+  "shareText": "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Vishal & Suman",
+  "slug": "vishal-suman",
   "status": "published",
-  "title": "Suman & Vishal's Wedding Invitation",
+  "title": "Vishal & Suman's Wedding Invitation",
   "updatedAt": "2026-10-20T01:53:10.490Z",
   "customerId": "user-customer",
   "rsvps": [],
@@ -1286,8 +1288,8 @@ const INITIAL_INVITATIONS = [
     id: "invite-1792423053258",
     customerId: "user-customer",
     title: "Vishal & Suman — Wedding Invitation",
-    slug: "suman-vishal-1792423053258",
-    customSlug: "suman-vishal-1792423053258",
+    slug: "vishal-suman-1792423053258",
+    customSlug: "vishal-suman-1792423053258",
     isCustomSlugManuallySet: true,
     config: {
       ...DEFAULT_CONFIG,
@@ -1298,12 +1300,15 @@ const INITIAL_INVITATIONS = [
       primaryColor: "#400d18",
       accentGold: "#d4af37",
       envelopeBgColor: "#2b060c",
-      envelopeInitials: "S 👑 V"
+      envelopeInitials: "V 👑 S",
+      envelopeNamesText: "Vishal & Suman",
+      coupleCardsOrder: "groomFirst",
+      weddingTitle: "Vishal & Suman"
     },
     rsvps: [],
     wishes: [],
     isPaid: true,
-    shareText: "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Suman & Vishal",
+    shareText: "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Vishal & Suman",
     status: "published",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
@@ -1640,7 +1645,13 @@ function getDb() {
     saveDb(db);
   }
 
-  // Guarantee BOTH customer Suman & Vishal paid invitations are always present and protected
+  // Guarantee customer user displayName is always Vishal & Suman
+  const custUser = db.users?.find(u => u.id === 'user-customer');
+  if (custUser) {
+    custUser.displayName = "Vishal & Suman";
+  }
+
+  // Guarantee BOTH customer Vishal & Suman paid invitations are always present and protected
   const primarySumanDef = INITIAL_INVITATIONS[0];
   const primaryIdx = db.invitations.findIndex(i => i.id === "invite-1792299417819");
   if (primaryIdx === -1) {
@@ -1649,6 +1660,19 @@ function getDb() {
     const curr = db.invitations[primaryIdx];
     curr.isPaid = true;
     curr.status = "published";
+    curr.title = "Vishal & Suman's Wedding Invitation";
+    curr.slug = "vishal-suman";
+    curr.customSlug = "vishal-suman";
+    curr.customerId = "user-customer";
+    if (!curr.config) curr.config = {};
+    curr.config.coupleCardsOrder = "groomFirst";
+    curr.config.weddingTitle = "Vishal & Suman";
+    curr.config.envelopeNamesText = "Vishal & Suman";
+    curr.config.envelopeInitials = "V & S";
+    curr.shareText = "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Vishal & Suman";
+    if (curr.driveStorage) {
+      curr.driveStorage.folderName = "Vishal & Suman (Snehalata Marriage Hall, Neamatpur, WB)";
+    }
     if (!curr.config?.ceremonies || curr.config.ceremonies.length < 5 || !curr.config.weddingVenue || curr.config.weddingVenue.includes("Starlight")) {
       db.invitations[primaryIdx] = {
         ...JSON.parse(JSON.stringify(primarySumanDef)),
@@ -1669,7 +1693,7 @@ function getDb() {
     }
   }
 
-  // Guarantee second paid Suman & Vishal invitation (invite-1792423053258) is always present and marked paid
+  // Guarantee second paid Vishal & Suman invitation (invite-1792423053258) is always present and marked paid
   const secondSumanDef = INITIAL_INVITATIONS[1];
   const secondIdx = db.invitations.findIndex(i => i.id === "invite-1792423053258");
   if (secondIdx === -1) {
@@ -1677,6 +1701,16 @@ function getDb() {
   } else {
     db.invitations[secondIdx].isPaid = true;
     db.invitations[secondIdx].status = "published";
+    db.invitations[secondIdx].title = "Vishal & Suman — Wedding Invitation";
+    db.invitations[secondIdx].slug = "vishal-suman-1792423053258";
+    db.invitations[secondIdx].customSlug = "vishal-suman-1792423053258";
+    db.invitations[secondIdx].customerId = "user-customer";
+    if (!db.invitations[secondIdx].config) db.invitations[secondIdx].config = {};
+    db.invitations[secondIdx].config.coupleCardsOrder = "groomFirst";
+    db.invitations[secondIdx].config.weddingTitle = "Vishal & Suman";
+    db.invitations[secondIdx].config.envelopeNamesText = "Vishal & Suman";
+    db.invitations[secondIdx].config.envelopeInitials = "V 👑 S";
+    db.invitations[secondIdx].shareText = "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Vishal & Suman";
   }
 
   return db;
