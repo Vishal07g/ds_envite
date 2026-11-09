@@ -174,13 +174,14 @@ function findInvitationBySlug(invitations, rawSlug) {
   const strippedTarget = targetSlug.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
   const numMatch = targetSlug.match(/(\d{6,})/);
 
-  // Strategy 1: Exact match on id, slug, or customSlug
+  // Strategy 1: Exact match on code, id, slug, or customSlug
   let match = invs.find(i => {
     if (!i) return false;
+    const iCode = String(i.code || '').toLowerCase();
     const iId = String(i.id || '').toLowerCase();
     const iSlug = String(i.slug || '').toLowerCase();
     const iCustom = String(i.customSlug || '').toLowerCase();
-    return iSlug === targetSlug || iCustom === targetSlug || iId === targetSlug;
+    return iCode === targetSlug || iSlug === targetSlug || iCustom === targetSlug || iId === targetSlug;
   });
   if (match) return match;
 

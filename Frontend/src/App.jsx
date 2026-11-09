@@ -252,7 +252,8 @@ export default function App() {
               } 
             />
 
-            {/* Shared Client Facing Invitation Link View */}
+            {/* Shared Client Facing Invitation Link View (supports /i/:code, /invite/:id, and /invitation/:id) */}
+            <Route path="/i/:id" element={<InvitationView />} />
             <Route path="/invite/:id" element={<InvitationView />} />
             <Route path="/invitation/:id" element={<InvitationView />} />
 
