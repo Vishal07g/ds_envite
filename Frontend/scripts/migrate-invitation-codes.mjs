@@ -48,3 +48,4 @@ async function migrateCodes() {
 }
 
 migrateCodes().catch(console.error);
+

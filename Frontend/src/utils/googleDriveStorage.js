@@ -896,6 +896,32 @@ export async function syncInvitationMediaFromDrive(invitation) {
  * Format folder name strictly according to:
  * "name of bride and groom name with wedding location in bracket whatever is given by customer or admin"
  */
+
+/**
+ * Maps an invitation media category to its proper subfolder in Drive:
+ * - images/ (photos, covers, galleries, symbols)
+ * - videos/ (cover videos, background videos)
+ * - music/ (starting song, background music)
+ * - files/ (documents, cliparts, attachments)
+ */
+export function getMediaSubfolderName(category, file = null) {
+  const isVideo = Boolean(
+    (file && file.type && (file.type.startsWith("video/") || file.type.includes("mp4") || file.type.includes("webm") || file.type.includes("quicktime"))) ||
+    (typeof category === "string" && (category.toLowerCase().includes("video") || category === "scratchCardBgVideo" || category === "envelopeBgVideo"))
+  );
+  if (isVideo) return "videos";
+
+  const isAudio = Boolean(
+    (file && file.type && (file.type.startsWith("audio/") || file.type.includes("mpeg") || file.type.includes("mp3") || file.type.includes("wav") || file.type.includes("ogg"))) ||
+    (typeof category === "string" && (category.toLowerCase().includes("music") || category.toLowerCase().includes("audio") || category.toLowerCase().includes("song")))
+  );
+  if (isAudio) return "music";
+
+  if (category === "files" || category === "documents" || category === "pdf") return "files";
+
+  return "images";
+}
+
 export function formatDriveFolderName(config = {}, fallbackTitle = "") {
   const sanitize = (str) => String(str || "").replace(/[/\\?%*:|"<>]/g, "-").replace(/\s+/g, " ").trim();
 
@@ -1261,11 +1287,22 @@ export async function uploadInvitationFileToDrive({
         ) || /\.(mp3|wav|ogg|m4a|aac)$/i.test(file.name || "")
       );
 
+      const subfolderName = getMediaSubfolderName(category, file);
+      let uploadTargetFolderId = targetFolderId;
+      try {
+        const subfolder = await getOrCreateDriveFolderOAuth(subfolderName, targetFolderId, oauthToken);
+        if (subfolder && subfolder.id) {
+          uploadTargetFolderId = subfolder.id;
+        }
+      } catch (subErr) {
+        console.warn("Could not create/find subfolder in Drive:", subErr);
+      }
+
       const uploaded = await uploadFileToDriveOAuth({
         blob: file,
         fileName: fileName,
         mimeType: file.type || (isVideo ? "video/mp4" : isMedia ? "audio/mpeg" : "image/jpeg"),
-        folderId: targetFolderId,
+        folderId: uploadTargetFolderId,
         token: oauthToken
       });
 
@@ -1351,6 +1388,7 @@ export async function uploadInvitationFileToDrive({
           folderId: invitation?.driveStorage?.folderId || null,
           folderName: folderName,
           categoryName: getCategoryFolderName(config, invitation),
+          subfolder: getMediaSubfolderName(category, file),
           fileName: fileName,
           previousFileId: previousFileId || null,
           mimeType: file.type || (isVideo ? "video/mp4" : isAudio ? "audio/mpeg" : "image/jpeg"),
@@ -1871,19 +1909,29 @@ function doPost(e) {
       });
     }
     
-    // ACTION 2: Upload file directly inside the invitation folder
+    // ACTION 2: Upload file directly inside the invitation folder & subfolder (images/videos/music/files)
     if (action === "uploadFile") {
-      var targetFolder;
+      var invFolder;
       if (contents.folderId) {
         try {
-          targetFolder = DriveApp.getFolderById(contents.folderId);
+          invFolder = DriveApp.getFolderById(contents.folderId);
         } catch(e) {}
       }
-      if (!targetFolder && contents.folderName) {
-        targetFolder = getOrCreateFolderByName(root, contents.folderName);
+      if (!invFolder && contents.folderName) {
+        var parentFolder = root;
+        if (contents.categoryName) {
+          parentFolder = getOrCreateFolderByName(root, contents.categoryName);
+        }
+        invFolder = getOrCreateFolderByName(parentFolder, contents.folderName);
       }
-      if (!targetFolder) {
-        targetFolder = root;
+      if (!invFolder) {
+        invFolder = root;
+      }
+      
+      // Strict hierarchy: place into subfolder (images, videos, music, files)
+      var targetFolder = invFolder;
+      if (contents.subfolder) {
+        targetFolder = getOrCreateFolderByName(invFolder, contents.subfolder);
       }
       
       var base64Str = contents.base64Data.indexOf(",") > -1 
@@ -1895,14 +1943,16 @@ function doPost(e) {
       var file = targetFolder.createFile(blob);
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
       
-      // High-speed direct image preview URL
       var directUrl = "https://lh3.googleusercontent.com/d/" + file.getId();
       
       return responseJSON({
         status: "success",
         fileId: file.getId(),
         fileUrl: directUrl,
-        driveViewUrl: file.getUrl()
+        driveViewUrl: file.getUrl(),
+        folderId: invFolder.getId(),
+        folderUrl: invFolder.getUrl(),
+        subfolderId: targetFolder.getId()
       });
     }
     

@@ -114,3 +114,4 @@ export async function resolveInvitationIdByCode(code) {
   const snap = await get(codeRef);
   return snap.exists() ? snap.val() : null;
 }
+

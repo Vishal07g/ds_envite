@@ -1212,7 +1212,7 @@ export default function AdminSidebar({
         const resolvedUrl = formatDriveDirectUrl(uploadRes.url, "audio");
         onChangeField(field, resolvedUrl);
       } else {
-        const finalImgUrl = uploadRes.driveDirectUrl || uploadRes.url || localHdData;
+        const finalImgUrl = uploadRes.driveDirectUrl || uploadRes.url || localPreview;
         onChangeField(field, finalImgUrl);
       }
 
@@ -5834,18 +5834,22 @@ export default function AdminSidebar({
                     <div className="relative w-12 h-16 rounded-lg overflow-hidden border border-slate-800 shrink-0 bg-slate-900 flex items-center justify-center">
                       {isVideoUrl(config.heroImage) ? (
                         extractDriveFileId(config.heroImage) ? (
-                          <iframe 
-                            src={`https://drive.google.com/file/d/${extractDriveFileId(config.heroImage)}/preview`} 
-                            className="w-full h-full border-0 pointer-events-none scale-125" 
-                          />
+                          <div className="relative w-full h-full flex items-center justify-center bg-slate-900">
+                            <iframe 
+                              src={`https://drive.google.com/file/d/${extractDriveFileId(config.heroImage)}/preview`} 
+                              className="w-full h-full border-0 pointer-events-none scale-125" 
+                            />
+                            <div className="absolute inset-0 bg-transparent" />
+                          </div>
                         ) : (
                           <video 
+                            key={config.heroImage}
                             src={formatDriveDirectUrl(config.heroImage, "video")} 
                             autoPlay 
                             loop 
                             muted 
                             playsInline 
-                            className="w-full h-full object-cover" 
+                            className="w-full h-full object-cover bg-black" 
                           />
                         )
                       ) : (
@@ -5854,8 +5858,10 @@ export default function AdminSidebar({
                           alt="Cover BG Preview" 
                           className="w-full h-full object-cover" 
                           onError={(e) => {
-                            if (!e.currentTarget.src.includes('cover_suman_vishal_1k.jpg')) {
-                              e.currentTarget.src = '/cover_suman_vishal_1k.jpg';
+                            const currentSrc = e.currentTarget.src || '';
+                            const fileId = extractDriveFileId(config.heroImage);
+                            if (fileId && !currentSrc.includes('thumbnail')) {
+                              e.currentTarget.src = `https://drive.google.com/thumbnail?id=${fileId}&sz=w2560`;
                             }
                           }}
                         />
