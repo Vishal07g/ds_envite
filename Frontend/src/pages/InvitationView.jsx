@@ -12,6 +12,7 @@ import PrivacyShield from '../components/PrivacyShield';
 import { updateSocialMetaTags, resetWebsiteSocialMetaTags } from '../utils/monogramThumbnail';
 import { useAuth } from '../context/AuthContext';
 import { SvgEdit, SvgSparkles, SvgCheck, SvgAward, SvgHeart } from '../components/icons';
+import { submitBlessingToFirebase, subscribeToBlessings, fetchBlessingsFromFirebase } from '../utils/isolatedFirebaseService';
 
 export default function InvitationView() {
   const { id } = useParams();
@@ -134,6 +135,7 @@ export default function InvitationView() {
           const strippedTarget = cleanId.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
           const foundCloud = cloudInvs.find(i => {
             if (!i) return false;
+            const code = String(i.code || '').toLowerCase();
             const s = String(i.slug || '').toLowerCase();
             const cs = String(i.customSlug || '').toLowerCase();
             const sStripped = s.replace(/^invite-/, '').replace(/-\d{6,}$/, '');
@@ -142,6 +144,7 @@ export default function InvitationView() {
             const g = (i.config?.groomName || i.config?.coverGroomText || '').toLowerCase();
             const namesMatch = b && g && cleanId.includes(b) && cleanId.includes(g);
             return (
+              code === cleanId ||
               i.id === id || 
               i.slug === id || 
               i.customSlug === id ||
@@ -282,17 +285,31 @@ export default function InvitationView() {
     }
   };
 
+  // Listen for real-time isolated blessings from Firebase
+  useEffect(() => {
+    if (!invitation?.id || id === "demo") return;
+    const unsub = subscribeToBlessings(invitation.id, (blessings) => {
+      if (blessings && blessings.length > 0) {
+        setInvitation(prev => prev ? ({
+          ...prev,
+          wishes: blessings
+        }) : prev);
+      }
+    });
+    return () => unsub();
+  }, [invitation?.id, id]);
+
   const handleWishSubmit = async (form) => {
     try {
-      const wishData = {
-        id: `wish-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        sender: (form.sender || "Guest").trim(),
-        message: (form.message || "").trim(),
-        date: new Date().toLocaleDateString('en-GB') + " " + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-        createdAt: new Date().toISOString()
-      };
-
+      const targetId = invitation?.id || id;
       if (id === "demo") {
+        const wishData = {
+          id: `wish-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          sender: (form.sender || "Guest").trim(),
+          message: (form.message || "").trim(),
+          date: new Date().toLocaleDateString('en-GB') + " " + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+          createdAt: new Date().toISOString()
+        };
         setInvitation(prev => ({
           ...prev,
           wishes: [wishData, ...(prev.wishes || [])]
@@ -301,19 +318,20 @@ export default function InvitationView() {
         return;
       }
 
+      // Submit atomically to Firebase isolated node: /saas_data/wishes/{invitationId}/{wishId}
+      const newBlessing = await submitBlessingToFirebase(targetId, form);
+      showToast("Thank you! Your beautiful blessing has been posted.", "success");
+
+      // Also cache in local state and store
       if (invitation) {
         dbStore.ensureInvitationCached(invitation);
       }
-      const targetId = invitation?.id || id;
-      const res = dbStore.submitWish(targetId, wishData);
-      showToast("Thank you! Your beautiful blessing has been posted.", "success");
+      dbStore.submitWish(targetId, newBlessing);
 
-      if (res && res.wishes) {
-        setInvitation(prev => ({
-          ...prev,
-          wishes: res.wishes
-        }));
-      }
+      setInvitation(prev => ({
+        ...prev,
+        wishes: [newBlessing, ...((prev?.wishes || []).filter(w => w.id !== newBlessing.id))]
+      }));
     } catch (err) {
       showToast(err.message || "Failed to post blessing", "error");
     }

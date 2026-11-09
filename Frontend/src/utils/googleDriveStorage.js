@@ -896,6 +896,32 @@ export async function syncInvitationMediaFromDrive(invitation) {
  * Format folder name strictly according to:
  * "name of bride and groom name with wedding location in bracket whatever is given by customer or admin"
  */
+
+/**
+ * Maps an invitation media category to its proper subfolder in Drive:
+ * - images/ (photos, covers, galleries, symbols)
+ * - videos/ (cover videos, background videos)
+ * - music/ (starting song, background music)
+ * - files/ (documents, cliparts, attachments)
+ */
+export function getMediaSubfolderName(category, file = null) {
+  const isVideo = Boolean(
+    (file && file.type && (file.type.startsWith("video/") || file.type.includes("mp4") || file.type.includes("webm") || file.type.includes("quicktime"))) ||
+    (typeof category === "string" && (category.toLowerCase().includes("video") || category === "scratchCardBgVideo" || category === "envelopeBgVideo"))
+  );
+  if (isVideo) return "videos";
+
+  const isAudio = Boolean(
+    (file && file.type && (file.type.startsWith("audio/") || file.type.includes("mpeg") || file.type.includes("mp3") || file.type.includes("wav") || file.type.includes("ogg"))) ||
+    (typeof category === "string" && (category.toLowerCase().includes("music") || category.toLowerCase().includes("audio") || category.toLowerCase().includes("song")))
+  );
+  if (isAudio) return "music";
+
+  if (category === "files" || category === "documents" || category === "pdf") return "files";
+
+  return "images";
+}
+
 export function formatDriveFolderName(config = {}, fallbackTitle = "") {
   const sanitize = (str) => String(str || "").replace(/[/\\?%*:|"<>]/g, "-").replace(/\s+/g, " ").trim();
 
@@ -1208,7 +1234,122 @@ export async function uploadInvitationFileToDrive({
   // Extract previous file ID to remove old version and save Drive storage
   const previousFileId = extractDriveFileId(previousUrl || config[category]);
 
-  // 1. If Google Drive OAuth token is already authorized, upload directly to Google Drive!
+  // 1. Primary: Google Apps Script Webhook (Direct native upload to Google Drive without OAuth popup)
+  if (webhookUrl) {
+    try {
+      const isVideo = Boolean(
+        (file.type && (
+          file.type.startsWith("video/") || 
+          file.type.includes("mp4") || 
+          file.type.includes("webm") || 
+          file.type.includes("quicktime")
+        )) || /\.(mp4|webm|mov|m4v|mkv|ogv)$/i.test(file.name || "")
+      );
+
+      const isAudio = Boolean(
+        file.type && (
+          file.type.startsWith("audio/") || 
+          file.type.includes("mpeg") || 
+          file.type.includes("mp3") ||
+          file.type.includes("wav") ||
+          file.type.includes("ogg")
+        ) || /\.(mp3|wav|ogg|m4a|aac)$/i.test(file.name || "")
+      );
+
+      const subfolder = getMediaSubfolderName(category, file);
+      const base64Data = (isImage && localHdDataUrl) || await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({
+          action: "uploadFile",
+          rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
+          folderId: invitation?.driveStorage?.folderId || null,
+          folderName: folderName,
+          categoryName: getCategoryFolderName(config, invitation),
+          subfolder: subfolder,
+          fileName: fileName,
+          previousFileId: previousFileId || null,
+          mimeType: file.type || (isVideo ? "video/mp4" : isAudio ? "audio/mpeg" : "image/jpeg"),
+          base64Data: base64Data
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.status === "success") {
+          driveFileId = result.fileId;
+          driveDirectUrl = isVideo
+            ? `https://drive.google.com/file/d/${result.fileId}/preview#type=video`
+            : (isAudio 
+              ? `https://drive.google.com/uc?export=download&id=${result.fileId}`
+              : `https://lh3.googleusercontent.com/d/${result.fileId}=w2560`);
+          cloudUrl = driveDirectUrl;
+          return {
+            success: true,
+            url: cloudUrl,
+            driveDirectUrl,
+            driveFileId,
+            fileName,
+            folderName: result.folderName || folderName,
+            folderId: result.folderId || invitation?.driveStorage?.folderId,
+            folderUrl: result.folderUrl || invitation?.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("Google Apps Script Webhook upload encountered an issue, trying next method:", err);
+    }
+  }
+
+  // 2. Secondary: Direct Native Google Drive Upload via Service Account
+  try {
+    const subfolder = getMediaSubfolderName(category, file);
+    const base64Data = localHdDataUrl || await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const driveRes = await fetch("/api/drive-upload", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName,
+        mimeType: file.type || "application/octet-stream",
+        base64Data,
+        folderName,
+        subfolder
+      })
+    });
+
+    if (driveRes.ok) {
+      const result = await driveRes.json();
+      if (result.success && result.url) {
+        return {
+          success: true,
+          url: result.url,
+          driveDirectUrl: result.directUrl || result.url,
+          driveFileId: result.fileId,
+          fileName: result.fileName || fileName,
+          folderName: result.folderName || folderName,
+          folderId: result.folderId,
+          folderUrl: result.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL
+        };
+      }
+    }
+  } catch (apiErr) {
+    console.warn("Direct /api/drive-upload service encountered an issue:", apiErr);
+  }
+
+  // 3. If Google Drive OAuth token is already authorized, upload directly to Google Drive!
   const oauthToken = getStoredOAuthToken();
 
   if (oauthToken) {
@@ -1261,11 +1402,22 @@ export async function uploadInvitationFileToDrive({
         ) || /\.(mp3|wav|ogg|m4a|aac)$/i.test(file.name || "")
       );
 
+      const subfolderName = getMediaSubfolderName(category, file);
+      let uploadTargetFolderId = targetFolderId;
+      try {
+        const subfolder = await getOrCreateDriveFolderOAuth(subfolderName, targetFolderId, oauthToken);
+        if (subfolder && subfolder.id) {
+          uploadTargetFolderId = subfolder.id;
+        }
+      } catch (subErr) {
+        console.warn("Could not create/find subfolder in Drive:", subErr);
+      }
+
       const uploaded = await uploadFileToDriveOAuth({
         blob: file,
         fileName: fileName,
         mimeType: file.type || (isVideo ? "video/mp4" : isMedia ? "audio/mpeg" : "image/jpeg"),
-        folderId: targetFolderId,
+        folderId: uploadTargetFolderId,
         token: oauthToken
       });
 
@@ -1290,7 +1442,8 @@ export async function uploadInvitationFileToDrive({
 
         // Background sync to Firebase Storage for ultra-fast CDN loading
         if (storage) {
-          const storagePath = `drive_storage/${folderName}/${fileName}`;
+          const bgSubfolder = getMediaSubfolderName(category, file);
+          const storagePath = `drive_storage/${folderName}/${bgSubfolder}/${fileName}`;
           const fileStorageRef = storageRef(storage, storagePath);
           uploadBytes(fileStorageRef, file, {
             contentType: file.type || (isVideo ? "video/mp4" : isMedia ? "audio/mpeg" : "image/jpeg")
@@ -1313,79 +1466,7 @@ export async function uploadInvitationFileToDrive({
     }
   }
 
-  // 2. If Google Apps Script Webhook is active, upload directly into the specific Drive folder!
-  if (webhookUrl) {
-    try {
-      const base64Data = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      const isVideo = Boolean(
-        (file.type && (
-          file.type.startsWith("video/") || 
-          file.type.includes("mp4") || 
-          file.type.includes("webm") || 
-          file.type.includes("quicktime")
-        )) || /\.(mp4|webm|mov|m4v|mkv|ogv)$/i.test(file.name || "")
-      );
-
-      const isAudio = Boolean(
-        file.type && (
-          file.type.startsWith("audio/") || 
-          file.type.includes("mpeg") || 
-          file.type.includes("mp3") ||
-          file.type.includes("wav") ||
-          file.type.includes("ogg")
-        ) || /\.(mp3|wav|ogg|m4a|aac)$/i.test(file.name || "")
-      );
-
-      const response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({
-          action: "uploadFile",
-          rootFolderId: GOOGLE_DRIVE_ROOT_FOLDER_ID,
-          folderId: invitation?.driveStorage?.folderId || null,
-          folderName: folderName,
-          categoryName: getCategoryFolderName(config, invitation),
-          fileName: fileName,
-          previousFileId: previousFileId || null,
-          mimeType: file.type || (isVideo ? "video/mp4" : isAudio ? "audio/mpeg" : "image/jpeg"),
-          base64Data: base64Data
-        })
-      });
-
-      if (response.ok) {
-        const result = await response.json();
-        if (result.status === "success") {
-          driveFileId = result.fileId;
-          driveDirectUrl = isVideo
-            ? `https://drive.google.com/file/d/${result.fileId}/preview#type=video`
-            : (isAudio 
-              ? `https://drive.google.com/uc?export=download&id=${result.fileId}`
-              : (result.fileUrl ? (result.fileUrl.includes("=") ? result.fileUrl : `${result.fileUrl}=s0`) : `https://lh3.googleusercontent.com/d/${result.fileId}=s0`));
-          cloudUrl = (isVideo || isAudio) ? driveDirectUrl : (driveDirectUrl || localHdDataUrl);
-          return {
-            success: true,
-            url: cloudUrl,
-            driveDirectUrl,
-            driveFileId,
-            fileName,
-            folderName,
-            folderId: result.folderId || invitation?.driveStorage?.folderId,
-            folderUrl: result.folderUrl || invitation?.driveStorage?.folderUrl || GOOGLE_DRIVE_ROOT_FOLDER_URL
-          };
-        }
-      }
-    } catch (err) {
-      console.warn("Direct Google Drive upload webhook encountered error:", err);
-    }
-  }
-
-  // 3. High-speed Realtime Storage via Firebase Storage
+  // 4. High-speed Realtime Storage via Firebase Storage
   if (storage && !cloudUrl) {
     try {
       const isVideo = Boolean(
@@ -1406,14 +1487,17 @@ export async function uploadInvitationFileToDrive({
         ) || /\.(mp3|wav|ogg|m4a|aac)$/i.test(file.name || "")
       );
 
-      const storagePath = `drive_storage/${folderName}/${fileName}`;
+      const subfolder = getMediaSubfolderName(category, file);
+      const storagePath = `drive_storage/${folderName}/${subfolder}/${fileName}`;
       const fileStorageRef = storageRef(storage, storagePath);
       await uploadBytes(fileStorageRef, file, {
         contentType: file.type || (isVideo ? "video/mp4" : isAudio ? "audio/mpeg" : "image/jpeg"),
         customMetadata: {
           invitationId: invitation?.id || "",
           folderName: folderName,
-          category: category
+          subfolder: subfolder,
+          category: category,
+          originalName: file.name || fileName
         }
       });
       const firebaseUrl = await getDownloadURL(fileStorageRef);
@@ -1871,19 +1955,29 @@ function doPost(e) {
       });
     }
     
-    // ACTION 2: Upload file directly inside the invitation folder
+    // ACTION 2: Upload file directly inside the invitation folder & subfolder (images/videos/music/files)
     if (action === "uploadFile") {
-      var targetFolder;
+      var invFolder;
       if (contents.folderId) {
         try {
-          targetFolder = DriveApp.getFolderById(contents.folderId);
+          invFolder = DriveApp.getFolderById(contents.folderId);
         } catch(e) {}
       }
-      if (!targetFolder && contents.folderName) {
-        targetFolder = getOrCreateFolderByName(root, contents.folderName);
+      if (!invFolder && contents.folderName) {
+        var parentFolder = root;
+        if (contents.categoryName) {
+          parentFolder = getOrCreateFolderByName(root, contents.categoryName);
+        }
+        invFolder = getOrCreateFolderByName(parentFolder, contents.folderName);
       }
-      if (!targetFolder) {
-        targetFolder = root;
+      if (!invFolder) {
+        invFolder = root;
+      }
+      
+      // Strict hierarchy: place into subfolder (images, videos, music, files)
+      var targetFolder = invFolder;
+      if (contents.subfolder) {
+        targetFolder = getOrCreateFolderByName(invFolder, contents.subfolder);
       }
       
       var base64Str = contents.base64Data.indexOf(",") > -1 
@@ -1895,14 +1989,16 @@ function doPost(e) {
       var file = targetFolder.createFile(blob);
       file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
       
-      // High-speed direct image preview URL
       var directUrl = "https://lh3.googleusercontent.com/d/" + file.getId();
       
       return responseJSON({
         status: "success",
         fileId: file.getId(),
         fileUrl: directUrl,
-        driveViewUrl: file.getUrl()
+        driveViewUrl: file.getUrl(),
+        folderId: invFolder.getId(),
+        folderUrl: invFolder.getUrl(),
+        subfolderId: targetFolder.getId()
       });
     }
     

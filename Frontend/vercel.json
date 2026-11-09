@@ -62,6 +62,10 @@
       "destination": "/api/home"
     },
     {
+      "source": "/i/:slug",
+      "destination": "/api/invite?slug=:slug"
+    },
+    {
       "source": "/invite/:slug",
       "destination": "/api/invite?slug=:slug"
     },

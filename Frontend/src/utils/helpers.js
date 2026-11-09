@@ -155,6 +155,14 @@ export function formatWeddingTime(dateStr) {
 export function compressImage(file, maxWidth = 3840, maxHeight = 3840, quality = 0.98, preserveAlpha = true) {
   return new Promise((resolve, reject) => {
     if (!file) return resolve("");
+
+    if (typeof window === "undefined" || typeof Image === "undefined" || typeof document === "undefined") {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result || "");
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+      return;
+    }
     
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -340,7 +348,7 @@ export function formatDriveDirectUrl(url, type = "image") {
     return trimmed;
   }
   // Universal high-res thumbnail endpoint: cross-origin safe & works in all browsers without Google login cookies
-  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w2560`;
+  return `https://lh3.googleusercontent.com/d/${fileId}=w2560`;
 }
 
 

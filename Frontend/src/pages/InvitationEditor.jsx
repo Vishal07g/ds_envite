@@ -318,7 +318,7 @@ export default function InvitationEditor() {
       title: 'Duplicate Invitation & Create Drive Folder',
       message: 'Enter title & Google Drive folder name for the new copy:',
       defaultValue: defaultFolder,
-      placeholder: 'e.g. Suman & Vishal Wedding (Copy)',
+      placeholder: 'e.g. Wedding Invitation (Copy)',
       confirmText: 'Duplicate & Sync Drive',
       onConfirm: async (customName) => {
         const folderName = (customName || '').trim() || defaultFolder;
@@ -359,7 +359,7 @@ export default function InvitationEditor() {
       title: 'Create / Sync Unique Google Drive Folder',
       message: `Enter Google Drive folder name for "${title || 'this invitation'}" inside DS_Envite_DataCentre:`,
       defaultValue: currentName,
-      placeholder: 'e.g. Suman & Vishal (Neamatpur)',
+      placeholder: 'e.g. Couple Names (City)',
       confirmText: 'Create / Sync in Drive',
       onConfirm: async (customName) => {
         const folderName = (customName || '').trim() || currentName;

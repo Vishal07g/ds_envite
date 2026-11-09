@@ -186,14 +186,14 @@ export function generateRandomDraftConfig(eventType = 'wedding', baseConfig = DE
 
 const DEFAULT_CONFIG = {
   ...DEFAULT_TIMELINE_CONFIG,
-  brideName: "Suman",
+  brideName: "Bride",
   brideFamily: "",
-  groomName: "Vishal",
+  groomName: "Groom",
   groomFamily: "",
-  coverBrideText: "Suman",
-  coverGroomText: "Vishal",
-  envelopeNamesText: "Suman & Vishal",
-  envelopeInitials: "S & V",
+  coverBrideText: "Bride",
+  coverGroomText: "Groom",
+  envelopeNamesText: "Bride & Groom",
+  envelopeInitials: "B & G",
   weddingDate: "2026-11-20T16:00:00",
   introQuote: "Celebrating love, togetherness and everlasting happiness.",
   weddingVenue: "The Starlight Cathedral",
@@ -817,7 +817,7 @@ const INITIAL_PRESETS = [
 
 const INITIAL_USERS = [
   { id: "user-admin", username: "dsenviteadmin", password: "dsenvite1006", displayName: "Administrator", role: "admin" },
-  { id: "user-customer", username: "customer", password: "customer123", displayName: "Vishal & Suman", role: "customer" }
+  { id: "user-customer", username: "customer", password: "customer123", displayName: "Valued Customer", role: "customer" }
 ];
 
 const INITIAL_INVITATIONS = [
@@ -1645,72 +1645,52 @@ function getDb() {
     saveDb(db);
   }
 
-  // Guarantee customer user displayName is always Vishal & Suman
+  // Guarantee customer user displayName
   const custUser = db.users?.find(u => u.id === 'user-customer');
-  if (custUser) {
-    custUser.displayName = "Vishal & Suman";
+  if (custUser && !custUser.displayName) {
+    custUser.displayName = "Customer Account";
   }
 
-  // Guarantee BOTH customer Vishal & Suman paid invitations are always present and protected
-  const primarySumanDef = INITIAL_INVITATIONS[0];
+  // Guarantee BOTH paid invitations are always present and protected by immutable ID
+  const primaryPaidDef = INITIAL_INVITATIONS[0];
   const primaryIdx = db.invitations.findIndex(i => i.id === "invite-1792299417819");
   if (primaryIdx === -1) {
-    if (primarySumanDef) db.invitations.unshift(JSON.parse(JSON.stringify(primarySumanDef)));
+    if (primaryPaidDef) db.invitations.unshift(JSON.parse(JSON.stringify(primaryPaidDef)));
   } else {
     const curr = db.invitations[primaryIdx];
     curr.isPaid = true;
     curr.status = "published";
-    curr.title = "Vishal & Suman's Wedding Invitation";
-    curr.slug = "vishal-suman";
-    curr.customSlug = "vishal-suman";
     curr.customerId = "user-customer";
     if (!curr.config) curr.config = {};
-    curr.config.coupleCardsOrder = "groomFirst";
-    curr.config.weddingTitle = "Vishal & Suman";
-    curr.config.envelopeNamesText = "Vishal & Suman";
-    curr.config.envelopeInitials = "V & S";
-    curr.shareText = "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Vishal & Suman";
-    if (curr.driveStorage) {
-      curr.driveStorage.folderName = "Vishal & Suman (Snehalata Marriage Hall, Neamatpur, WB)";
-    }
     if (!curr.config?.ceremonies || curr.config.ceremonies.length < 5 || !curr.config.weddingVenue || curr.config.weddingVenue.includes("Starlight")) {
       db.invitations[primaryIdx] = {
-        ...JSON.parse(JSON.stringify(primarySumanDef)),
+        ...JSON.parse(JSON.stringify(primaryPaidDef)),
         id: curr.id,
         customerId: "user-customer",
         isPaid: true,
         status: "published",
-        wishes: (curr.wishes && curr.wishes.length > 0) ? curr.wishes : (primarySumanDef.wishes || []),
-        rsvps: (curr.rsvps && curr.rsvps.length > 0) ? curr.rsvps : (primarySumanDef.rsvps || [])
+        wishes: (curr.wishes && curr.wishes.length > 0) ? curr.wishes : (primaryPaidDef.wishes || []),
+        rsvps: (curr.rsvps && curr.rsvps.length > 0) ? curr.rsvps : (primaryPaidDef.rsvps || [])
       };
     } else {
       if (!curr.config.startingMusicUrl || curr.config.startingMusicUrl.includes("1ScEGe8HiEjdTdhbYh2R_6rTJMjHfsNu6")) {
-        curr.config.startingMusicUrl = primarySumanDef.config.startingMusicUrl;
+        curr.config.startingMusicUrl = primaryPaidDef.config.startingMusicUrl;
       }
       if (!curr.config.musicUrl) {
-        curr.config.musicUrl = primarySumanDef.config.musicUrl;
+        curr.config.musicUrl = primaryPaidDef.config.musicUrl;
       }
     }
   }
 
-  // Guarantee second paid Vishal & Suman invitation (invite-1792423053258) is always present and marked paid
-  const secondSumanDef = INITIAL_INVITATIONS[1];
+  // Guarantee second paid invitation (invite-1792423053258) is always present and marked paid
+  const secondPaidDef = INITIAL_INVITATIONS[1];
   const secondIdx = db.invitations.findIndex(i => i.id === "invite-1792423053258");
   if (secondIdx === -1) {
-    if (secondSumanDef) db.invitations.splice(1, 0, JSON.parse(JSON.stringify(secondSumanDef)));
+    if (secondPaidDef) db.invitations.splice(1, 0, JSON.parse(JSON.stringify(secondPaidDef)));
   } else {
     db.invitations[secondIdx].isPaid = true;
     db.invitations[secondIdx].status = "published";
-    db.invitations[secondIdx].title = "Vishal & Suman — Wedding Invitation";
-    db.invitations[secondIdx].slug = "vishal-suman-1792423053258";
-    db.invitations[secondIdx].customSlug = "vishal-suman-1792423053258";
     db.invitations[secondIdx].customerId = "user-customer";
-    if (!db.invitations[secondIdx].config) db.invitations[secondIdx].config = {};
-    db.invitations[secondIdx].config.coupleCardsOrder = "groomFirst";
-    db.invitations[secondIdx].config.weddingTitle = "Vishal & Suman";
-    db.invitations[secondIdx].config.envelopeNamesText = "Vishal & Suman";
-    db.invitations[secondIdx].config.envelopeInitials = "V 👑 S";
-    db.invitations[secondIdx].shareText = "We are thrilled to invite you to our wedding celebration! View our digital invitation here: {url} - Vishal & Suman";
   }
 
   return db;

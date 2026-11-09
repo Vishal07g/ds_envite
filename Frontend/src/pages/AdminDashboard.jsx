@@ -1072,6 +1072,7 @@ export default function AdminDashboard() {
   const [driveClientIdInput, setDriveClientIdInput] = useState(() => getDriveClientId());
   const [driveApiKeyInput, setDriveApiKeyInput] = useState(() => getDriveApiKey());
   const [hasStoredOAuth, setHasStoredOAuth] = useState(() => Boolean(getStoredOAuthToken()));
+  const [driveServiceStatus, setDriveServiceStatus] = useState(null);
   const [isSyncingAllDrive, setIsSyncingAllDrive] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
   const [isMigratingImages, setIsMigratingImages] = useState(false);
@@ -1084,6 +1085,10 @@ export default function AdminDashboard() {
     };
     window.addEventListener("db_synced", handleUpdate);
     window.addEventListener("drive_images_migrated", handleUpdate);
+    fetch("/api/drive-status")
+      .then((r) => r.json())
+      .then((d) => setDriveServiceStatus(d))
+      .catch(() => setDriveServiceStatus({ ok: false }));
     return () => {
       window.removeEventListener("db_synced", handleUpdate);
       window.removeEventListener("drive_images_migrated", handleUpdate);
@@ -1272,7 +1277,7 @@ export default function AdminDashboard() {
       title: 'Create / Sync Unique Google Drive Folder',
       message: `Enter Google Drive folder name for "${inv.title || 'this invitation'}" inside DS_Envite_DataCentre:`,
       defaultValue: currentName,
-      placeholder: 'e.g. Suman & Vishal (Neamatpur)',
+      placeholder: 'e.g. Couple Names (City)',
       confirmText: 'Create / Sync in Drive',
       onConfirm: async (customName) => {
         const folderName = (customName || "").trim() || currentName;
@@ -2892,6 +2897,55 @@ export default function AdminDashboard() {
                     </button>
                   </div>
                 </div>
+
+                {/* Direct Google Drive Native Service Sync Status */}
+                {driveServiceStatus?.canAddChildren ? (
+                  <div className="p-3 bg-emerald-950/40 border border-emerald-500/40 rounded-xl flex items-center space-x-3 text-xs text-emerald-300">
+                    <span className="text-base">🚀</span>
+                    <div>
+                      <strong>Native Google Drive Direct Sync: ACTIVE</strong>
+                      <p className="text-[11px] text-emerald-400/80">Folder &ldquo;DS_Envite_DataCentre&rdquo; has full write access. All uploads automatically create folders and sync permanently with zero webhooks.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3.5 bg-amber-950/40 border border-amber-500/40 rounded-xl text-xs space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-amber-300 font-bold">
+                        <span>⚡</span>
+                        <span>Zero-Webhook Google Drive Sync (Direct Cloud Sync)</span>
+                      </div>
+                      <a
+                        href="https://drive.google.com/drive/folders/1_pdrNFiXcOymZQEby52O3FbvImCU_SW8"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-amber-400 hover:text-amber-300 underline font-mono flex items-center space-x-1"
+                      >
+                        <span>Open DS_Envite_DataCentre ↗</span>
+                      </a>
+                    </div>
+                    <p className="text-slate-300 text-[11px] leading-relaxed">
+                      To enable seamless, permanent uploading directly into your Google Drive folder <strong>DS_Envite_DataCentre</strong> without any webhooks, share the folder with this Service Account:
+                    </p>
+                    <div className="flex items-center space-x-2 bg-slate-900/90 p-2 rounded-lg border border-slate-700">
+                      <code className="text-emerald-300 text-[11px] flex-1 truncate font-mono select-all">
+                        firebase-adminsdk-fbsvc@digital-invitation-e906f.iam.gserviceaccount.com
+                      </code>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText('firebase-adminsdk-fbsvc@digital-invitation-e906f.iam.gserviceaccount.com');
+                          showToast('Service account email copied to clipboard!', 'success');
+                        }}
+                        className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-[10px] rounded transition"
+                      >
+                        Copy Email
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Role: <strong>Editor</strong>. Once shared, every uploaded cover, video, gallery photo, and song will immediately create its invitation folder and sync forever.
+                    </p>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
