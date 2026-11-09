@@ -147,3 +147,8 @@ vite.config.ts.timestamp-*
 
 # Turbo Repo
 .turbo
+
+# Service Account credentials & private keys
+*sa-key*.json
+credentials*.json
+*.pem

@@ -155,6 +155,14 @@ export function formatWeddingTime(dateStr) {
 export function compressImage(file, maxWidth = 3840, maxHeight = 3840, quality = 0.98, preserveAlpha = true) {
   return new Promise((resolve, reject) => {
     if (!file) return resolve("");
+
+    if (typeof window === "undefined" || typeof Image === "undefined" || typeof document === "undefined") {
+      const reader = new FileReader();
+      reader.onload = (e) => resolve(e.target?.result || "");
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+      return;
+    }
     
     const reader = new FileReader();
     reader.readAsDataURL(file);
