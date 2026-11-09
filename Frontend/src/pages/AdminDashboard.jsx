@@ -1272,7 +1272,7 @@ export default function AdminDashboard() {
       title: 'Create / Sync Unique Google Drive Folder',
       message: `Enter Google Drive folder name for "${inv.title || 'this invitation'}" inside DS_Envite_DataCentre:`,
       defaultValue: currentName,
-      placeholder: 'e.g. Suman & Vishal (Neamatpur)',
+      placeholder: 'e.g. Couple Names (City)',
       confirmText: 'Create / Sync in Drive',
       onConfirm: async (customName) => {
         const folderName = (customName || "").trim() || currentName;

@@ -389,7 +389,7 @@ export default function ShareInviteModal({
                       type="text"
                       value={socialTitleInput}
                       onChange={(e) => setSocialTitleInput(e.target.value)}
-                      placeholder="e.g. Suman &amp; Vishal — Wedding Invitation"
+                      placeholder="e.g. Wedding Invitation"
                       className="w-full px-2.5 py-1.5 rounded-lg bg-slate-900 border border-amber-500/40 text-xs text-amber-100 focus:outline-none focus:border-amber-400"
                     />
                   </div>

@@ -792,7 +792,7 @@ export default function AdminSidebar({
       title: 'Rename Google Drive Folder',
       message: 'Enter the new directory name for this invitation inside DS_Envite_DataCentre:',
       defaultValue: currentName,
-      placeholder: 'e.g. Suman & Vishal Wedding',
+      placeholder: 'e.g. Royal Wedding Celebration',
       confirmText: 'Save & Rename',
       onConfirm: async (newName) => {
         const trimmed = (newName || '').trim();
